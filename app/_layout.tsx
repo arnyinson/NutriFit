@@ -13,6 +13,7 @@ export default function RootLayout() {
       <Stack.Screen name="progress/index" />
       <Stack.Screen name="achievements/index" />
       <Stack.Screen name="notifications/index" />
+      <Stack.Screen name="calendar/index" />
     </Stack>
   );
 }
