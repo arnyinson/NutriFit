@@ -85,7 +85,9 @@ export default function DashboardScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <View style={styles.avatar} />
+            <TouchableOpacity onPress={() => router.push("/profile" as any)}>
+              <View style={styles.avatar} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push("/calendar" as any)}>
               <Text style={styles.dateText}>{today} ▼</Text>
             </TouchableOpacity>
@@ -245,6 +247,7 @@ export default function DashboardScreen() {
           { name: "Stats", icon: "📊", route: "/progress" },
           { name: "Meal", icon: "🍽️", route: "/meal" },
           { name: "Exercise", icon: "💪", route: "/workout" },
+          { name: "Profile", icon: "👤", route: "/profile" },
         ].map((tab) => (
           <TouchableOpacity
             key={tab.name}
