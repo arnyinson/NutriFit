@@ -1,13 +1,14 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { useTheme } from "../../constants/theme";
 
 const weeklyMeals = [
   {
@@ -184,6 +185,7 @@ const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 export default function CalendarScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1),
@@ -248,32 +250,56 @@ export default function CalendarScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backBtn}>← Calendar</Text>
+          <Text style={[styles.backBtn, { color: colors.primary }]}>
+            ← Calendar
+          </Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Calendar */}
-        <View style={styles.calendarCard}>
+        {/* Calendar Card */}
+        <View
+          style={[
+            styles.calendarCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           {/* Month Navigation */}
           <View style={styles.monthRow}>
             <TouchableOpacity onPress={prevMonth}>
-              <Text style={styles.monthArrow}>‹</Text>
+              <Text style={[styles.monthArrow, { color: colors.primary }]}>
+                ‹
+              </Text>
             </TouchableOpacity>
-            <Text style={styles.monthTitle}>{monthName}</Text>
+            <Text style={[styles.monthTitle, { color: colors.text }]}>
+              {monthName}
+            </Text>
             <TouchableOpacity onPress={nextMonth}>
-              <Text style={styles.monthArrow}>›</Text>
+              <Text style={[styles.monthArrow, { color: colors.primary }]}>
+                ›
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Day Labels */}
           <View style={styles.dayLabels}>
             {DAYS.map((d, i) => (
-              <Text key={i} style={styles.dayLabel}>
+              <Text
+                key={i}
+                style={[styles.dayLabel, { color: colors.textMuted }]}
+              >
                 {d}
               </Text>
             ))}
@@ -289,8 +315,7 @@ export default function CalendarScreen() {
                   day === selectedDate && styles.dateCellSelected,
                   day !== null &&
                     isToday(day) &&
-                    day !== selectedDate &&
-                    styles.dateCellToday,
+                    day !== selectedDate && { backgroundColor: colors.input },
                 ]}
                 onPress={() => day !== null && setSelectedDate(day)}
                 disabled={day === null}
@@ -298,11 +323,11 @@ export default function CalendarScreen() {
                 <Text
                   style={[
                     styles.dateText,
+                    { color: colors.text },
                     day === selectedDate && styles.dateTextSelected,
                     day !== null &&
                       isToday(day) &&
-                      day !== selectedDate &&
-                      styles.dateTextToday,
+                      day !== selectedDate && { color: colors.primary },
                   ]}
                 >
                   {day ?? ""}
@@ -316,16 +341,24 @@ export default function CalendarScreen() {
         <View style={styles.mealsSection}>
           {selectedDayData ? (
             <>
-              <Text style={styles.dayHeader}>
+              <Text style={[styles.dayHeader, { color: colors.text }]}>
                 {getDateLabel()} — {selectedDayData.day}
               </Text>
-
               {selectedDayData.meals.map((meal, i) => (
                 <View
                   key={i}
-                  style={[styles.mealCard, meal.taken && styles.mealCardTaken]}
+                  style={[
+                    styles.mealCard,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                    meal.taken && styles.mealCardTaken,
+                  ]}
                 >
-                  <View style={styles.mealIcon}>
+                  <View
+                    style={[styles.mealIcon, { backgroundColor: colors.input }]}
+                  >
                     <Text style={styles.mealEmoji}>
                       {meal.type === "Breakfast"
                         ? "🌅"
@@ -335,8 +368,14 @@ export default function CalendarScreen() {
                     </Text>
                   </View>
                   <View style={styles.mealInfo}>
-                    <Text style={styles.mealType}>{meal.type}</Text>
-                    <Text style={styles.mealName}>{meal.name}</Text>
+                    <Text style={[styles.mealType, { color: colors.text }]}>
+                      {meal.type}
+                    </Text>
+                    <Text
+                      style={[styles.mealName, { color: colors.textMuted }]}
+                    >
+                      {meal.name}
+                    </Text>
                     <Text style={styles.mealCal}>~{meal.calories} kcal</Text>
                   </View>
                   {meal.taken && (
@@ -346,11 +385,11 @@ export default function CalendarScreen() {
                   )}
                 </View>
               ))}
-
-              {/* Total */}
-              <View style={styles.totalRow}>
+              <View
+                style={[styles.totalRow, { backgroundColor: colors.surface }]}
+              >
                 <Text style={styles.fireIcon}>🔥</Text>
-                <Text style={styles.totalText}>
+                <Text style={[styles.totalText, { color: colors.text }]}>
                   Total kcal |{" "}
                   {selectedDayData.meals
                     .reduce((s, m) => s + m.calories, 0)
@@ -362,8 +401,12 @@ export default function CalendarScreen() {
           ) : (
             <View style={styles.noPlanCard}>
               <Text style={styles.noPlanIcon}>📅</Text>
-              <Text style={styles.noPlanTitle}>No Plan Yet</Text>
-              <Text style={styles.noPlanSubtitle}>
+              <Text style={[styles.noPlanTitle, { color: colors.text }]}>
+                No Plan Yet
+              </Text>
+              <Text
+                style={[styles.noPlanSubtitle, { color: colors.textMuted }]}
+              >
                 No meal plan found for this date.
               </Text>
             </View>
@@ -377,23 +420,19 @@ export default function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#fff" },
+  safe: { flex: 1 },
   header: {
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
-  backBtn: { fontSize: 16, fontWeight: "600", color: "#4CAF50" },
-
+  backBtn: { fontSize: 16, fontWeight: "600" },
   calendarCard: {
     margin: 16,
-    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -405,18 +444,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  monthArrow: { fontSize: 28, color: "#4CAF50", paddingHorizontal: 8 },
-  monthTitle: { fontSize: 18, fontWeight: "700", color: "#111" },
-
+  monthArrow: { fontSize: 28, paddingHorizontal: 8 },
+  monthTitle: { fontSize: 18, fontWeight: "700" },
   dayLabels: { flexDirection: "row", marginBottom: 8 },
-  dayLabel: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#888",
-  },
-
+  dayLabel: { flex: 1, textAlign: "center", fontSize: 12, fontWeight: "600" },
   dateGrid: { flexDirection: "row", flexWrap: "wrap" },
   dateCell: {
     width: "14.28%",
@@ -426,19 +457,10 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   dateCellSelected: { backgroundColor: "#4CAF50" },
-  dateCellToday: { backgroundColor: "#E8F5E9" },
-  dateText: { fontSize: 14, color: "#333" },
+  dateText: { fontSize: 14 },
   dateTextSelected: { color: "#fff", fontWeight: "700" },
-  dateTextToday: { color: "#4CAF50", fontWeight: "700" },
-
   mealsSection: { paddingHorizontal: 16 },
-  dayHeader: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111",
-    marginBottom: 12,
-  },
-
+  dayHeader: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
   mealCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -446,23 +468,20 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
     marginBottom: 10,
-    backgroundColor: "#fafafa",
   },
-  mealCardTaken: { borderColor: "#4CAF50", backgroundColor: "#F1F8E9" },
+  mealCardTaken: { borderColor: "#4CAF50" },
   mealIcon: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: "#eee",
     justifyContent: "center",
     alignItems: "center",
   },
   mealEmoji: { fontSize: 20 },
   mealInfo: { flex: 1 },
-  mealType: { fontSize: 13, fontWeight: "700", color: "#111" },
-  mealName: { fontSize: 12, color: "#888", marginTop: 2 },
+  mealType: { fontSize: 13, fontWeight: "700" },
+  mealName: { fontSize: 12, marginTop: 2 },
   mealCal: { fontSize: 11, color: "#4CAF50", marginTop: 2 },
   takenBadge: {
     backgroundColor: "#4CAF50",
@@ -471,26 +490,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   takenText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-
   totalRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     padding: 12,
-    backgroundColor: "#f5f5f5",
     borderRadius: 12,
     marginTop: 4,
   },
   fireIcon: { fontSize: 16 },
-  totalText: { fontSize: 13, fontWeight: "600", color: "#333" },
-
+  totalText: { fontSize: 13, fontWeight: "600" },
   noPlanCard: { alignItems: "center", paddingVertical: 40 },
   noPlanIcon: { fontSize: 48, marginBottom: 12 },
-  noPlanTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#111",
-    marginBottom: 6,
-  },
-  noPlanSubtitle: { fontSize: 13, color: "#888" },
+  noPlanTitle: { fontSize: 18, fontWeight: "700", marginBottom: 6 },
+  noPlanSubtitle: { fontSize: 13 },
 });

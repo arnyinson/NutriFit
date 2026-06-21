@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../constants/theme";
 
 type UserProfile = {
   name: string;
@@ -28,6 +29,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [showEditModal, setShowEditModal] = useState(false);
   const [activeWeightTab, setActiveWeightTab] = useState("1M");
+  const { isDark, toggleTheme, colors } = useTheme();
 
   const [profile, setProfile] = useState<UserProfile>({
     name: "David Johnson",
@@ -120,20 +122,23 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backBtn}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity
-            onPress={() => router.push("/notifications" as any)}
-          >
-            <Text style={styles.notifIcon}>🔔</Text>
-          </TouchableOpacity>
-        </View>
+<View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+  <TouchableOpacity onPress={() => router.back()}>
+    <Text style={[styles.backBtn, { color: colors.primary }]}>←</Text>
+  </TouchableOpacity>
+  <Text style={[styles.headerTitle, { color: colors.text }]}>Profile</Text>
+  <View style={styles.headerRight}>
+    <TouchableOpacity onPress={toggleTheme}>
+      <Text style={styles.notifIcon}>{isDark ? '☀️' : '🌙'}</Text>
+    </TouchableOpacity>
+    <TouchableOpacity onPress={() => router.push("/notifications" as any)}>
+      <Text style={styles.notifIcon}>🔔</Text>
+    </TouchableOpacity>
+  </View>
+</View>
 
         {/* Avatar + Name */}
         <View style={styles.avatarSection}>
@@ -146,28 +151,55 @@ export default function ProfileScreen() {
                   .join("")}
               </Text>
             </View>
-            <TouchableOpacity style={styles.cameraBtn}>
+            <TouchableOpacity
+              style={[
+                styles.cameraBtn,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
               <Text style={styles.cameraIcon}>📷</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.profileName}>{profile.name}</Text>
-          <Text style={styles.profileEmail}>{profile.email}</Text>
+          <Text style={[styles.profileName, { color: colors.text }]}>
+            {profile.name}
+          </Text>
+          <Text style={[styles.profileEmail, { color: colors.textMuted }]}>
+            {profile.email}
+          </Text>
         </View>
 
         {/* BMI + TDEE Cards */}
         <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{bmi}</Text>
-            <Text style={styles.statLabel}>BMI</Text>
+          <View
+            style={[
+              styles.statCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.statValue, { color: colors.text }]}>
+              {bmi}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+              BMI
+            </Text>
             <View
               style={[styles.statBadge, { backgroundColor: bmiCategory.color }]}
             >
               <Text style={styles.statBadgeText}>{bmiCategory.label}</Text>
             </View>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{tdee}</Text>
-            <Text style={styles.statLabel}>TDEE (kcal)</Text>
+          <View
+            style={[
+              styles.statCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.statValue, { color: colors.text }]}>
+              {tdee}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+              TDEE (kcal)
+            </Text>
             <View style={[styles.statBadge, { backgroundColor: "#4CAF50" }]}>
               <Text style={styles.statBadgeText}>{profile.dietaryGoal}</Text>
             </View>
@@ -175,10 +207,17 @@ export default function ProfileScreen() {
         </View>
 
         {/* Personal Info */}
-        <View style={styles.section}>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionIcon}>👤</Text>
-            <Text style={styles.sectionTitle}>Personal Info</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Personal Info
+            </Text>
           </View>
           {[
             { icon: "📅", label: "Birthday", value: profile.birthday },
@@ -192,17 +231,26 @@ export default function ProfileScreen() {
               value: profile.activityLevel,
             },
           ].map((item, i) => (
-            <View key={i} style={styles.infoRow}>
+            <View
+              key={i}
+              style={[styles.infoRow, { borderBottomColor: colors.border }]}
+            >
               <Text style={styles.infoIcon}>{item.icon}</Text>
-              <Text style={styles.infoLabel}>{item.label}</Text>
-              <Text style={styles.infoValue}>{item.value}</Text>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
+                {item.label}
+              </Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>
+                {item.value}
+              </Text>
             </View>
           ))}
 
           {/* Allergens */}
           <View style={styles.allergenRow}>
             <Text style={styles.infoIcon}>⚠️</Text>
-            <Text style={styles.infoLabel}>Allergens</Text>
+            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
+              Allergens
+            </Text>
             <View style={styles.allergenChips}>
               {profile.allergens.length > 0 ? (
                 profile.allergens.map((a) => (
@@ -211,7 +259,9 @@ export default function ProfileScreen() {
                   </View>
                 ))
               ) : (
-                <Text style={styles.noAllergen}>None</Text>
+                <Text style={[styles.noAllergen, { color: colors.textMuted }]}>
+                  None
+                </Text>
               )}
             </View>
           </View>
@@ -228,9 +278,16 @@ export default function ProfileScreen() {
         </View>
 
         {/* Weight Graph */}
-        <View style={styles.section}>
-          <Text style={styles.weightTitle}>Current Weight</Text>
-          <Text style={styles.weightSub}>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.weightTitle, { color: colors.text }]}>
+            Current Weight
+          </Text>
+          <Text style={[styles.weightSub, { color: colors.textMuted }]}>
             {weightInKg} kg • Updated 3 days ago
           </Text>
 
@@ -245,7 +302,11 @@ export default function ProfileScreen() {
                   <View key={i} style={styles.graphBarWrapper}>
                     <Text style={styles.graphValue}>{point.value}</Text>
                     <View style={[styles.graphDot, { marginBottom: height }]} />
-                    <Text style={styles.graphLabel}>{point.label}</Text>
+                    <Text
+                      style={[styles.graphLabel, { color: colors.textMuted }]}
+                    >
+                      {point.label}
+                    </Text>
                   </View>
                 );
               })}
@@ -262,6 +323,7 @@ export default function ProfileScreen() {
                 key={tab}
                 style={[
                   styles.weightTab,
+                  { backgroundColor: colors.input },
                   activeWeightTab === tab && styles.weightTabActive,
                 ]}
                 onPress={() => setActiveWeightTab(tab)}
@@ -269,6 +331,7 @@ export default function ProfileScreen() {
                 <Text
                   style={[
                     styles.weightTabText,
+                    { color: colors.textMuted },
                     activeWeightTab === tab && styles.weightTabTextActive,
                   ]}
                 >
@@ -296,9 +359,26 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Ticket / Feedback */}
+        <TouchableOpacity
+          style={[
+            styles.ticketBtn,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+          onPress={() => router.push("/ticket" as any)}
+        >
+          <Text style={styles.ticketIcon}>🎫</Text>
+          <Text style={[styles.ticketText, { color: colors.text }]}>
+            Submit Feedback / Support
+          </Text>
+          <Text style={[styles.ticketArrow, { color: colors.textMuted }]}>
+            ›
+          </Text>
+        </TouchableOpacity>
+
         {/* Logout */}
         <TouchableOpacity
-          style={styles.logoutBtn}
+          style={[styles.logoutBtn, { borderColor: colors.border }]}
           onPress={() =>
             Alert.alert("Logout", "Are you sure you want to logout?", [
               { text: "Cancel", style: "cancel" },
@@ -319,40 +399,78 @@ export default function ProfileScreen() {
       {/* Edit Profile Modal */}
       <Modal visible={showEditModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Edit Profile</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  Edit Profile
+                </Text>
                 <TouchableOpacity onPress={() => setShowEditModal(false)}>
-                  <Text style={styles.modalClose}>✕</Text>
+                  <Text
+                    style={[styles.modalClose, { color: colors.textMuted }]}
+                  >
+                    ✕
+                  </Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.inputLabel}>Full Name</Text>
+              <Text
+                style={[styles.inputLabel, { color: colors.textSecondary }]}
+              >
+                Full Name
+              </Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                    color: colors.text,
+                  },
+                ]}
                 value={editForm.name}
                 onChangeText={(v) => setEditForm((p) => ({ ...p, name: v }))}
                 placeholder="Full Name"
+                placeholderTextColor={colors.textMuted}
               />
 
-              <Text style={styles.inputLabel}>Birthday</Text>
+              <Text
+                style={[styles.inputLabel, { color: colors.textSecondary }]}
+              >
+                Birthday
+              </Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                    color: colors.text,
+                  },
+                ]}
                 value={editForm.birthday}
                 onChangeText={(v) =>
                   setEditForm((p) => ({ ...p, birthday: v }))
                 }
                 placeholder="MM/DD/YYYY"
+                placeholderTextColor={colors.textMuted}
               />
 
-              <Text style={styles.inputLabel}>Sex</Text>
+              <Text
+                style={[styles.inputLabel, { color: colors.textSecondary }]}
+              >
+                Sex
+              </Text>
               <View style={styles.sexRow}>
                 {["Male", "Female"].map((s) => (
                   <TouchableOpacity
                     key={s}
                     style={[
                       styles.sexBtn,
+                      {
+                        borderColor: colors.inputBorder,
+                        backgroundColor: colors.input,
+                      },
                       editForm.sex === s &&
                         (s === "Male"
                           ? styles.sexBtnMale
@@ -363,6 +481,7 @@ export default function ProfileScreen() {
                     <Text
                       style={[
                         styles.sexBtnText,
+                        { color: colors.textSecondary },
                         editForm.sex === s && styles.sexBtnTextActive,
                       ]}
                     >
@@ -372,30 +491,62 @@ export default function ProfileScreen() {
                 ))}
               </View>
 
-              <Text style={styles.inputLabel}>Height</Text>
+              <Text
+                style={[styles.inputLabel, { color: colors.textSecondary }]}
+              >
+                Height
+              </Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                    color: colors.text,
+                  },
+                ]}
                 value={editForm.height}
                 onChangeText={(v) => setEditForm((p) => ({ ...p, height: v }))}
                 placeholder="e.g. 5'7 ft"
+                placeholderTextColor={colors.textMuted}
               />
 
-              <Text style={styles.inputLabel}>Weight (kg)</Text>
+              <Text
+                style={[styles.inputLabel, { color: colors.textSecondary }]}
+              >
+                Weight (kg)
+              </Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                    color: colors.text,
+                  },
+                ]}
                 value={editForm.weight}
                 onChangeText={(v) => setEditForm((p) => ({ ...p, weight: v }))}
                 placeholder="e.g. 69.39 kg"
                 keyboardType="numeric"
+                placeholderTextColor={colors.textMuted}
               />
 
-              <Text style={styles.inputLabel}>Dietary Goal</Text>
+              <Text
+                style={[styles.inputLabel, { color: colors.textSecondary }]}
+              >
+                Dietary Goal
+              </Text>
               <View style={styles.chipRow}>
                 {["Maintenance", "Cutting", "Bulking"].map((goal) => (
                   <TouchableOpacity
                     key={goal}
                     style={[
                       styles.chip,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                      },
                       editForm.dietaryGoal === goal && styles.chipActive,
                     ]}
                     onPress={() =>
@@ -405,6 +556,7 @@ export default function ProfileScreen() {
                     <Text
                       style={[
                         styles.chipText,
+                        { color: colors.textSecondary },
                         editForm.dietaryGoal === goal && styles.chipTextActive,
                       ]}
                     >
@@ -414,7 +566,11 @@ export default function ProfileScreen() {
                 ))}
               </View>
 
-              <Text style={styles.inputLabel}>Activity Level</Text>
+              <Text
+                style={[styles.inputLabel, { color: colors.textSecondary }]}
+              >
+                Activity Level
+              </Text>
               {[
                 "Lightly Active (1-2 days per week)",
                 "Moderate Active (3-4 days per week)",
@@ -424,6 +580,10 @@ export default function ProfileScreen() {
                   key={level}
                   style={[
                     styles.optionBtn,
+                    {
+                      backgroundColor: colors.input,
+                      borderColor: colors.inputBorder,
+                    },
                     editForm.activityLevel === level && styles.optionBtnActive,
                   ]}
                   onPress={() =>
@@ -433,17 +593,29 @@ export default function ProfileScreen() {
                   <Text style={styles.optionCheck}>
                     {editForm.activityLevel === level ? "✓ " : "   "}
                   </Text>
-                  <Text style={styles.optionText}>{level}</Text>
+                  <Text
+                    style={[styles.optionText, { color: colors.textSecondary }]}
+                  >
+                    {level}
+                  </Text>
                 </TouchableOpacity>
               ))}
 
-              <Text style={styles.inputLabel}>Allergens</Text>
+              <Text
+                style={[styles.inputLabel, { color: colors.textSecondary }]}
+              >
+                Allergens
+              </Text>
               <View style={styles.chipRow}>
                 {allergenList.map((item) => (
                   <TouchableOpacity
                     key={item}
                     style={[
                       styles.chip,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                      },
                       editForm.allergens.includes(item) && styles.chipActive,
                     ]}
                     onPress={() => toggleAllergen(item)}
@@ -451,6 +623,7 @@ export default function ProfileScreen() {
                     <Text
                       style={[
                         styles.chipText,
+                        { color: colors.textSecondary },
                         editForm.allergens.includes(item) &&
                           styles.chipTextActive,
                       ]}
@@ -475,8 +648,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#fff" },
-
+  safe: { flex: 1 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -485,12 +657,11 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
-  backBtn: { fontSize: 22, color: "#4CAF50", fontWeight: "bold" },
-  headerTitle: { fontSize: 18, fontWeight: "bold", color: "#111" },
+  backBtn: { fontSize: 22, fontWeight: "bold" },
+  headerTitle: { fontSize: 18, fontWeight: "bold" },
   notifIcon: { fontSize: 22 },
-
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatarSection: { alignItems: "center", paddingVertical: 24 },
   avatarContainer: { position: "relative", marginBottom: 12 },
   avatar: {
@@ -509,16 +680,13 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#ddd",
   },
   cameraIcon: { fontSize: 14 },
-  profileName: { fontSize: 20, fontWeight: "bold", color: "#111" },
-  profileEmail: { fontSize: 13, color: "#888", marginTop: 4 },
-
+  profileName: { fontSize: 20, fontWeight: "bold" },
+  profileEmail: { fontSize: 13, marginTop: 4 },
   statsRow: {
     flexDirection: "row",
     gap: 12,
@@ -527,26 +695,21 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: "#fafafa",
     borderRadius: 16,
     padding: 16,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#f0f0f0",
   },
-  statValue: { fontSize: 24, fontWeight: "bold", color: "#111" },
-  statLabel: { fontSize: 12, color: "#888", marginTop: 2, marginBottom: 8 },
+  statValue: { fontSize: 24, fontWeight: "bold" },
+  statLabel: { fontSize: 12, marginTop: 2, marginBottom: 8 },
   statBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
-
   section: {
     marginHorizontal: 20,
     marginBottom: 16,
-    backgroundColor: "#fafafa",
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
   },
   sectionHeader: {
     flexDirection: "row",
@@ -555,19 +718,16 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   sectionIcon: { fontSize: 18 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#111" },
-
+  sectionTitle: { fontSize: 16, fontWeight: "700" },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f5f5f5",
   },
   infoIcon: { fontSize: 16, width: 28 },
-  infoLabel: { flex: 1, fontSize: 14, color: "#555" },
-  infoValue: { fontSize: 14, fontWeight: "600", color: "#111" },
-
+  infoLabel: { flex: 1, fontSize: 14 },
+  infoValue: { fontSize: 14, fontWeight: "600" },
   allergenRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -582,8 +742,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   allergenChipText: { color: "#fff", fontSize: 11, fontWeight: "600" },
-  noAllergen: { fontSize: 13, color: "#888" },
-
+  noAllergen: { fontSize: 13 },
   editBtn: {
     backgroundColor: "#4CAF50",
     padding: 12,
@@ -592,15 +751,8 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   editBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
-
-  weightTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111",
-    marginBottom: 4,
-  },
-  weightSub: { fontSize: 12, color: "#888", marginBottom: 16 },
-
+  weightTitle: { fontSize: 16, fontWeight: "700", marginBottom: 4 },
+  weightSub: { fontSize: 12, marginBottom: 16 },
   graphContainer: { marginBottom: 12 },
   graph: {
     flexDirection: "row",
@@ -616,23 +768,56 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "#4CAF50",
   },
-  graphLabel: { fontSize: 9, color: "#888", marginTop: 4 },
-
+  graphLabel: { fontSize: 9, marginTop: 4 },
   weightTabs: { marginBottom: 12 },
   weightTab: {
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
     marginRight: 8,
-    backgroundColor: "#f5f5f5",
   },
   weightTabActive: { backgroundColor: "#4CAF50" },
-  weightTabText: { fontSize: 12, color: "#888", fontWeight: "600" },
+  weightTabText: { fontSize: 12, fontWeight: "600" },
   weightTabTextActive: { color: "#fff" },
-
   weightChangeBadge: { padding: 10, borderRadius: 12, alignItems: "center" },
   weightChangeText: { fontSize: 13, fontWeight: "700" },
-
+  ticketBtn: {
+    marginHorizontal: 20,
+    marginBottom: 8,
+    padding: 14,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+  },
+  ticketIcon: { fontSize: 20 },
+  ticketText: { flex: 1, fontSize: 14, fontWeight: "600" },
+  ticketArrow: { fontSize: 22 },
+  darkModeBtn: {
+    marginHorizontal: 20,
+    marginBottom: 8,
+    padding: 14,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+  },
+  darkModeIcon: { fontSize: 20 },
+  darkModeText: { flex: 1, fontSize: 14, fontWeight: "600" },
+  toggleSwitch: {
+    width: 42,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+  },
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+  },
   logoutBtn: {
     marginHorizontal: 20,
     marginBottom: 8,
@@ -640,17 +825,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#ddd",
   },
   logoutText: { color: "#F44336", fontWeight: "bold", fontSize: 15 },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -662,68 +844,56 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: "bold", color: "#111" },
-  modalClose: { fontSize: 20, color: "#999", padding: 4 },
-
+  modalTitle: { fontSize: 18, fontWeight: "bold" },
+  modalClose: { fontSize: 20, padding: 4 },
   inputLabel: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#555",
     marginBottom: 6,
     marginTop: 12,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 12,
     padding: 12,
     fontSize: 14,
     marginBottom: 4,
   },
-
   sexRow: { flexDirection: "row", gap: 8, marginBottom: 4 },
   sexBtn: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ddd",
     alignItems: "center",
   },
   sexBtnMale: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
   sexBtnFemale: { backgroundColor: "#E91E8C", borderColor: "#E91E8C" },
-  sexBtnText: { fontWeight: "600", color: "#555" },
+  sexBtnText: { fontWeight: "600" },
   sexBtnTextActive: { color: "#fff" },
-
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 4 },
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#ddd",
-    backgroundColor: "#fafafa",
   },
   chipActive: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
-  chipText: { fontSize: 13, color: "#555" },
+  chipText: { fontSize: 13 },
   chipTextActive: { color: "#fff", fontWeight: "600" },
-
   optionBtn: {
     flexDirection: "row",
     alignItems: "center",
     width: "100%",
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 12,
     marginBottom: 8,
-    backgroundColor: "#fafafa",
   },
   optionBtnActive: { borderColor: "#4CAF50", backgroundColor: "#f0faf0" },
   optionCheck: { fontSize: 14, color: "#4CAF50", width: 20 },
-  optionText: { fontSize: 13, color: "#444", flex: 1 },
-
+  optionText: { fontSize: 13, flex: 1 },
   saveBtn: {
     backgroundColor: "#4CAF50",
     padding: 14,

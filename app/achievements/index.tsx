@@ -1,9 +1,17 @@
-import { useState } from 'react';
+import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, SafeAreaView, Modal, Alert, Share
-} from 'react-native';
-import { useRouter } from 'expo-router';
+  Alert,
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useTheme } from "../../constants/theme";
 
 type Achievement = {
   id: string;
@@ -12,146 +20,327 @@ type Achievement = {
   xp: number;
   unlocked: boolean;
   icon: string;
-  category: 'Nutrition' | 'Workout' | 'Goals';
+  category: "Nutrition" | "Workout" | "Goals";
 };
 
 const achievements: Achievement[] = [
-  // Nutrition
-  { id: 'a1', title: 'First Healthy Meal', description: 'Logged your first nutritious meal', xp: 50, unlocked: true, icon: '🥗', category: 'Nutrition' },
-  { id: 'a2', title: 'Food Tracker', description: 'Logged all meals in one day', xp: 70, unlocked: true, icon: '📋', category: 'Nutrition' },
-  { id: 'a3', title: 'Healthy Choice', description: 'Selected a recommended meal', xp: 50, unlocked: true, icon: '✅', category: 'Nutrition' },
-  { id: 'a4', title: 'Meal Logger', description: 'Logged meals for 3 days', xp: 100, unlocked: true, icon: '📝', category: 'Nutrition' },
-  { id: 'a5', title: 'Food Explorer', description: 'Logged 10 different meals', xp: 150, unlocked: false, icon: '🍱', category: 'Nutrition' },
-  { id: 'a6', title: 'Nutrition Recorder', description: 'Logged meals for 30 days', xp: 300, unlocked: false, icon: '🏅', category: 'Nutrition' },
-  // Workout
-  { id: 'a7', title: 'First Workout', description: 'Completed your first workout', xp: 50, unlocked: true, icon: '💪', category: 'Workout' },
-  { id: 'a8', title: 'Consistency King', description: 'Worked out 3 days in a row', xp: 100, unlocked: true, icon: '👑', category: 'Workout' },
-  { id: 'a9', title: 'Sweat Session', description: 'Logged 5 full workouts', xp: 120, unlocked: false, icon: '🏋️', category: 'Workout' },
-  { id: 'a10', title: 'Iron Will', description: 'Completed 10 workouts', xp: 200, unlocked: false, icon: '🔥', category: 'Workout' },
-  { id: 'a11', title: 'No Days Off', description: 'Worked out 7 days in a row', xp: 250, unlocked: false, icon: '⚡', category: 'Workout' },
-  // Goals
-  { id: 'a12', title: 'Goal Setter', description: 'Set your first dietary goal', xp: 30, unlocked: true, icon: '🎯', category: 'Goals' },
-  { id: 'a13', title: 'On Track', description: 'Met calorie goal for 3 days', xp: 80, unlocked: true, icon: '📊', category: 'Goals' },
-  { id: 'a14', title: 'Weight Watcher', description: 'Lost 1kg toward your goal', xp: 150, unlocked: false, icon: '⚖️', category: 'Goals' },
-  { id: 'a15', title: 'Halfway There', description: 'Reached 50% of weight goal', xp: 200, unlocked: false, icon: '🌟', category: 'Goals' },
-  { id: 'a16', title: 'Goal Crusher', description: 'Reached your target weight', xp: 500, unlocked: false, icon: '🏆', category: 'Goals' },
+  {
+    id: "a1",
+    title: "First Healthy Meal",
+    description: "Logged your first nutritious meal",
+    xp: 50,
+    unlocked: true,
+    icon: "🥗",
+    category: "Nutrition",
+  },
+  {
+    id: "a2",
+    title: "Food Tracker",
+    description: "Logged all meals in one day",
+    xp: 70,
+    unlocked: true,
+    icon: "📋",
+    category: "Nutrition",
+  },
+  {
+    id: "a3",
+    title: "Healthy Choice",
+    description: "Selected a recommended meal",
+    xp: 50,
+    unlocked: true,
+    icon: "✅",
+    category: "Nutrition",
+  },
+  {
+    id: "a4",
+    title: "Meal Logger",
+    description: "Logged meals for 3 days",
+    xp: 100,
+    unlocked: true,
+    icon: "📝",
+    category: "Nutrition",
+  },
+  {
+    id: "a5",
+    title: "Food Explorer",
+    description: "Logged 10 different meals",
+    xp: 150,
+    unlocked: false,
+    icon: "🍱",
+    category: "Nutrition",
+  },
+  {
+    id: "a6",
+    title: "Nutrition Recorder",
+    description: "Logged meals for 30 days",
+    xp: 300,
+    unlocked: false,
+    icon: "🏅",
+    category: "Nutrition",
+  },
+  {
+    id: "a7",
+    title: "First Workout",
+    description: "Completed your first workout",
+    xp: 50,
+    unlocked: true,
+    icon: "💪",
+    category: "Workout",
+  },
+  {
+    id: "a8",
+    title: "Consistency King",
+    description: "Worked out 3 days in a row",
+    xp: 100,
+    unlocked: true,
+    icon: "👑",
+    category: "Workout",
+  },
+  {
+    id: "a9",
+    title: "Sweat Session",
+    description: "Logged 5 full workouts",
+    xp: 120,
+    unlocked: false,
+    icon: "🏋️",
+    category: "Workout",
+  },
+  {
+    id: "a10",
+    title: "Iron Will",
+    description: "Completed 10 workouts",
+    xp: 200,
+    unlocked: false,
+    icon: "🔥",
+    category: "Workout",
+  },
+  {
+    id: "a11",
+    title: "No Days Off",
+    description: "Worked out 7 days in a row",
+    xp: 250,
+    unlocked: false,
+    icon: "⚡",
+    category: "Workout",
+  },
+  {
+    id: "a12",
+    title: "Goal Setter",
+    description: "Set your first dietary goal",
+    xp: 30,
+    unlocked: true,
+    icon: "🎯",
+    category: "Goals",
+  },
+  {
+    id: "a13",
+    title: "On Track",
+    description: "Met calorie goal for 3 days",
+    xp: 80,
+    unlocked: true,
+    icon: "📊",
+    category: "Goals",
+  },
+  {
+    id: "a14",
+    title: "Weight Watcher",
+    description: "Lost 1kg toward your goal",
+    xp: 150,
+    unlocked: false,
+    icon: "⚖️",
+    category: "Goals",
+  },
+  {
+    id: "a15",
+    title: "Halfway There",
+    description: "Reached 50% of weight goal",
+    xp: 200,
+    unlocked: false,
+    icon: "🌟",
+    category: "Goals",
+  },
+  {
+    id: "a16",
+    title: "Goal Crusher",
+    description: "Reached your target weight",
+    xp: 500,
+    unlocked: false,
+    icon: "🏆",
+    category: "Goals",
+  },
 ];
 
 export default function AchievementsScreen() {
   const router = useRouter();
-  const [activeCategory, setActiveCategory] = useState<'Nutrition' | 'Workout' | 'Goals'>('Nutrition');
-  const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
+  const { colors } = useTheme();
+  const [activeCategory, setActiveCategory] = useState<
+    "Nutrition" | "Workout" | "Goals"
+  >("Nutrition");
+  const [selectedAchievement, setSelectedAchievement] =
+    useState<Achievement | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
-  const totalXP = achievements.filter(a => a.unlocked).reduce((sum, a) => sum + a.xp, 0);
+  const totalXP = achievements
+    .filter((a) => a.unlocked)
+    .reduce((sum, a) => sum + a.xp, 0);
   const currentLevel = Math.floor(totalXP / 200) + 1;
-  const nextLevelXP = currentLevel * 200;
   const progressToNext = ((totalXP % 200) / 200) * 100;
-
-  const unlockedCount = achievements.filter(a => a.unlocked).length;
+  const unlockedCount = achievements.filter((a) => a.unlocked).length;
   const totalCount = achievements.length;
 
   const weightLost = 1.2;
   const mealsTaken = 21;
   const caloriesBurned = 4850;
 
-  const filteredAchievements = achievements.filter(a => a.category === activeCategory);
+  const filteredAchievements = achievements.filter(
+    (a) => a.category === activeCategory,
+  );
 
   const handleShare = async (achievement: Achievement) => {
     try {
       await Share.share({
-        message: `🏆 I just unlocked "${achievement.title}" on NutriFit! ${achievement.icon}\n\n${achievement.description}\n\n+${achievement.xp} XP earned! 💪\n\n#NutriFit #FitnessGoals #HealthyLiving`,
+        message: `🏆 I just unlocked "${achievement.title}" on NutriFit! ${achievement.icon}\n\n${achievement.description}\n\n+${achievement.xp} XP earned! 💪\n\n#NutriFit #FitnessGoals`,
       });
     } catch (error) {
-      Alert.alert('Error', 'Could not share achievement.');
+      Alert.alert("Error", "Could not share achievement.");
     }
   };
 
   const handleShareProgress = async () => {
     try {
       await Share.share({
-        message: `💪 My NutriFit Progress Update!\n\n📉 Weight Lost: ${weightLost} kg\n🍽️ Meals Taken: ${mealsTaken}/21\n🔥 Calories Burned: ${caloriesBurned.toLocaleString()}\n⭐ Total XP: ${totalXP}\n🏅 Level: ${currentLevel}\n\n#NutriFit #FitnessJourney #HealthyLiving`,
+        message: `💪 My NutriFit Progress!\n\n📉 Weight Lost: ${weightLost} kg\n🍽️ Meals Taken: ${mealsTaken}/21\n🔥 Calories Burned: ${caloriesBurned.toLocaleString()}\n⭐ Total XP: ${totalXP}\n🏅 Level: ${currentLevel}\n\n#NutriFit #FitnessJourney`,
       });
     } catch (error) {
-      Alert.alert('Error', 'Could not share progress.');
+      Alert.alert("Error", "Could not share progress.");
     }
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backBtn}>←</Text>
+          <Text style={[styles.backBtn, { color: colors.primary }]}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Achievements</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Achievements
+        </Text>
         <View style={{ width: 30 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-
         {/* Level + XP Card */}
-        <View style={styles.levelCard}>
+        <View
+          style={[
+            styles.levelCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.levelRow}>
             <View style={styles.levelBadge}>
               <Text style={styles.levelText}>Lv.{currentLevel}</Text>
             </View>
             <View style={styles.levelInfo}>
-              <Text style={styles.levelTitle}>Explorer</Text>
-              <Text style={styles.levelSubtitle}>+100 exp to Lv. {currentLevel + 1}</Text>
+              <Text style={[styles.levelTitle, { color: colors.text }]}>
+                Explorer
+              </Text>
+              <Text style={[styles.levelSubtitle, { color: colors.textMuted }]}>
+                +100 exp to Lv. {currentLevel + 1}
+              </Text>
             </View>
-            <Text style={styles.totalXP}>{totalXP} XP</Text>
+            <Text style={[styles.totalXP, { color: colors.primary }]}>
+              {totalXP} XP
+            </Text>
           </View>
-          <View style={styles.xpBar}>
+          <View style={[styles.xpBar, { backgroundColor: colors.border }]}>
             <View style={[styles.xpFill, { width: `${progressToNext}%` }]} />
           </View>
-          <Text style={styles.xpProgress}>{totalXP % 200} / 200 XP to next level</Text>
+          <Text style={[styles.xpProgress, { color: colors.textMuted }]}>
+            {totalXP % 200} / 200 XP to next level
+          </Text>
         </View>
 
         {/* Stats Summary */}
-        <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>Great job! Small changes every day lead to big results.</Text>
+        <View
+          style={[
+            styles.statsCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.statsTitle, { color: colors.textSecondary }]}>
+            Great job! Small changes every day lead to big results.
+          </Text>
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>-{weightLost} kg</Text>
-              <Text style={styles.statLabel}>Weight Lost</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                -{weightLost} kg
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                Weight Lost
+              </Text>
             </View>
-            <View style={styles.statDivider} />
+            <View
+              style={[styles.statDivider, { backgroundColor: colors.border }]}
+            />
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{mealsTaken}/21</Text>
-              <Text style={styles.statLabel}>Meal Taken</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {mealsTaken}/21
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                Meal Taken
+              </Text>
             </View>
-            <View style={styles.statDivider} />
+            <View
+              style={[styles.statDivider, { backgroundColor: colors.border }]}
+            />
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{caloriesBurned.toLocaleString()}</Text>
-              <Text style={styles.statLabel}>Cal. Burned</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {caloriesBurned.toLocaleString()}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                Cal. Burned
+              </Text>
             </View>
           </View>
 
-          {/* Recently Unlocked */}
-          <View style={styles.recentUnlock}>
+          <View
+            style={[styles.recentUnlock, { backgroundColor: colors.input }]}
+          >
             <Text style={styles.recentIcon}>🏆</Text>
             <View style={styles.recentInfo}>
               <Text style={styles.recentTitle}>Achievement Unlocked!</Text>
-              <Text style={styles.recentName}>First Weekly Meal</Text>
+              <Text style={[styles.recentName, { color: colors.text }]}>
+                First Weekly Meal
+              </Text>
             </View>
           </View>
 
-          {/* Share Progress */}
-          <TouchableOpacity style={styles.shareProgressBtn} onPress={() => setShowShareModal(true)}>
-            <Text style={styles.shareProgressIcon}>＜ Share My Progress</Text>
+          <TouchableOpacity
+            style={styles.shareProgressBtn}
+            onPress={() => setShowShareModal(true)}
+          >
+            <Text style={[styles.shareProgressIcon, { color: colors.primary }]}>
+              ＜ Share My Progress
+            </Text>
           </TouchableOpacity>
           <View style={styles.socialRow}>
-            {['Facebook', 'Google', 'Twitter', 'Instagram', 'TikTok'].map((platform, i) => (
+            {["📘", "🔴", "🐦", "📸", "🎵"].map((icon, i) => (
               <TouchableOpacity
-                key={platform}
-                style={styles.socialBtn}
+                key={i}
+                style={[styles.socialBtn, { backgroundColor: colors.input }]}
                 onPress={handleShareProgress}
               >
-                <Text style={styles.socialIcon}>
-                  {['📘', '🔴', '🐦', '📸', '🎵'][i]}
-                </Text>
+                <Text style={styles.socialIcon}>{icon}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -159,23 +348,39 @@ export default function AchievementsScreen() {
 
         {/* Achievement Progress */}
         <View style={styles.progressSummary}>
-          <Text style={styles.progressText}>
+          <Text style={[styles.progressText, { color: colors.textSecondary }]}>
             {unlockedCount}/{totalCount} Achievements Unlocked
           </Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${(unlockedCount / totalCount) * 100}%` }]} />
+          <View
+            style={[styles.progressBar, { backgroundColor: colors.border }]}
+          >
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${(unlockedCount / totalCount) * 100}%` },
+              ]}
+            />
           </View>
         </View>
 
         {/* Category Tabs */}
-        <View style={styles.categoryRow}>
-          {(['Nutrition', 'Workout', 'Goals'] as const).map(cat => (
+        <View style={[styles.categoryRow, { backgroundColor: colors.surface }]}>
+          {(["Nutrition", "Workout", "Goals"] as const).map((cat) => (
             <TouchableOpacity
               key={cat}
-              style={[styles.categoryBtn, activeCategory === cat && styles.categoryBtnActive]}
+              style={[
+                styles.categoryBtn,
+                activeCategory === cat && styles.categoryBtnActive,
+              ]}
               onPress={() => setActiveCategory(cat)}
             >
-              <Text style={[styles.categoryText, activeCategory === cat && styles.categoryTextActive]}>
+              <Text
+                style={[
+                  styles.categoryText,
+                  { color: colors.textMuted },
+                  activeCategory === cat && styles.categoryTextActive,
+                ]}
+              >
                 {cat}
               </Text>
             </TouchableOpacity>
@@ -184,24 +389,62 @@ export default function AchievementsScreen() {
 
         {/* Achievement List */}
         <View style={styles.achievementList}>
-          {filteredAchievements.map(achievement => (
+          {filteredAchievements.map((achievement) => (
             <TouchableOpacity
               key={achievement.id}
-              style={[styles.achievementCard, !achievement.unlocked && styles.achievementCardLocked]}
-              onPress={() => { setSelectedAchievement(achievement); setShowModal(true); }}
+              style={[
+                styles.achievementCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+                !achievement.unlocked && styles.achievementCardLocked,
+              ]}
+              onPress={() => {
+                setSelectedAchievement(achievement);
+                setShowModal(true);
+              }}
               activeOpacity={0.8}
             >
-              <View style={[styles.achievementIcon, !achievement.unlocked && styles.achievementIconLocked]}>
+              <View
+                style={[
+                  styles.achievementIcon,
+                  {
+                    backgroundColor: achievement.unlocked
+                      ? "#E8F5E9"
+                      : colors.input,
+                  },
+                ]}
+              >
                 <Text style={styles.achievementEmoji}>
-                  {achievement.unlocked ? achievement.icon : '🔒'}
+                  {achievement.unlocked ? achievement.icon : "🔒"}
                 </Text>
               </View>
               <View style={styles.achievementInfo}>
-                <Text style={[styles.achievementTitle, !achievement.unlocked && styles.achievementTitleLocked]}>
+                <Text
+                  style={[
+                    styles.achievementTitle,
+                    {
+                      color: achievement.unlocked
+                        ? colors.text
+                        : colors.textMuted,
+                    },
+                  ]}
+                >
                   {achievement.title}
                 </Text>
-                <Text style={styles.achievementDesc}>{achievement.description}</Text>
-                <Text style={[styles.achievementXP, { color: achievement.unlocked ? '#4CAF50' : '#bbb' }]}>
+                <Text
+                  style={[styles.achievementDesc, { color: colors.textMuted }]}
+                >
+                  {achievement.description}
+                </Text>
+                <Text
+                  style={[
+                    styles.achievementXP,
+                    {
+                      color: achievement.unlocked
+                        ? "#4CAF50"
+                        : colors.textMuted,
+                    },
+                  ]}
+                >
                   +{achievement.xp} XP
                 </Text>
               </View>
@@ -227,40 +470,66 @@ export default function AchievementsScreen() {
       {/* Achievement Detail Modal */}
       <Modal visible={showModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             {selectedAchievement && (
               <>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{selectedAchievement.title}</Text>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>
+                    {selectedAchievement.title}
+                  </Text>
                   <TouchableOpacity onPress={() => setShowModal(false)}>
-                    <Text style={styles.modalClose}>✕</Text>
+                    <Text
+                      style={[styles.modalClose, { color: colors.textMuted }]}
+                    >
+                      ✕
+                    </Text>
                   </TouchableOpacity>
                 </View>
-
                 <View style={styles.modalIconContainer}>
                   <Text style={styles.modalIcon}>
-                    {selectedAchievement.unlocked ? selectedAchievement.icon : '🔒'}
+                    {selectedAchievement.unlocked
+                      ? selectedAchievement.icon
+                      : "🔒"}
                   </Text>
                 </View>
-
-                <Text style={styles.modalDesc}>{selectedAchievement.description}</Text>
-                <Text style={styles.modalXP}>+{selectedAchievement.xp} XP</Text>
-                <Text style={styles.modalCategory}>Category: {selectedAchievement.category}</Text>
-                <Text style={styles.modalStatus}>
-                  Status: {selectedAchievement.unlocked ? '✅ Unlocked' : '🔒 Locked'}
+                <Text
+                  style={[styles.modalDesc, { color: colors.textSecondary }]}
+                >
+                  {selectedAchievement.description}
                 </Text>
-
+                <Text style={styles.modalXP}>+{selectedAchievement.xp} XP</Text>
+                <Text
+                  style={[styles.modalCategory, { color: colors.textMuted }]}
+                >
+                  Category: {selectedAchievement.category}
+                </Text>
+                <Text style={[styles.modalStatus, { color: colors.textMuted }]}>
+                  Status:{" "}
+                  {selectedAchievement.unlocked ? "✅ Unlocked" : "🔒 Locked"}
+                </Text>
                 {selectedAchievement.unlocked && (
                   <TouchableOpacity
                     style={styles.modalShareBtn}
-                    onPress={() => { setShowModal(false); handleShare(selectedAchievement); }}
+                    onPress={() => {
+                      setShowModal(false);
+                      handleShare(selectedAchievement);
+                    }}
                   >
                     <Text style={styles.modalShareText}>Share Achievement</Text>
                   </TouchableOpacity>
                 )}
-
-                <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowModal(false)}>
-                  <Text style={styles.modalCloseBtnText}>Close</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.modalCloseBtn,
+                    { backgroundColor: colors.input },
+                  ]}
+                  onPress={() => setShowModal(false)}
+                >
+                  <Text
+                    style={[styles.modalCloseBtnText, { color: colors.text }]}
+                  >
+                    Close
+                  </Text>
                 </TouchableOpacity>
               </>
             )}
@@ -271,57 +540,82 @@ export default function AchievementsScreen() {
       {/* Share Progress Modal */}
       <Modal visible={showShareModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Share My Progress</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Share My Progress
+              </Text>
               <TouchableOpacity onPress={() => setShowShareModal(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+                <Text style={[styles.modalClose, { color: colors.textMuted }]}>
+                  ✕
+                </Text>
               </TouchableOpacity>
             </View>
-
-            <View style={styles.sharePreview}>
-              <Text style={styles.sharePreviewTitle}>💪 My NutriFit Progress</Text>
-              <View style={styles.shareStatRow}>
-                <Text style={styles.shareStatIcon}>📉</Text>
-                <Text style={styles.shareStatText}>Weight Lost: {weightLost} kg</Text>
-              </View>
-              <View style={styles.shareStatRow}>
-                <Text style={styles.shareStatIcon}>🍽️</Text>
-                <Text style={styles.shareStatText}>Meals Taken: {mealsTaken}/21</Text>
-              </View>
-              <View style={styles.shareStatRow}>
-                <Text style={styles.shareStatIcon}>🔥</Text>
-                <Text style={styles.shareStatText}>Calories Burned: {caloriesBurned.toLocaleString()}</Text>
-              </View>
-              <View style={styles.shareStatRow}>
-                <Text style={styles.shareStatIcon}>⭐</Text>
-                <Text style={styles.shareStatText}>Total XP: {totalXP} | Level {currentLevel}</Text>
-              </View>
+            <View
+              style={[styles.sharePreview, { backgroundColor: colors.input }]}
+            >
+              <Text style={[styles.sharePreviewTitle, { color: colors.text }]}>
+                💪 My NutriFit Progress
+              </Text>
+              {[
+                { icon: "📉", text: `Weight Lost: ${weightLost} kg` },
+                { icon: "🍽️", text: `Meals Taken: ${mealsTaken}/21` },
+                {
+                  icon: "🔥",
+                  text: `Calories Burned: ${caloriesBurned.toLocaleString()}`,
+                },
+                {
+                  icon: "⭐",
+                  text: `Total XP: ${totalXP} | Level ${currentLevel}`,
+                },
+              ].map((item, i) => (
+                <View key={i} style={styles.shareStatRow}>
+                  <Text style={styles.shareStatIcon}>{item.icon}</Text>
+                  <Text
+                    style={[
+                      styles.shareStatText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {item.text}
+                  </Text>
+                </View>
+              ))}
             </View>
-
             <View style={styles.socialShareRow}>
               {[
-                { name: 'Facebook', icon: '📘' },
-                { name: 'Twitter', icon: '🐦' },
-                { name: 'Instagram', icon: '📸' },
-                { name: 'TikTok', icon: '🎵' },
-              ].map(platform => (
+                { name: "Facebook", icon: "📘" },
+                { name: "Twitter", icon: "🐦" },
+                { name: "Instagram", icon: "📸" },
+                { name: "TikTok", icon: "🎵" },
+              ].map((platform) => (
                 <TouchableOpacity
                   key={platform.name}
                   style={styles.socialShareBtn}
-                  onPress={() => { setShowShareModal(false); handleShareProgress(); }}
+                  onPress={() => {
+                    setShowShareModal(false);
+                    handleShareProgress();
+                  }}
                 >
                   <Text style={styles.socialShareIcon}>{platform.icon}</Text>
-                  <Text style={styles.socialShareName}>{platform.name}</Text>
+                  <Text
+                    style={[
+                      styles.socialShareName,
+                      { color: colors.textMuted },
+                    ]}
+                  >
+                    {platform.name}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
-
             <TouchableOpacity
-              style={styles.modalCloseBtn}
+              style={[styles.modalCloseBtn, { backgroundColor: colors.input }]}
               onPress={() => setShowShareModal(false)}
             >
-              <Text style={styles.modalCloseBtnText}>Cancel</Text>
+              <Text style={[styles.modalCloseBtnText, { color: colors.text }]}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -331,130 +625,194 @@ export default function AchievementsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-
+  safe: { flex: 1 },
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
   },
-  backBtn: { fontSize: 22, color: '#4CAF50', fontWeight: 'bold' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#111' },
-
-  levelCard: {
-    margin: 16, backgroundColor: '#fafafa', borderRadius: 16,
-    padding: 16, borderWidth: 1, borderColor: '#f0f0f0',
+  backBtn: { fontSize: 22, fontWeight: "bold" },
+  headerTitle: { fontSize: 18, fontWeight: "bold" },
+  levelCard: { margin: 16, borderRadius: 16, padding: 16, borderWidth: 1 },
+  levelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
   },
-  levelRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   levelBadge: {
-    backgroundColor: '#FF9800', paddingHorizontal: 14,
-    paddingVertical: 8, borderRadius: 12,
+    backgroundColor: "#FF9800",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
-  levelText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  levelText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
   levelInfo: { flex: 1 },
-  levelTitle: { fontSize: 16, fontWeight: '700', color: '#111' },
-  levelSubtitle: { fontSize: 12, color: '#888', marginTop: 2 },
-  totalXP: { fontSize: 16, fontWeight: 'bold', color: '#4CAF50' },
-  xpBar: { height: 10, backgroundColor: '#f0f0f0', borderRadius: 5, overflow: 'hidden', marginBottom: 6 },
-  xpFill: { height: 10, backgroundColor: '#FF9800', borderRadius: 5 },
-  xpProgress: { fontSize: 11, color: '#888', textAlign: 'right' },
-
+  levelTitle: { fontSize: 16, fontWeight: "700" },
+  levelSubtitle: { fontSize: 12, marginTop: 2 },
+  totalXP: { fontSize: 16, fontWeight: "bold" },
+  xpBar: { height: 10, borderRadius: 5, overflow: "hidden", marginBottom: 6 },
+  xpFill: { height: 10, backgroundColor: "#FF9800", borderRadius: 5 },
+  xpProgress: { fontSize: 11, textAlign: "right" },
   statsCard: {
-    marginHorizontal: 16, marginBottom: 14, backgroundColor: '#fafafa',
-    borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#f0f0f0',
+    marginHorizontal: 16,
+    marginBottom: 14,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
   },
-  statsTitle: { fontSize: 13, color: '#555', marginBottom: 14, textAlign: 'center' },
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  statBox: { flex: 1, alignItems: 'center' },
-  statDivider: { width: 1, backgroundColor: '#f0f0f0' },
-  statValue: { fontSize: 18, fontWeight: 'bold', color: '#111' },
-  statLabel: { fontSize: 11, color: '#888', marginTop: 4 },
-
+  statsTitle: { fontSize: 13, marginBottom: 14, textAlign: "center" },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  statBox: { flex: 1, alignItems: "center" },
+  statDivider: { width: 1 },
+  statValue: { fontSize: 18, fontWeight: "bold" },
+  statLabel: { fontSize: 11, marginTop: 4 },
   recentUnlock: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#FFF8E1', borderRadius: 12, padding: 12, marginBottom: 12,
-    borderWidth: 1, borderColor: '#FFE082',
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
   },
   recentIcon: { fontSize: 28 },
   recentInfo: { flex: 1 },
-  recentTitle: { fontSize: 12, fontWeight: '600', color: '#FF9800' },
-  recentName: { fontSize: 14, fontWeight: 'bold', color: '#111', marginTop: 2 },
-
-  shareProgressBtn: { alignItems: 'center', marginBottom: 10 },
-  shareProgressIcon: { fontSize: 14, color: '#4CAF50', fontWeight: '600' },
-  socialRow: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
+  recentTitle: { fontSize: 12, fontWeight: "600", color: "#FF9800" },
+  recentName: { fontSize: 14, fontWeight: "bold", marginTop: 2 },
+  shareProgressBtn: { alignItems: "center", marginBottom: 10 },
+  shareProgressIcon: { fontSize: 14, fontWeight: "600" },
+  socialRow: { flexDirection: "row", justifyContent: "center", gap: 12 },
   socialBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#f5f5f5', justifyContent: 'center', alignItems: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
   },
   socialIcon: { fontSize: 20 },
-
   progressSummary: { marginHorizontal: 16, marginBottom: 12 },
-  progressText: { fontSize: 13, color: '#555', marginBottom: 6, fontWeight: '600' },
-  progressBar: { height: 8, backgroundColor: '#f0f0f0', borderRadius: 4, overflow: 'hidden' },
-  progressFill: { height: 8, backgroundColor: '#4CAF50', borderRadius: 4 },
-
+  progressText: { fontSize: 13, marginBottom: 6, fontWeight: "600" },
+  progressBar: { height: 8, borderRadius: 4, overflow: "hidden" },
+  progressFill: { height: 8, backgroundColor: "#4CAF50", borderRadius: 4 },
   categoryRow: {
-    flexDirection: 'row', marginHorizontal: 16, marginBottom: 12,
-    backgroundColor: '#f5f5f5', borderRadius: 12, padding: 4, gap: 4,
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
   },
-  categoryBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
-  categoryBtnActive: { backgroundColor: '#4CAF50' },
-  categoryText: { fontSize: 13, fontWeight: '600', color: '#888' },
-  categoryTextActive: { color: '#fff' },
-
+  categoryBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  categoryBtnActive: { backgroundColor: "#4CAF50" },
+  categoryText: { fontSize: 13, fontWeight: "600" },
+  categoryTextActive: { color: "#fff" },
   achievementList: { paddingHorizontal: 16 },
   achievementCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    padding: 14, borderRadius: 14, borderWidth: 1,
-    borderColor: '#f0f0f0', marginBottom: 10, backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 10,
   },
-  achievementCardLocked: { backgroundColor: '#fafafa', opacity: 0.7 },
+  achievementCardLocked: { opacity: 0.6 },
   achievementIcon: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: '#E8F5E9', justifyContent: 'center', alignItems: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  achievementIconLocked: { backgroundColor: '#f5f5f5' },
   achievementEmoji: { fontSize: 24 },
   achievementInfo: { flex: 1 },
-  achievementTitle: { fontSize: 14, fontWeight: '700', color: '#111' },
-  achievementTitleLocked: { color: '#999' },
-  achievementDesc: { fontSize: 12, color: '#888', marginTop: 2 },
-  achievementXP: { fontSize: 12, fontWeight: '600', marginTop: 4 },
-  shareBtn: { backgroundColor: '#4CAF50', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16 },
-  shareBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  achievementTitle: { fontSize: 14, fontWeight: "700" },
+  achievementDesc: { fontSize: 12, marginTop: 2 },
+  achievementXP: { fontSize: 12, fontWeight: "600", marginTop: 4 },
+  shareBtn: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  shareBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   lockedBadge: { padding: 8 },
   lockedText: { fontSize: 20 },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '85%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111', flex: 1 },
-  modalClose: { fontSize: 20, color: '#999', padding: 4 },
-  modalIconContainer: { alignItems: 'center', marginBottom: 16 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: "85%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: { fontSize: 18, fontWeight: "bold", flex: 1 },
+  modalClose: { fontSize: 20, padding: 4 },
+  modalIconContainer: { alignItems: "center", marginBottom: 16 },
   modalIcon: { fontSize: 64 },
-  modalDesc: { fontSize: 14, color: '#555', textAlign: 'center', marginBottom: 10 },
-  modalXP: { fontSize: 18, fontWeight: 'bold', color: '#4CAF50', textAlign: 'center', marginBottom: 6 },
-  modalCategory: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 4 },
-  modalStatus: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 16 },
+  modalDesc: { fontSize: 14, textAlign: "center", marginBottom: 10 },
+  modalXP: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#4CAF50",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  modalCategory: { fontSize: 13, textAlign: "center", marginBottom: 4 },
+  modalStatus: { fontSize: 13, textAlign: "center", marginBottom: 16 },
   modalShareBtn: {
-    backgroundColor: '#4CAF50', padding: 14,
-    borderRadius: 12, alignItems: 'center', marginBottom: 10,
+    backgroundColor: "#4CAF50",
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginBottom: 10,
   },
-  modalShareText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  modalCloseBtn: { backgroundColor: '#f5f5f5', padding: 14, borderRadius: 12, alignItems: 'center' },
-  modalCloseBtnText: { color: '#555', fontWeight: 'bold', fontSize: 15 },
-
-  sharePreview: {
-    backgroundColor: '#F1F8E9', borderRadius: 16, padding: 16,
-    marginBottom: 16, borderWidth: 1, borderColor: '#C8E6C9',
+  modalShareText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  modalCloseBtn: { padding: 14, borderRadius: 12, alignItems: "center" },
+  modalCloseBtnText: { fontWeight: "bold", fontSize: 15 },
+  sharePreview: { borderRadius: 16, padding: 16, marginBottom: 16 },
+  sharePreviewTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 12,
+    textAlign: "center",
   },
-  sharePreviewTitle: { fontSize: 16, fontWeight: 'bold', color: '#111', marginBottom: 12, textAlign: 'center' },
-  shareStatRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  shareStatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
   shareStatIcon: { fontSize: 18 },
-  shareStatText: { fontSize: 14, color: '#333' },
-  socialShareRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },
-  socialShareBtn: { alignItems: 'center', gap: 6 },
+  shareStatText: { fontSize: 14 },
+  socialShareRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 16,
+  },
+  socialShareBtn: { alignItems: "center", gap: 6 },
   socialShareIcon: { fontSize: 32 },
-  socialShareName: { fontSize: 11, color: '#888' },
+  socialShareName: { fontSize: 11 },
 });

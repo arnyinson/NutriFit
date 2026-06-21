@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../constants/theme";
 
 const meals = [
   {
@@ -43,6 +44,7 @@ const workouts = [
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [mealList, setMealList] = useState(meals);
   const [workoutList, setWorkoutList] = useState(
     workouts.map((w) => ({ ...w, done: false })),
@@ -80,26 +82,33 @@ export default function DashboardScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: colors.background }]}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.push("/profile" as any)}>
               <View style={styles.avatar} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push("/calendar" as any)}>
-              <Text style={styles.dateText}>{today} ▼</Text>
+              <Text style={[styles.dateText, { color: colors.textSecondary }]}>
+                {today} ▼
+              </Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={() => router.push("/achievements")}>
+          <TouchableOpacity onPress={() => router.push("/achievements" as any)}>
             <Text style={styles.trophy}>🏆</Text>
           </TouchableOpacity>
         </View>
 
         {/* Greeting */}
-        <Text style={styles.greeting}>{getGreeting()}</Text>
-        <Text style={styles.subGreeting}>
+        <Text style={[styles.greeting, { color: colors.text }]}>
+          {getGreeting()}
+        </Text>
+        <Text style={[styles.subGreeting, { color: colors.textMuted }]}>
           {"You're "}
           {percentage}% toward {"today's"} goal 🔥
         </Text>
@@ -133,9 +142,16 @@ export default function DashboardScreen() {
         </View>
 
         {/* Today's Meal Plan */}
-        <View style={styles.section}>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{"Today's Meal Plan"}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              {"Today's Meal Plan"}
+            </Text>
             <View style={styles.sectionActions}>
               <TouchableOpacity
                 style={styles.takeAllBtn}
@@ -154,15 +170,37 @@ export default function DashboardScreen() {
           </View>
 
           {mealList.map((meal) => (
-            <View key={meal.id} style={styles.mealRow}>
-              <View style={styles.mealIcon}>
-                <Text style={styles.mealEmoji}>🍽️</Text>
+            <View
+              key={meal.id}
+              style={[
+                styles.mealRow,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <View
+                style={[styles.mealIcon, { backgroundColor: colors.input }]}
+              >
+                <Text style={styles.mealEmoji}>
+                  {meal.type === "Breakfast"
+                    ? "🌅"
+                    : meal.type === "Lunch"
+                      ? "☀️"
+                      : "🌙"}
+                </Text>
               </View>
               <View style={styles.mealInfo}>
-                <Text style={styles.mealType}>{meal.type}</Text>
-                <Text style={styles.mealName}>{meal.name}</Text>
+                <Text style={[styles.mealType, { color: colors.text }]}>
+                  {meal.type}
+                </Text>
+                <Text style={[styles.mealName, { color: colors.textMuted }]}>
+                  {meal.name}
+                </Text>
               </View>
-              <Text style={styles.mealCalories}>~{meal.calories} kcal</Text>
+              <Text
+                style={[styles.mealCalories, { color: colors.textSecondary }]}
+              >
+                ~{meal.calories} kcal
+              </Text>
               <TouchableOpacity
                 style={[
                   styles.actionBtn,
@@ -181,7 +219,7 @@ export default function DashboardScreen() {
 
           <View style={styles.totalRow}>
             <Text style={styles.fireIcon}>🔥</Text>
-            <Text style={styles.totalText}>
+            <Text style={[styles.totalText, { color: colors.text }]}>
               Total kcal |{" "}
               {mealList
                 .reduce((sum, m) => sum + m.calories, 0)
@@ -192,9 +230,14 @@ export default function DashboardScreen() {
         </View>
 
         {/* Today's Workout Plan */}
-        <View style={styles.section}>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
               {"Today's Workout Plan - Chest + Core"}
             </Text>
             <View style={styles.sectionActions}>
@@ -210,7 +253,7 @@ export default function DashboardScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.seeAllBtn}
-                onPress={() => router.push("/workout")}
+                onPress={() => router.push("/workout" as any)}
               >
                 <Text style={styles.seeAllText}>See all</Text>
               </TouchableOpacity>
@@ -218,15 +261,25 @@ export default function DashboardScreen() {
           </View>
 
           {workoutList.map((exercise, index) => (
-            <View key={index} style={styles.exerciseRow}>
+            <View
+              key={index}
+              style={[styles.exerciseRow, { borderBottomColor: colors.border }]}
+            >
               <View style={styles.exerciseBullet} />
               <View style={styles.exerciseInfo}>
-                <Text style={styles.exerciseName}>{exercise.name}</Text>
-                <Text style={styles.exerciseSets}>{exercise.sets}</Text>
+                <Text style={[styles.exerciseName, { color: colors.text }]}>
+                  {exercise.name}
+                </Text>
+                <Text
+                  style={[styles.exerciseSets, { color: colors.textMuted }]}
+                >
+                  {exercise.sets}
+                </Text>
               </View>
               <TouchableOpacity
                 style={[
                   styles.exerciseCheck,
+                  { borderColor: colors.border },
                   exercise.done && styles.exerciseCheckDone,
                 ]}
                 onPress={() => toggleWorkout(index)}
@@ -241,7 +294,12 @@ export default function DashboardScreen() {
       </ScrollView>
 
       {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
+      <View
+        style={[
+          styles.bottomNav,
+          { backgroundColor: colors.navBg, borderTopColor: colors.border },
+        ]}
+      >
         {[
           { name: "Home", icon: "🏠", route: "/dashboard" },
           { name: "Stats", icon: "📊", route: "/progress" },
@@ -261,6 +319,7 @@ export default function DashboardScreen() {
             <Text
               style={[
                 styles.navLabel,
+                { color: colors.textMuted },
                 activeTab === tab.name && styles.navLabelActive,
               ]}
             >
@@ -274,9 +333,8 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#fff" },
-  container: { flex: 1, backgroundColor: "#fff" },
-
+  safe: { flex: 1 },
+  container: { flex: 1 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -286,24 +344,21 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#ddd" },
-  dateText: { fontSize: 13, color: "#555", fontWeight: "500" },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#4CAF50",
+  },
+  dateText: { fontSize: 13, fontWeight: "500" },
   trophy: { fontSize: 24 },
-
   greeting: {
     fontSize: 26,
     fontWeight: "bold",
-    color: "#111",
     paddingHorizontal: 20,
     marginTop: 4,
   },
-  subGreeting: {
-    fontSize: 13,
-    color: "#888",
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-
+  subGreeting: { fontSize: 13, paddingHorizontal: 20, marginBottom: 16 },
   calorieCard: {
     marginHorizontal: 20,
     borderRadius: 20,
@@ -313,7 +368,6 @@ const styles = StyleSheet.create({
   },
   calorieCardOrange: { backgroundColor: "#FF9800" },
   calorieCardGreen: { backgroundColor: "#4CAF50" },
-
   ringOuter: {
     width: 130,
     height: 130,
@@ -350,15 +404,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.4)",
   },
   dotActive: { backgroundColor: "#fff" },
-
   section: {
     marginHorizontal: 20,
     marginBottom: 16,
-    backgroundColor: "#fafafa",
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
   },
   sectionHeader: {
     flexDirection: "row",
@@ -366,7 +417,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#111", flex: 1 },
+  sectionTitle: { fontSize: 15, fontWeight: "700", flex: 1 },
   sectionActions: { flexDirection: "row", gap: 8 },
   takeAllBtn: {
     backgroundColor: "#4CAF50",
@@ -382,31 +433,31 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   editText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-
   mealRow: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 12,
     gap: 8,
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
   },
   mealIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#eee",
     justifyContent: "center",
     alignItems: "center",
   },
   mealEmoji: { fontSize: 18 },
   mealInfo: { flex: 1 },
-  mealType: { fontSize: 13, fontWeight: "700", color: "#111" },
-  mealName: { fontSize: 11, color: "#888" },
-  mealCalories: { fontSize: 12, color: "#555", marginRight: 4 },
+  mealType: { fontSize: 13, fontWeight: "700" },
+  mealName: { fontSize: 11 },
+  mealCalories: { fontSize: 12, marginRight: 4 },
   actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   takeBtn: { backgroundColor: "#4CAF50" },
   takenBtn: { backgroundColor: "#FF9800" },
   actionBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-
   totalRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -414,8 +465,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   fireIcon: { fontSize: 16 },
-  totalText: { fontSize: 13, fontWeight: "600", color: "#333" },
-
+  totalText: { fontSize: 13, fontWeight: "600" },
   logBtn: {
     backgroundColor: "#4CAF50",
     paddingHorizontal: 12,
@@ -430,13 +480,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   seeAllText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-
   exerciseRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
     gap: 10,
   },
   exerciseBullet: {
@@ -446,26 +494,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
   },
   exerciseInfo: { flex: 1 },
-  exerciseName: { fontSize: 13, fontWeight: "600", color: "#111" },
-  exerciseSets: { fontSize: 11, color: "#888", marginTop: 2 },
+  exerciseName: { fontSize: 13, fontWeight: "600" },
+  exerciseSets: { fontSize: 11, marginTop: 2 },
   exerciseCheck: {
     width: 22,
     height: 22,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: "#ddd",
     alignItems: "center",
     justifyContent: "center",
   },
   exerciseCheckDone: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
   checkmark: { color: "#fff", fontSize: 12, fontWeight: "bold" },
-
   bottomNav: {
     flexDirection: "row",
-    backgroundColor: "#fff",
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
     position: "absolute",
     bottom: 0,
     left: 0,
@@ -473,6 +517,6 @@ const styles = StyleSheet.create({
   },
   navItem: { flex: 1, alignItems: "center" },
   navIcon: { fontSize: 22 },
-  navLabel: { fontSize: 11, color: "#aaa", marginTop: 2 },
+  navLabel: { fontSize: 11, marginTop: 2 },
   navLabelActive: { color: "#4CAF50", fontWeight: "700" },
 });

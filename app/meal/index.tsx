@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../constants/theme";
 
 type Ingredient = {
   name: string;
@@ -1511,11 +1512,10 @@ const weeklyMeals: DayPlan[] = [
 
 export default function MealScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [mealPlan, setMealPlan] = useState(weeklyMeals);
   const [activeTab, setActiveTab] = useState("Meal");
   const [planMode, setPlanMode] = useState<"Weekly" | "Continuous">("Weekly");
-  const [searchText, setSearchText] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [showMealModal, setShowMealModal] = useState(false);
   const [showEditPlanModal, setShowEditPlanModal] = useState(false);
@@ -1527,17 +1527,12 @@ export default function MealScreen() {
   const [editMealIndex, setEditMealIndex] = useState<number | null>(null);
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
   const [editMealSearch, setEditMealSearch] = useState("");
-  const [editTab, setEditTab] = useState<"ingredients" | "replace">(
+  const [editTab, setEditTab] = useState<"ingredients" | "replace" | "log">(
     "ingredients",
   );
-  const [showManualLog, setShowManualLog] = useState(false);
   const [manualFoodName, setManualFoodName] = useState("");
   const [manualKcal, setManualKcal] = useState("");
   const [manualWeight, setManualWeight] = useState("");
-  const [manualLogSearch, setManualLogSearch] = useState("");
-  const [manualLogTab, setManualLogTab] = useState<"search" | "manual">(
-    "search",
-  );
   const [userAllergens] = useState(["Fish", "Soy"]);
 
   const getMealAllergenStatus = (meal: Meal) => {
@@ -1637,6 +1632,9 @@ export default function MealScreen() {
       setEditingMeal({ ...getDisplayMeal(meal) });
       setEditMealSearch("");
       setEditTab("ingredients");
+      setManualFoodName("");
+      setManualKcal("");
+      setManualWeight("");
       setShowEditMealModal(true);
     };
     if (status !== "safe") {
@@ -1708,39 +1706,26 @@ export default function MealScreen() {
         m.name.toLowerCase().includes((search || "").toLowerCase()),
     );
 
-  const displayDays = searchText
-    ? mealPlan
-        .map((day) => ({
-          ...day,
-          meals: day.meals.filter((m) =>
-            getDisplayMeal(m)
-              .name.toLowerCase()
-              .includes(searchText.toLowerCase()),
-          ),
-        }))
-        .filter((day) => day.meals.length > 0)
-    : mealPlan;
-
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Weekly Meal Plan</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity onPress={() => setShowSearch(!showSearch)}>
-            <Text style={styles.headerIcon}>🔍</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowManualLog(true)}>
-            <Text style={styles.headerIcon}>✏️</Text>
-          </TouchableOpacity>
-          <TouchableOpacity>
-            <Text style={styles.headerIcon}>⚙️</Text>
-          </TouchableOpacity>
-        </View>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Weekly Meal Plan
+        </Text>
+        <View style={{ width: 30 }} />
       </View>
 
       {/* Plan Mode Toggle */}
-      <View style={styles.modeRow}>
+      <View style={[styles.modeRow, { backgroundColor: colors.surface }]}>
         {(["Weekly", "Continuous"] as const).map((mode) => (
           <TouchableOpacity
             key={mode}
@@ -1750,6 +1735,7 @@ export default function MealScreen() {
             <Text
               style={[
                 styles.modeBtnText,
+                { color: colors.textMuted },
                 planMode === mode && styles.modeBtnTextActive,
               ]}
             >
@@ -1758,25 +1744,6 @@ export default function MealScreen() {
           </TouchableOpacity>
         ))}
       </View>
-
-      {/* Search Bar */}
-      {showSearch && (
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search meals..."
-            value={searchText}
-            onChangeText={setSearchText}
-            autoFocus
-          />
-          {searchText !== "" && (
-            <TouchableOpacity onPress={() => setSearchText("")}>
-              <Text style={styles.clearSearch}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
 
       {/* Allergen Notice */}
       {userAllergens.length > 0 && (
@@ -1789,12 +1756,22 @@ export default function MealScreen() {
       )}
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {displayDays.map((day, dayIndex) => (
-          <View key={day.day} style={styles.daySection}>
+        {mealPlan.map((day, dayIndex) => (
+          <View
+            key={day.day}
+            style={[
+              styles.daySection,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <View style={styles.dayHeader}>
               <View>
-                <Text style={styles.dayTitle}>{day.day}</Text>
-                <Text style={styles.dayDate}>{day.date}</Text>
+                <Text style={[styles.dayTitle, { color: colors.text }]}>
+                  {day.day}
+                </Text>
+                <Text style={[styles.dayDate, { color: colors.textMuted }]}>
+                  {day.date}
+                </Text>
               </View>
               <View style={styles.dayActions}>
                 <TouchableOpacity
@@ -1823,6 +1800,10 @@ export default function MealScreen() {
                   key={meal.id}
                   style={[
                     styles.mealRow,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
                     isReplaced && styles.mealRowReplaced,
                     isSubstituted && styles.mealRowSubstituted,
                   ]}
@@ -1832,7 +1813,9 @@ export default function MealScreen() {
                   }}
                   activeOpacity={0.8}
                 >
-                  <View style={styles.mealIcon}>
+                  <View
+                    style={[styles.mealIcon, { backgroundColor: colors.input }]}
+                  >
                     <Text style={styles.mealEmoji}>
                       {meal.type === "Breakfast"
                         ? "🌅"
@@ -1843,7 +1826,9 @@ export default function MealScreen() {
                   </View>
                   <View style={styles.mealInfo}>
                     <View style={styles.mealNameRow}>
-                      <Text style={styles.mealType}>{displayMeal.type}</Text>
+                      <Text style={[styles.mealType, { color: colors.text }]}>
+                        {displayMeal.type}
+                      </Text>
                       {isReplaced && (
                         <View style={styles.replacedBadge}>
                           <Text style={styles.badgeText}>AI Replaced</Text>
@@ -1855,7 +1840,11 @@ export default function MealScreen() {
                         </View>
                       )}
                     </View>
-                    <Text style={styles.mealName}>{displayMeal.name}</Text>
+                    <Text
+                      style={[styles.mealName, { color: colors.textMuted }]}
+                    >
+                      {displayMeal.name}
+                    </Text>
                     {isReplaced && (
                       <Text style={styles.originalMealText}>
                         Original: {meal.name}
@@ -1874,7 +1863,12 @@ export default function MealScreen() {
                     </View>
                   </View>
                   <View style={styles.mealRight}>
-                    <Text style={styles.mealCalories}>
+                    <Text
+                      style={[
+                        styles.mealCalories,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
                       ~{displayMeal.calories} kcal
                     </Text>
                     <TouchableOpacity
@@ -1899,9 +1893,9 @@ export default function MealScreen() {
               );
             })}
 
-            <View style={styles.totalRow}>
+            <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
               <Text style={styles.fireIcon}>🔥</Text>
-              <Text style={styles.totalText}>
+              <Text style={[styles.totalText, { color: colors.text }]}>
                 Total kcal | {getDayTotal(day.meals).toLocaleString()} kcal
               </Text>
             </View>
@@ -1913,17 +1907,25 @@ export default function MealScreen() {
       {/* MEAL DETAIL MODAL */}
       <Modal visible={showMealModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
               {selectedMeal && (
                 <>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>{selectedMeal.name}</Text>
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>
+                      {selectedMeal.name}
+                    </Text>
                     <TouchableOpacity onPress={() => setShowMealModal(false)}>
-                      <Text style={styles.modalClose}>✕</Text>
+                      <Text
+                        style={[styles.modalClose, { color: colors.textMuted }]}
+                      >
+                        ✕
+                      </Text>
                     </TouchableOpacity>
                   </View>
-                  <Text style={styles.modalSection}>Nutritional Info</Text>
+                  <Text style={[styles.modalSection, { color: colors.text }]}>
+                    Nutritional Info
+                  </Text>
                   <View style={styles.nutritionGrid}>
                     {[
                       { label: "Calories", value: `${selectedMeal.calories}` },
@@ -1931,26 +1933,57 @@ export default function MealScreen() {
                       { label: "Carbs", value: `${selectedMeal.carbs}g` },
                       { label: "Fats", value: `${selectedMeal.fats}g` },
                     ].map((n) => (
-                      <View key={n.label} style={styles.nutritionBox}>
+                      <View
+                        key={n.label}
+                        style={[
+                          styles.nutritionBox,
+                          { backgroundColor: colors.input },
+                        ]}
+                      >
                         <Text style={styles.nutritionValue}>{n.value}</Text>
-                        <Text style={styles.nutritionLabel}>{n.label}</Text>
+                        <Text
+                          style={[
+                            styles.nutritionLabel,
+                            { color: colors.textMuted },
+                          ]}
+                        >
+                          {n.label}
+                        </Text>
                       </View>
                     ))}
                   </View>
-                  <Text style={styles.modalSection}>Ingredients</Text>
+                  <Text style={[styles.modalSection, { color: colors.text }]}>
+                    Ingredients
+                  </Text>
                   {selectedMeal.ingredients.map((ing, i) => (
                     <View key={i} style={styles.ingredientRow}>
                       <View style={styles.ingredientBullet} />
-                      <Text style={styles.ingredientText}>{ing.name}</Text>
+                      <Text
+                        style={[
+                          styles.ingredientText,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {ing.name}
+                      </Text>
                     </View>
                   ))}
-                  <Text style={styles.modalSection}>Cooking Instructions</Text>
+                  <Text style={[styles.modalSection, { color: colors.text }]}>
+                    Cooking Instructions
+                  </Text>
                   {selectedMeal.instructions.map((step, i) => (
                     <View key={i} style={styles.stepRow}>
                       <View style={styles.stepNumber}>
                         <Text style={styles.stepNumberText}>{i + 1}</Text>
                       </View>
-                      <Text style={styles.stepText}>{step}</Text>
+                      <Text
+                        style={[
+                          styles.stepText,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {step}
+                      </Text>
                     </View>
                   ))}
                   <TouchableOpacity
@@ -1969,9 +2002,9 @@ export default function MealScreen() {
       {/* EDIT PLAN MODAL */}
       <Modal visible={showEditPlanModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
                 {editPlanSlot
                   ? `Choose ${editPlanSlot}`
                   : `Edit ${editPlanDay !== null ? mealPlan[editPlanDay]?.day : ""} Plan`}
@@ -1984,14 +2017,16 @@ export default function MealScreen() {
                   } else setShowEditPlanModal(false);
                 }}
               >
-                <Text style={styles.modalClose}>
+                <Text style={[styles.modalClose, { color: colors.textMuted }]}>
                   {editPlanSlot ? "← Back" : "✕"}
                 </Text>
               </TouchableOpacity>
             </View>
             {!editPlanSlot ? (
               <ScrollView>
-                <Text style={styles.editPlanSubtitle}>
+                <Text
+                  style={[styles.editPlanSubtitle, { color: colors.textMuted }]}
+                >
                   Select a meal slot to replace:
                 </Text>
                 {editPlanDay !== null &&
@@ -2000,7 +2035,13 @@ export default function MealScreen() {
                     return (
                       <TouchableOpacity
                         key={meal.id}
-                        style={styles.slotCard}
+                        style={[
+                          styles.slotCard,
+                          {
+                            backgroundColor: colors.surface,
+                            borderColor: colors.border,
+                          },
+                        ]}
                         onPress={() => setEditPlanSlot(meal.type)}
                       >
                         <Text style={styles.slotEmoji}>
@@ -2011,26 +2052,45 @@ export default function MealScreen() {
                               : "🌙"}
                         </Text>
                         <View style={styles.slotInfo}>
-                          <Text style={styles.slotType}>{meal.type}</Text>
-                          <Text style={styles.slotName}>
+                          <Text
+                            style={[styles.slotType, { color: colors.text }]}
+                          >
+                            {meal.type}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.slotName,
+                              { color: colors.textMuted },
+                            ]}
+                          >
                             {displayMeal.name}
                           </Text>
                           <Text style={styles.slotCal}>
                             {displayMeal.calories} kcal
                           </Text>
                         </View>
-                        <Text style={styles.slotArrow}>›</Text>
+                        <Text
+                          style={[
+                            styles.slotArrow,
+                            { color: colors.textMuted },
+                          ]}
+                        >
+                          ›
+                        </Text>
                       </TouchableOpacity>
                     );
                   })}
               </ScrollView>
             ) : (
               <>
-                <View style={styles.searchBar}>
+                <View
+                  style={[styles.searchBar, { backgroundColor: colors.input }]}
+                >
                   <Text style={styles.searchIcon}>🔍</Text>
                   <TextInput
-                    style={styles.searchInput}
+                    style={[styles.searchInput, { color: colors.text }]}
                     placeholder={`Search ${editPlanSlot} meals...`}
+                    placeholderTextColor={colors.textMuted}
                     value={editPlanSearch}
                     onChangeText={setEditPlanSearch}
                     autoFocus
@@ -2041,11 +2101,21 @@ export default function MealScreen() {
                   keyExtractor={(item) => item.id}
                   renderItem={({ item }) => (
                     <TouchableOpacity
-                      style={styles.dbMealCard}
+                      style={[
+                        styles.dbMealCard,
+                        {
+                          backgroundColor: colors.surface,
+                          borderColor: colors.border,
+                        },
+                      ]}
                       onPress={() => replaceMealSlot(item)}
                     >
                       <View style={styles.dbMealInfo}>
-                        <Text style={styles.dbMealName}>{item.name}</Text>
+                        <Text
+                          style={[styles.dbMealName, { color: colors.text }]}
+                        >
+                          {item.name}
+                        </Text>
                         <View style={styles.macroRow}>
                           <Text style={styles.macroText}>
                             P: {item.protein}g
@@ -2073,15 +2143,22 @@ export default function MealScreen() {
       {/* EDIT MEAL MODAL */}
       <Modal visible={showEditMealModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Meal</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Edit Meal
+              </Text>
               <TouchableOpacity onPress={() => setShowEditMealModal(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+                <Text style={[styles.modalClose, { color: colors.textMuted }]}>
+                  ✕
+                </Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.editTabRow}>
-              {(["ingredients", "replace"] as const).map((tab) => (
+
+            <View
+              style={[styles.editTabRow, { backgroundColor: colors.input }]}
+            >
+              {(["ingredients", "replace", "log"] as const).map((tab) => (
                 <TouchableOpacity
                   key={tab}
                   style={[
@@ -2093,25 +2170,50 @@ export default function MealScreen() {
                   <Text
                     style={[
                       styles.editTabText,
+                      { color: colors.textMuted },
                       editTab === tab && styles.editTabTextActive,
                     ]}
                   >
                     {tab === "ingredients"
-                      ? "🥄 Edit Ingredients"
-                      : "🔄 Replace Meal"}
+                      ? "🥄 Ingredients"
+                      : tab === "replace"
+                        ? "🔄 Replace"
+                        : "✏️ Log"}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-            {editTab === "ingredients" ? (
+
+            {editTab === "ingredients" && (
               <ScrollView>
-                <Text style={styles.editSectionLabel}>
+                <Text
+                  style={[
+                    styles.editSectionLabel,
+                    { color: colors.textSecondary },
+                  ]}
+                >
                   Tap Swap to replace an ingredient:
                 </Text>
                 {editingMeal?.ingredients.map((ing, i) => (
-                  <View key={i} style={styles.ingredientEditRow}>
+                  <View
+                    key={i}
+                    style={[
+                      styles.ingredientEditRow,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
                     <View style={styles.ingredientBullet} />
-                    <Text style={styles.ingredientText}>{ing.name}</Text>
+                    <Text
+                      style={[
+                        styles.ingredientText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {ing.name}
+                    </Text>
                     <TouchableOpacity
                       style={styles.swapBtn}
                       onPress={() => {
@@ -2149,13 +2251,18 @@ export default function MealScreen() {
                   <Text style={styles.modalCloseBtnText}>Save Changes</Text>
                 </TouchableOpacity>
               </ScrollView>
-            ) : (
+            )}
+
+            {editTab === "replace" && (
               <>
-                <View style={styles.searchBar}>
+                <View
+                  style={[styles.searchBar, { backgroundColor: colors.input }]}
+                >
                   <Text style={styles.searchIcon}>🔍</Text>
                   <TextInput
-                    style={styles.searchInput}
+                    style={[styles.searchInput, { color: colors.text }]}
                     placeholder="Search replacement meal..."
+                    placeholderTextColor={colors.textMuted}
                     value={editMealSearch}
                     onChangeText={setEditMealSearch}
                     autoFocus
@@ -2166,11 +2273,21 @@ export default function MealScreen() {
                   keyExtractor={(item) => item.id}
                   renderItem={({ item }) => (
                     <TouchableOpacity
-                      style={styles.dbMealCard}
+                      style={[
+                        styles.dbMealCard,
+                        {
+                          backgroundColor: colors.surface,
+                          borderColor: colors.border,
+                        },
+                      ]}
                       onPress={() => replaceWholeMeal(item)}
                     >
                       <View style={styles.dbMealInfo}>
-                        <Text style={styles.dbMealName}>{item.name}</Text>
+                        <Text
+                          style={[styles.dbMealName, { color: colors.text }]}
+                        >
+                          {item.name}
+                        </Text>
                         <View style={styles.macroRow}>
                           <Text style={styles.macroText}>
                             P: {item.protein}g
@@ -2191,107 +2308,128 @@ export default function MealScreen() {
                 />
               </>
             )}
-          </View>
-        </View>
-      </Modal>
 
-      {/* MANUAL LOG MODAL */}
-      <Modal visible={showManualLog} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Log Food Intake</Text>
-              <TouchableOpacity onPress={() => setShowManualLog(false)}>
-                <Text style={styles.modalClose}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.editTabRow}>
-              {(["search", "manual"] as const).map((tab) => (
-                <TouchableOpacity
-                  key={tab}
+            {editTab === "log" && (
+              <ScrollView>
+                <Text
                   style={[
-                    styles.editTabBtn,
-                    manualLogTab === tab && styles.editTabActive,
+                    styles.editSectionLabel,
+                    { color: colors.textSecondary },
                   ]}
-                  onPress={() => setManualLogTab(tab)}
                 >
-                  <Text
-                    style={[
-                      styles.editTabText,
-                      manualLogTab === tab && styles.editTabTextActive,
-                    ]}
-                  >
-                    {tab === "search" ? "🔍 Search Meal" : "⚖️ Manual Input"}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {manualLogTab === "search" ? (
-              <>
-                <View style={styles.searchBar}>
+                  Kumain ka sa labas? I-log ang iyong food intake:
+                </Text>
+                <Text style={[styles.logSubLabel, { color: colors.text }]}>
+                  🔍 Search Meal
+                </Text>
+                <View
+                  style={[styles.searchBar, { backgroundColor: colors.input }]}
+                >
                   <Text style={styles.searchIcon}>🔍</Text>
                   <TextInput
-                    style={styles.searchInput}
+                    style={[styles.searchInput, { color: colors.text }]}
                     placeholder="Search meal to log..."
-                    value={manualLogSearch}
-                    onChangeText={setManualLogSearch}
-                    autoFocus
+                    placeholderTextColor={colors.textMuted}
+                    value={editMealSearch}
+                    onChangeText={setEditMealSearch}
                   />
                 </View>
-                <FlatList
-                  data={getFilteredDb(undefined, manualLogSearch)}
-                  keyExtractor={(item) => item.id}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.dbMealCard}
-                      onPress={() => {
-                        Alert.alert(
-                          "Logged!",
-                          `${item.name} (${item.calories} kcal) added to your log.`,
-                        );
-                        setShowManualLog(false);
-                        setManualLogSearch("");
-                      }}
-                    >
-                      <View style={styles.dbMealInfo}>
-                        <Text style={styles.dbMealName}>{item.name}</Text>
-                        <View style={styles.macroRow}>
-                          <Text style={styles.macroText}>
-                            P: {item.protein}g
+                {editMealSearch !== "" && (
+                  <FlatList
+                    data={getFilteredDb(undefined, editMealSearch)}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={[
+                          styles.dbMealCard,
+                          {
+                            backgroundColor: colors.surface,
+                            borderColor: colors.border,
+                          },
+                        ]}
+                        onPress={() => {
+                          Alert.alert(
+                            "Logged!",
+                            `${item.name} (${item.calories} kcal) added to your log.`,
+                          );
+                          setEditMealSearch("");
+                        }}
+                      >
+                        <View style={styles.dbMealInfo}>
+                          <Text
+                            style={[styles.dbMealName, { color: colors.text }]}
+                          >
+                            {item.name}
                           </Text>
-                          <Text style={styles.macroText}>C: {item.carbs}g</Text>
-                          <Text style={styles.macroText}>F: {item.fats}g</Text>
+                          <View style={styles.macroRow}>
+                            <Text style={styles.macroText}>
+                              P: {item.protein}g
+                            </Text>
+                            <Text style={styles.macroText}>
+                              C: {item.carbs}g
+                            </Text>
+                            <Text style={styles.macroText}>
+                              F: {item.fats}g
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                      <Text style={styles.dbMealCal}>{item.calories} kcal</Text>
-                    </TouchableOpacity>
-                  )}
-                  style={{ maxHeight: 350 }}
-                />
-              </>
-            ) : (
-              <ScrollView>
-                <Text style={styles.editSectionLabel}>Food Name</Text>
+                        <Text style={styles.dbMealCal}>
+                          {item.calories} kcal
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    style={{ maxHeight: 180 }}
+                    scrollEnabled={false}
+                  />
+                )}
+                <Text
+                  style={[
+                    styles.logSubLabel,
+                    { color: colors.text, marginTop: 16 },
+                  ]}
+                >
+                  ⚖️ Manual Input
+                </Text>
                 <TextInput
-                  style={styles.manualInput}
-                  placeholder="e.g. Adobo, Rice, Banana..."
+                  style={[
+                    styles.manualInput,
+                    {
+                      backgroundColor: colors.input,
+                      borderColor: colors.inputBorder,
+                      color: colors.text,
+                    },
+                  ]}
+                  placeholder="Food name (e.g. Jollibee Chickenjoy)"
+                  placeholderTextColor={colors.textMuted}
                   value={manualFoodName}
                   onChangeText={setManualFoodName}
                 />
-                <Text style={styles.editSectionLabel}>
-                  Weight in grams (optional)
-                </Text>
                 <TextInput
-                  style={styles.manualInput}
-                  placeholder="e.g. 150g"
+                  style={[
+                    styles.manualInput,
+                    {
+                      backgroundColor: colors.input,
+                      borderColor: colors.inputBorder,
+                      color: colors.text,
+                    },
+                  ]}
+                  placeholder="Weight in grams (optional, e.g. 150)"
+                  placeholderTextColor={colors.textMuted}
                   value={manualWeight}
                   onChangeText={setManualWeight}
                   keyboardType="numeric"
                 />
-                <Text style={styles.editSectionLabel}>Calories (kcal)</Text>
                 <TextInput
-                  style={styles.manualInput}
-                  placeholder="e.g. 350"
+                  style={[
+                    styles.manualInput,
+                    {
+                      backgroundColor: colors.input,
+                      borderColor: colors.inputBorder,
+                      color: colors.text,
+                    },
+                  ]}
+                  placeholder="Calories (kcal) e.g. 400"
+                  placeholderTextColor={colors.textMuted}
                   value={manualKcal}
                   onChangeText={setManualKcal}
                   keyboardType="numeric"
@@ -2313,7 +2451,7 @@ export default function MealScreen() {
                     setManualFoodName("");
                     setManualKcal("");
                     setManualWeight("");
-                    setShowManualLog(false);
+                    setShowEditMealModal(false);
                   }}
                 >
                   <Text style={styles.modalCloseBtnText}>Log Food</Text>
@@ -2325,7 +2463,12 @@ export default function MealScreen() {
       </Modal>
 
       {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
+      <View
+        style={[
+          styles.bottomNav,
+          { backgroundColor: colors.navBg, borderTopColor: colors.border },
+        ]}
+      >
         {[
           { name: "Home", icon: "🏠", route: "/dashboard" },
           { name: "Stats", icon: "📊", route: "/progress" },
@@ -2345,6 +2488,7 @@ export default function MealScreen() {
             <Text
               style={[
                 styles.navLabel,
+                { color: colors.textMuted },
                 activeTab === tab.name && styles.navLabelActive,
               ]}
             >
@@ -2358,7 +2502,7 @@ export default function MealScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#fff" },
+  safe: { flex: 1 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -2367,19 +2511,9 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
-  headerTitle: { fontSize: 20, fontWeight: "bold", color: "#111" },
-  headerActions: { flexDirection: "row", gap: 12 },
-  headerIcon: { fontSize: 20 },
-  modeRow: {
-    flexDirection: "row",
-    margin: 16,
-    gap: 8,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 12,
-    padding: 4,
-  },
+  headerTitle: { fontSize: 20, fontWeight: "bold" },
+  modeRow: { flexDirection: "row", margin: 16, borderRadius: 12, padding: 4 },
   modeBtn: {
     flex: 1,
     paddingVertical: 8,
@@ -2387,20 +2521,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modeBtnActive: { backgroundColor: "#4CAF50" },
-  modeBtnText: { fontSize: 13, fontWeight: "600", color: "#888" },
+  modeBtnText: { fontSize: 13, fontWeight: "600" },
   modeBtnTextActive: { color: "#fff" },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
-    marginBottom: 8,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-  },
-  searchIcon: { fontSize: 16, marginRight: 8 },
-  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14 },
-  clearSearch: { fontSize: 16, color: "#999", padding: 4 },
   allergenNotice: {
     marginHorizontal: 16,
     marginBottom: 8,
@@ -2414,11 +2536,9 @@ const styles = StyleSheet.create({
   daySection: {
     marginHorizontal: 16,
     marginTop: 12,
-    backgroundColor: "#fafafa",
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
   },
   dayHeader: {
     flexDirection: "row",
@@ -2426,8 +2546,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  dayTitle: { fontSize: 15, fontWeight: "700", color: "#111" },
-  dayDate: { fontSize: 11, color: "#888", marginTop: 2 },
+  dayTitle: { fontSize: 15, fontWeight: "700" },
+  dayDate: { fontSize: 11, marginTop: 2 },
   dayActions: { flexDirection: "row", gap: 8 },
   takeAllBtn: {
     backgroundColor: "#4CAF50",
@@ -2448,11 +2568,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
     gap: 8,
-    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 10,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
   },
   mealRowReplaced: { borderColor: "#4CAF50", backgroundColor: "#F1F8E9" },
   mealRowSubstituted: { borderColor: "#FF9800", backgroundColor: "#FFF8E1" },
@@ -2460,7 +2578,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#eee",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -2472,7 +2589,7 @@ const styles = StyleSheet.create({
     gap: 6,
     flexWrap: "wrap",
   },
-  mealType: { fontSize: 13, fontWeight: "700", color: "#111" },
+  mealType: { fontSize: 13, fontWeight: "700" },
   replacedBadge: {
     backgroundColor: "#4CAF50",
     paddingHorizontal: 6,
@@ -2486,12 +2603,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   badgeText: { color: "#fff", fontSize: 9, fontWeight: "700" },
-  mealName: { fontSize: 11, color: "#555", marginTop: 2 },
+  mealName: { fontSize: 11, marginTop: 2 },
   originalMealText: { fontSize: 10, color: "#999", fontStyle: "italic" },
   macroRow: { flexDirection: "row", gap: 6, marginTop: 3 },
   macroText: { fontSize: 10, color: "#4CAF50", fontWeight: "600" },
   mealRight: { alignItems: "flex-end", gap: 4 },
-  mealCalories: { fontSize: 12, color: "#555" },
+  mealCalories: { fontSize: 12 },
   actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   takeBtn: { backgroundColor: "#4CAF50" },
   skipBtn: { backgroundColor: "#FF9800" },
@@ -2505,17 +2622,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
   },
   fireIcon: { fontSize: 16 },
-  totalText: { fontSize: 13, fontWeight: "600", color: "#333" },
+  totalText: { fontSize: 13, fontWeight: "600" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -2527,25 +2642,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: "bold", color: "#111", flex: 1 },
-  modalClose: { fontSize: 16, color: "#999", padding: 4 },
+  modalTitle: { fontSize: 18, fontWeight: "bold", flex: 1 },
+  modalClose: { fontSize: 16, padding: 4 },
   modalSection: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#111",
     marginTop: 16,
     marginBottom: 10,
   },
   nutritionGrid: { flexDirection: "row", gap: 8 },
   nutritionBox: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
     borderRadius: 12,
     padding: 12,
     alignItems: "center",
   },
   nutritionValue: { fontSize: 18, fontWeight: "bold", color: "#4CAF50" },
-  nutritionLabel: { fontSize: 11, color: "#888", marginTop: 4 },
+  nutritionLabel: { fontSize: 11, marginTop: 4 },
   ingredientRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2558,7 +2671,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: "#4CAF50",
   },
-  ingredientText: { fontSize: 13, color: "#444", flex: 1 },
+  ingredientText: { fontSize: 13, flex: 1 },
   stepRow: {
     flexDirection: "row",
     gap: 10,
@@ -2574,7 +2687,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   stepNumberText: { color: "#fff", fontSize: 12, fontWeight: "bold" },
-  stepText: { fontSize: 13, color: "#444", flex: 1, lineHeight: 20 },
+  stepText: { fontSize: 13, flex: 1, lineHeight: 20 },
   modalCloseBtn: {
     backgroundColor: "#4CAF50",
     padding: 14,
@@ -2584,7 +2697,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalCloseBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  editPlanSubtitle: { fontSize: 13, color: "#888", marginBottom: 12 },
+  editPlanSubtitle: { fontSize: 13, marginBottom: 12 },
   slotCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -2592,33 +2705,37 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
     marginBottom: 10,
-    backgroundColor: "#fafafa",
   },
   slotEmoji: { fontSize: 24 },
   slotInfo: { flex: 1 },
-  slotType: { fontSize: 13, fontWeight: "700", color: "#111" },
-  slotName: { fontSize: 12, color: "#888" },
+  slotType: { fontSize: 13, fontWeight: "700" },
+  slotName: { fontSize: 12 },
   slotCal: { fontSize: 11, color: "#4CAF50", marginTop: 2 },
-  slotArrow: { fontSize: 22, color: "#ccc" },
+  slotArrow: { fontSize: 22 },
   dbMealCard: {
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
     marginBottom: 8,
-    backgroundColor: "#fafafa",
   },
   dbMealInfo: { flex: 1 },
-  dbMealName: { fontSize: 14, fontWeight: "600", color: "#111" },
+  dbMealName: { fontSize: 14, fontWeight: "600" },
   dbMealAllergen: { fontSize: 11, color: "#E65100", marginTop: 2 },
   dbMealCal: { fontSize: 13, fontWeight: "700", color: "#4CAF50" },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+  },
+  searchIcon: { fontSize: 16, marginRight: 8 },
+  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14 },
   editTabRow: {
     flexDirection: "row",
-    backgroundColor: "#f5f5f5",
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
@@ -2631,15 +2748,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   editTabActive: { backgroundColor: "#4CAF50" },
-  editTabText: { fontSize: 12, fontWeight: "600", color: "#888" },
+  editTabText: { fontSize: 11, fontWeight: "600" },
   editTabTextActive: { color: "#fff" },
   editSectionLabel: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#555",
     marginBottom: 8,
-    marginTop: 8,
+    marginTop: 4,
   },
+  logSubLabel: { fontSize: 13, fontWeight: "700", marginBottom: 8 },
   ingredientEditRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2647,9 +2764,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
     marginBottom: 8,
-    backgroundColor: "#fafafa",
   },
   swapBtn: {
     backgroundColor: "#FF9800",
@@ -2660,7 +2775,6 @@ const styles = StyleSheet.create({
   swapBtnText: { color: "#fff", fontSize: 11, fontWeight: "600" },
   manualInput: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 12,
     padding: 12,
     fontSize: 14,
@@ -2668,10 +2782,8 @@ const styles = StyleSheet.create({
   },
   bottomNav: {
     flexDirection: "row",
-    backgroundColor: "#fff",
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
     position: "absolute",
     bottom: 0,
     left: 0,
@@ -2679,6 +2791,6 @@ const styles = StyleSheet.create({
   },
   navItem: { flex: 1, alignItems: "center" },
   navIcon: { fontSize: 22 },
-  navLabel: { fontSize: 11, color: "#aaa", marginTop: 2 },
+  navLabel: { fontSize: 11, marginTop: 2 },
   navLabelActive: { color: "#4CAF50", fontWeight: "700" },
 });

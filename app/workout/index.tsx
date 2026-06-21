@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../constants/theme";
 
 type Exercise = {
   id: string;
@@ -115,7 +116,7 @@ const weeklyWorkout: WorkoutDay[] = [
         done: false,
         loggedSets: [],
         instructions: [
-          "Forearms on floor, elbows below shoulders.",
+          "Forearms on floor.",
           "Keep body in straight line.",
           "Hold position.",
           "Breathe steadily.",
@@ -133,7 +134,7 @@ const weeklyWorkout: WorkoutDay[] = [
         instructions: [
           "Lie on back, hands behind head.",
           "Bring opposite elbow to knee.",
-          "Alternate sides continuously.",
+          "Alternate sides.",
           "Keep lower back pressed to floor.",
         ],
       },
@@ -156,7 +157,7 @@ const weeklyWorkout: WorkoutDay[] = [
         loggedSets: [],
         instructions: [
           "Stand feet shoulder-width apart.",
-          "Lower hips until thighs are parallel.",
+          "Lower hips until thighs parallel.",
           "Push through heels to stand.",
           "Keep chest up.",
         ],
@@ -211,18 +212,18 @@ const weeklyWorkout: WorkoutDay[] = [
       },
       {
         id: "e10",
-        name: "Bicycle Crunch",
+        name: "Mountain Climbers",
         sets: 3,
-        reps: "45 sec",
+        reps: "30 sec",
         equipment: "Bodyweight",
         muscleGroup: "Core",
         done: false,
         loggedSets: [],
         instructions: [
-          "Lie on back.",
-          "Bring knees to chest alternately.",
-          "Keep back flat.",
-          "Control the movement.",
+          "Start in plank.",
+          "Drive knees to chest alternately.",
+          "Keep hips level.",
+          "Move fast but controlled.",
         ],
       },
     ],
@@ -477,6 +478,7 @@ const weeklyWorkout: WorkoutDay[] = [
 
 export default function WorkoutScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [workout, setWorkout] = useState(weeklyWorkout);
   const [activeTab, setActiveTab] = useState("Exercise");
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
@@ -563,25 +565,45 @@ export default function WorkoutScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Weekly Workout Plan</Text>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Weekly Workout Plan
+        </Text>
         <TouchableOpacity>
-          <Text style={styles.headerIcon}>✕</Text>
+          <Text style={[styles.headerIcon, { color: colors.textMuted }]}>
+            ✕
+          </Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {workout.map((day, dayIndex) => (
-          <View key={day.day} style={styles.daySection}>
+          <View
+            key={day.day}
+            style={[
+              styles.daySection,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             {/* Day Header */}
             <View style={styles.dayHeader}>
               <View>
-                <Text style={styles.dayTitle}>
+                <Text style={[styles.dayTitle, { color: colors.text }]}>
                   {day.day} — {day.focus}
                 </Text>
-                <Text style={styles.dayDate}>{day.date}</Text>
+                <Text style={[styles.dayDate, { color: colors.textMuted }]}>
+                  {day.date}
+                </Text>
               </View>
               {!day.isRest && (
                 <View style={styles.dayActions}>
@@ -598,12 +620,15 @@ export default function WorkoutScreen() {
               )}
             </View>
 
-            {/* Rest Day */}
             {day.isRest ? (
               <View style={styles.restCard}>
                 <Text style={styles.restIcon}>😴</Text>
-                <Text style={styles.restTitle}>Rest Day</Text>
-                <Text style={styles.restSubtitle}>
+                <Text style={[styles.restTitle, { color: colors.text }]}>
+                  Rest Day
+                </Text>
+                <Text
+                  style={[styles.restSubtitle, { color: colors.textMuted }]}
+                >
                   Recovery is part of progress!
                 </Text>
               </View>
@@ -611,7 +636,12 @@ export default function WorkoutScreen() {
               <>
                 {/* Progress Bar */}
                 <View style={styles.progressRow}>
-                  <View style={styles.progressBar}>
+                  <View
+                    style={[
+                      styles.progressBar,
+                      { backgroundColor: colors.border },
+                    ]}
+                  >
                     <View
                       style={[
                         styles.progressFill,
@@ -630,6 +660,10 @@ export default function WorkoutScreen() {
                     key={exercise.id}
                     style={[
                       styles.exerciseRow,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                      },
                       exercise.done && styles.exerciseRowDone,
                     ]}
                     onPress={() => {
@@ -638,29 +672,32 @@ export default function WorkoutScreen() {
                     }}
                     activeOpacity={0.8}
                   >
-                    <View style={styles.exerciseLeft}>
-                      <TouchableOpacity
-                        style={[
-                          styles.exerciseCheck,
-                          exercise.done && styles.exerciseCheckDone,
-                        ]}
-                        onPress={() => toggleExercise(dayIndex, exIndex)}
-                      >
-                        {exercise.done && (
-                          <Text style={styles.checkmark}>✓</Text>
-                        )}
-                      </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                      style={[
+                        styles.exerciseCheck,
+                        { borderColor: colors.border },
+                        exercise.done && styles.exerciseCheckDone,
+                      ]}
+                      onPress={() => toggleExercise(dayIndex, exIndex)}
+                    >
+                      {exercise.done && <Text style={styles.checkmark}>✓</Text>}
+                    </TouchableOpacity>
                     <View style={styles.exerciseInfo}>
                       <Text
                         style={[
                           styles.exerciseName,
+                          { color: colors.text },
                           exercise.done && styles.exerciseNameDone,
                         ]}
                       >
                         {exercise.name}
                       </Text>
-                      <Text style={styles.exerciseSets}>
+                      <Text
+                        style={[
+                          styles.exerciseSets,
+                          { color: colors.textMuted },
+                        ]}
+                      >
                         {exercise.sets} sets × {exercise.reps} •{" "}
                         {exercise.equipment}
                       </Text>
@@ -697,48 +734,48 @@ export default function WorkoutScreen() {
       {/* Exercise Detail Modal */}
       <Modal visible={showDetailModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
               {selectedExercise && (
                 <>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>
+                    <Text style={[styles.modalTitle, { color: colors.text }]}>
                       {selectedExercise.name}
                     </Text>
                     <TouchableOpacity onPress={() => setShowDetailModal(false)}>
-                      <Text style={styles.modalClose}>✕</Text>
+                      <Text
+                        style={[styles.modalClose, { color: colors.textMuted }]}
+                      >
+                        ✕
+                      </Text>
                     </TouchableOpacity>
                   </View>
-
-                  {/* Info */}
                   <View style={styles.exerciseInfoGrid}>
-                    <View style={styles.infoBox}>
-                      <Text style={styles.infoValue}>
-                        {selectedExercise.sets}
-                      </Text>
-                      <Text style={styles.infoLabel}>Sets</Text>
-                    </View>
-                    <View style={styles.infoBox}>
-                      <Text style={styles.infoValue}>
-                        {selectedExercise.reps}
-                      </Text>
-                      <Text style={styles.infoLabel}>Reps</Text>
-                    </View>
-                    <View style={styles.infoBox}>
-                      <Text style={styles.infoValue}>
-                        {selectedExercise.muscleGroup}
-                      </Text>
-                      <Text style={styles.infoLabel}>Muscle</Text>
-                    </View>
-                    <View style={styles.infoBox}>
-                      <Text style={styles.infoValue}>
-                        {selectedExercise.equipment}
-                      </Text>
-                      <Text style={styles.infoLabel}>Equipment</Text>
-                    </View>
+                    {[
+                      { label: "Sets", value: `${selectedExercise.sets}` },
+                      { label: "Reps", value: selectedExercise.reps },
+                      { label: "Muscle", value: selectedExercise.muscleGroup },
+                      { label: "Equipment", value: selectedExercise.equipment },
+                    ].map((info) => (
+                      <View
+                        key={info.label}
+                        style={[
+                          styles.infoBox,
+                          { backgroundColor: colors.input },
+                        ]}
+                      >
+                        <Text style={styles.infoValue}>{info.value}</Text>
+                        <Text
+                          style={[
+                            styles.infoLabel,
+                            { color: colors.textMuted },
+                          ]}
+                        >
+                          {info.label}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
-
-                  {/* Video Demo Placeholder */}
                   <View style={styles.videoPlaceholder}>
                     <Text style={styles.videoIcon}>▶️</Text>
                     <Text style={styles.videoText}>Video Demonstration</Text>
@@ -746,18 +783,24 @@ export default function WorkoutScreen() {
                       Available in full version
                     </Text>
                   </View>
-
-                  {/* Instructions */}
-                  <Text style={styles.modalSection}>Instructions</Text>
+                  <Text style={[styles.modalSection, { color: colors.text }]}>
+                    Instructions
+                  </Text>
                   {selectedExercise.instructions.map((step, i) => (
                     <View key={i} style={styles.stepRow}>
                       <View style={styles.stepNumber}>
                         <Text style={styles.stepNumberText}>{i + 1}</Text>
                       </View>
-                      <Text style={styles.stepText}>{step}</Text>
+                      <Text
+                        style={[
+                          styles.stepText,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {step}
+                      </Text>
                     </View>
                   ))}
-
                   <TouchableOpacity
                     style={styles.modalCloseBtn}
                     onPress={() => setShowDetailModal(false)}
@@ -774,28 +817,60 @@ export default function WorkoutScreen() {
       {/* Log Exercise Modal */}
       <Modal visible={showLogModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.logModalContent}>
+          <View
+            style={[styles.logModalContent, { backgroundColor: colors.card }]}
+          >
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Log Exercise</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Log Exercise
+              </Text>
               <TouchableOpacity onPress={() => setShowLogModal(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+                <Text style={[styles.modalClose, { color: colors.textMuted }]}>
+                  ✕
+                </Text>
               </TouchableOpacity>
             </View>
             {logExercise && (
               <>
-                <Text style={styles.logExerciseName}>{logExercise.name}</Text>
-                <Text style={styles.logLabel}>Reps Completed</Text>
+                <Text style={[styles.logExerciseName, { color: colors.text }]}>
+                  {logExercise.name}
+                </Text>
+                <Text
+                  style={[styles.logLabel, { color: colors.textSecondary }]}
+                >
+                  Reps Completed
+                </Text>
                 <TextInput
-                  style={styles.logInput}
+                  style={[
+                    styles.logInput,
+                    {
+                      backgroundColor: colors.input,
+                      borderColor: colors.inputBorder,
+                      color: colors.text,
+                    },
+                  ]}
                   placeholder={`e.g. ${logExercise.reps}`}
+                  placeholderTextColor={colors.textMuted}
                   value={logReps}
                   onChangeText={setLogReps}
                   keyboardType="numeric"
                 />
-                <Text style={styles.logLabel}>Weight Used (optional)</Text>
+                <Text
+                  style={[styles.logLabel, { color: colors.textSecondary }]}
+                >
+                  Weight Used (optional)
+                </Text>
                 <TextInput
-                  style={styles.logInput}
+                  style={[
+                    styles.logInput,
+                    {
+                      backgroundColor: colors.input,
+                      borderColor: colors.inputBorder,
+                      color: colors.text,
+                    },
+                  ]}
                   placeholder="e.g. 10kg or BW (bodyweight)"
+                  placeholderTextColor={colors.textMuted}
                   value={logWeight}
                   onChangeText={setLogWeight}
                 />
@@ -809,7 +884,12 @@ export default function WorkoutScreen() {
       </Modal>
 
       {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
+      <View
+        style={[
+          styles.bottomNav,
+          { backgroundColor: colors.navBg, borderTopColor: colors.border },
+        ]}
+      >
         {[
           { name: "Home", icon: "🏠", route: "/dashboard" },
           { name: "Stats", icon: "📊", route: "/progress" },
@@ -829,6 +909,7 @@ export default function WorkoutScreen() {
             <Text
               style={[
                 styles.navLabel,
+                { color: colors.textMuted },
                 activeTab === tab.name && styles.navLabelActive,
               ]}
             >
@@ -842,7 +923,7 @@ export default function WorkoutScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#fff" },
+  safe: { flex: 1 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -851,19 +932,15 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
-  headerTitle: { fontSize: 20, fontWeight: "bold", color: "#111" },
-  headerIcon: { fontSize: 20, color: "#999" },
-
+  headerTitle: { fontSize: 20, fontWeight: "bold" },
+  headerIcon: { fontSize: 20 },
   daySection: {
     marginHorizontal: 16,
     marginTop: 14,
-    backgroundColor: "#fafafa",
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
   },
   dayHeader: {
     flexDirection: "row",
@@ -871,8 +948,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
-  dayTitle: { fontSize: 15, fontWeight: "700", color: "#111" },
-  dayDate: { fontSize: 11, color: "#888", marginTop: 2 },
+  dayTitle: { fontSize: 15, fontWeight: "700" },
+  dayDate: { fontSize: 11, marginTop: 2 },
   dayActions: { flexDirection: "row", gap: 8 },
   logAllBtn: {
     backgroundColor: "#4CAF50",
@@ -888,19 +965,17 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   editPlanText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-
   restCard: { alignItems: "center", paddingVertical: 20 },
   restIcon: { fontSize: 36, marginBottom: 8 },
-  restTitle: { fontSize: 16, fontWeight: "700", color: "#111" },
-  restSubtitle: { fontSize: 12, color: "#888", marginTop: 4 },
-
+  restTitle: { fontSize: 16, fontWeight: "700" },
+  restSubtitle: { fontSize: 12, marginTop: 4 },
   progressRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     marginBottom: 12,
   },
-  progressBar: { flex: 1, height: 6, backgroundColor: "#eee", borderRadius: 3 },
+  progressBar: { flex: 1, height: 6, borderRadius: 3 },
   progressFill: { height: 6, backgroundColor: "#4CAF50", borderRadius: 3 },
   progressText: {
     fontSize: 12,
@@ -908,7 +983,6 @@ const styles = StyleSheet.create({
     color: "#4CAF50",
     width: 35,
   },
-
   exerciseRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -916,27 +990,23 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
     marginBottom: 8,
-    backgroundColor: "#fff",
   },
-  exerciseRowDone: { borderColor: "#4CAF50", backgroundColor: "#F1F8E9" },
-  exerciseLeft: { alignItems: "center" },
+  exerciseRowDone: { borderColor: "#4CAF50" },
   exerciseCheck: {
     width: 24,
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: "#ddd",
     alignItems: "center",
     justifyContent: "center",
   },
   exerciseCheckDone: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
   checkmark: { color: "#fff", fontSize: 14, fontWeight: "bold" },
   exerciseInfo: { flex: 1 },
-  exerciseName: { fontSize: 14, fontWeight: "700", color: "#111" },
+  exerciseName: { fontSize: 14, fontWeight: "700" },
   exerciseNameDone: { color: "#4CAF50" },
-  exerciseSets: { fontSize: 12, color: "#888", marginTop: 2 },
+  exerciseSets: { fontSize: 12, marginTop: 2 },
   exerciseMuscle: { fontSize: 11, color: "#4CAF50", marginTop: 2 },
   loggedRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 },
   loggedBadge: {
@@ -953,21 +1023,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   logBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
     maxHeight: "85%",
   },
   logModalContent: {
-    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -978,20 +1045,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: "bold", color: "#111", flex: 1 },
-  modalClose: { fontSize: 20, color: "#999", padding: 4 },
-
+  modalTitle: { fontSize: 18, fontWeight: "bold", flex: 1 },
+  modalClose: { fontSize: 20, padding: 4 },
   exerciseInfoGrid: { flexDirection: "row", gap: 8, marginBottom: 16 },
-  infoBox: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "center",
-  },
+  infoBox: { flex: 1, borderRadius: 12, padding: 12, alignItems: "center" },
   infoValue: { fontSize: 14, fontWeight: "bold", color: "#4CAF50" },
-  infoLabel: { fontSize: 10, color: "#888", marginTop: 4 },
-
+  infoLabel: { fontSize: 10, marginTop: 4 },
   videoPlaceholder: {
     backgroundColor: "#1a1a1a",
     borderRadius: 16,
@@ -1002,13 +1061,7 @@ const styles = StyleSheet.create({
   videoIcon: { fontSize: 40, marginBottom: 8 },
   videoText: { fontSize: 16, fontWeight: "600", color: "#fff" },
   videoSubtext: { fontSize: 12, color: "#888", marginTop: 4 },
-
-  modalSection: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111",
-    marginBottom: 12,
-  },
+  modalSection: { fontSize: 15, fontWeight: "700", marginBottom: 12 },
   stepRow: {
     flexDirection: "row",
     gap: 10,
@@ -1024,7 +1077,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   stepNumberText: { color: "#fff", fontSize: 12, fontWeight: "bold" },
-  stepText: { fontSize: 13, color: "#444", flex: 1, lineHeight: 20 },
+  stepText: { fontSize: 13, flex: 1, lineHeight: 20 },
   modalCloseBtn: {
     backgroundColor: "#4CAF50",
     padding: 14,
@@ -1034,17 +1087,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalCloseBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-
-  logExerciseName: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111",
-    marginBottom: 16,
-  },
-  logLabel: { fontSize: 13, fontWeight: "600", color: "#555", marginBottom: 6 },
+  logExerciseName: { fontSize: 15, fontWeight: "700", marginBottom: 16 },
+  logLabel: { fontSize: 13, fontWeight: "600", marginBottom: 6 },
   logInput: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 12,
     padding: 12,
     fontSize: 14,
@@ -1057,13 +1103,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveLogText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-
   bottomNav: {
     flexDirection: "row",
-    backgroundColor: "#fff",
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
     position: "absolute",
     bottom: 0,
     left: 0,
@@ -1071,6 +1114,6 @@ const styles = StyleSheet.create({
   },
   navItem: { flex: 1, alignItems: "center" },
   navIcon: { fontSize: 22 },
-  navLabel: { fontSize: 11, color: "#aaa", marginTop: 2 },
+  navLabel: { fontSize: 11, marginTop: 2 },
   navLabelActive: { color: "#4CAF50", fontWeight: "700" },
 });
