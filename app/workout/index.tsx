@@ -1,4 +1,16 @@
 import { useRouter } from "expo-router";
+import {
+  BarChart3,
+  Check,
+  Dumbbell,
+  Home,
+  Moon,
+  Dumbbell as MuscleIcon,
+  Play,
+  User,
+  Utensils,
+  X,
+} from "lucide-react-native";
 import { useState } from "react";
 import {
   Alert,
@@ -579,10 +591,8 @@ export default function WorkoutScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Weekly Workout Plan
         </Text>
-        <TouchableOpacity>
-          <Text style={[styles.headerIcon, { color: colors.textMuted }]}>
-            ✕
-          </Text>
+        <TouchableOpacity onPress={() => router.push("/dashboard" as any)}>
+          <X size={20} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -622,7 +632,7 @@ export default function WorkoutScreen() {
 
             {day.isRest ? (
               <View style={styles.restCard}>
-                <Text style={styles.restIcon}>😴</Text>
+                <Moon size={36} color={colors.textMuted} />
                 <Text style={[styles.restTitle, { color: colors.text }]}>
                   Rest Day
                 </Text>
@@ -680,7 +690,9 @@ export default function WorkoutScreen() {
                       ]}
                       onPress={() => toggleExercise(dayIndex, exIndex)}
                     >
-                      {exercise.done && <Text style={styles.checkmark}>✓</Text>}
+                      {exercise.done && (
+                        <Check size={14} color="#fff" strokeWidth={3} />
+                      )}
                     </TouchableOpacity>
                     <View style={styles.exerciseInfo}>
                       <Text
@@ -701,9 +713,12 @@ export default function WorkoutScreen() {
                         {exercise.sets} sets × {exercise.reps} •{" "}
                         {exercise.equipment}
                       </Text>
-                      <Text style={styles.exerciseMuscle}>
-                        💪 {exercise.muscleGroup}
-                      </Text>
+                      <View style={styles.muscleRow}>
+                        <MuscleIcon size={11} color="#4CAF50" />
+                        <Text style={styles.exerciseMuscle}>
+                          {exercise.muscleGroup}
+                        </Text>
+                      </View>
                       {exercise.loggedSets.length > 0 && (
                         <View style={styles.loggedRow}>
                           {exercise.loggedSets.map((log, li) => (
@@ -743,11 +758,7 @@ export default function WorkoutScreen() {
                       {selectedExercise.name}
                     </Text>
                     <TouchableOpacity onPress={() => setShowDetailModal(false)}>
-                      <Text
-                        style={[styles.modalClose, { color: colors.textMuted }]}
-                      >
-                        ✕
-                      </Text>
+                      <X size={20} color={colors.textMuted} />
                     </TouchableOpacity>
                   </View>
                   <View style={styles.exerciseInfoGrid}>
@@ -777,7 +788,9 @@ export default function WorkoutScreen() {
                     ))}
                   </View>
                   <View style={styles.videoPlaceholder}>
-                    <Text style={styles.videoIcon}>▶️</Text>
+                    <View style={styles.playButtonCircle}>
+                      <Play size={24} color="#fff" fill="#fff" />
+                    </View>
                     <Text style={styles.videoText}>Video Demonstration</Text>
                     <Text style={styles.videoSubtext}>
                       Available in full version
@@ -825,9 +838,7 @@ export default function WorkoutScreen() {
                 Log Exercise
               </Text>
               <TouchableOpacity onPress={() => setShowLogModal(false)}>
-                <Text style={[styles.modalClose, { color: colors.textMuted }]}>
-                  ✕
-                </Text>
+                <X size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
             {logExercise && (
@@ -891,32 +902,39 @@ export default function WorkoutScreen() {
         ]}
       >
         {[
-          { name: "Home", icon: "🏠", route: "/dashboard" },
-          { name: "Stats", icon: "📊", route: "/progress" },
-          { name: "Meal", icon: "🍽️", route: "/meal" },
-          { name: "Exercise", icon: "💪", route: "/workout" },
-          { name: "Profile", icon: "👤", route: "/profile" },
-        ].map((tab) => (
-          <TouchableOpacity
-            key={tab.name}
-            style={styles.navItem}
-            onPress={() => {
-              setActiveTab(tab.name);
-              router.push(tab.route as any);
-            }}
-          >
-            <Text style={styles.navIcon}>{tab.icon}</Text>
-            <Text
-              style={[
-                styles.navLabel,
-                { color: colors.textMuted },
-                activeTab === tab.name && styles.navLabelActive,
-              ]}
+          { name: "Home", Icon: Home, route: "/dashboard" },
+          { name: "Stats", Icon: BarChart3, route: "/progress" },
+          { name: "Meal", Icon: Utensils, route: "/meal" },
+          { name: "Exercise", Icon: Dumbbell, route: "/workout" },
+          { name: "Profile", Icon: User, route: "/profile" },
+        ].map((tab) => {
+          const isActive = activeTab === tab.name;
+          return (
+            <TouchableOpacity
+              key={tab.name}
+              style={styles.navItem}
+              onPress={() => {
+                setActiveTab(tab.name);
+                router.push(tab.route as any);
+              }}
             >
-              {tab.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <tab.Icon
+                size={22}
+                color={isActive ? "#4CAF50" : colors.textMuted}
+                strokeWidth={isActive ? 2.4 : 2}
+              />
+              <Text
+                style={[
+                  styles.navLabel,
+                  { color: colors.textMuted },
+                  isActive && styles.navLabelActive,
+                ]}
+              >
+                {tab.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </SafeAreaView>
   );
@@ -934,7 +952,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: { fontSize: 20, fontWeight: "bold" },
-  headerIcon: { fontSize: 20 },
   daySection: {
     marginHorizontal: 16,
     marginTop: 14,
@@ -965,10 +982,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   editPlanText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  restCard: { alignItems: "center", paddingVertical: 20 },
-  restIcon: { fontSize: 36, marginBottom: 8 },
+  restCard: { alignItems: "center", paddingVertical: 20, gap: 8 },
   restTitle: { fontSize: 16, fontWeight: "700" },
-  restSubtitle: { fontSize: 12, marginTop: 4 },
+  restSubtitle: { fontSize: 12 },
   progressRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1002,12 +1018,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   exerciseCheckDone: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
-  checkmark: { color: "#fff", fontSize: 14, fontWeight: "bold" },
   exerciseInfo: { flex: 1 },
   exerciseName: { fontSize: 14, fontWeight: "700" },
   exerciseNameDone: { color: "#4CAF50" },
   exerciseSets: { fontSize: 12, marginTop: 2 },
-  exerciseMuscle: { fontSize: 11, color: "#4CAF50", marginTop: 2 },
+  muscleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  exerciseMuscle: { fontSize: 11, color: "#4CAF50" },
   loggedRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 },
   loggedBadge: {
     backgroundColor: "#E8F5E9",
@@ -1046,7 +1067,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: { fontSize: 18, fontWeight: "bold", flex: 1 },
-  modalClose: { fontSize: 20, padding: 4 },
   exerciseInfoGrid: { flexDirection: "row", gap: 8, marginBottom: 16 },
   infoBox: { flex: 1, borderRadius: 12, padding: 12, alignItems: "center" },
   infoValue: { fontSize: 14, fontWeight: "bold", color: "#4CAF50" },
@@ -1057,10 +1077,18 @@ const styles = StyleSheet.create({
     padding: 30,
     alignItems: "center",
     marginBottom: 16,
+    gap: 8,
   },
-  videoIcon: { fontSize: 40, marginBottom: 8 },
+  playButtonCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   videoText: { fontSize: 16, fontWeight: "600", color: "#fff" },
-  videoSubtext: { fontSize: 12, color: "#888", marginTop: 4 },
+  videoSubtext: { fontSize: 12, color: "#888" },
   modalSection: { fontSize: 15, fontWeight: "700", marginBottom: 12 },
   stepRow: {
     flexDirection: "row",
@@ -1113,7 +1141,6 @@ const styles = StyleSheet.create({
     right: 0,
   },
   navItem: { flex: 1, alignItems: "center" },
-  navIcon: { fontSize: 22 },
   navLabel: { fontSize: 11, marginTop: 2 },
   navLabelActive: { color: "#4CAF50", fontWeight: "700" },
 });

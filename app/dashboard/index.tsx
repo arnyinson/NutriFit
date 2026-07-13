@@ -1,4 +1,18 @@
 import { useRouter } from "expo-router";
+import {
+  BarChart3,
+  Check,
+  ChevronDown,
+  Dumbbell,
+  Flame,
+  Home,
+  Moon,
+  Sun,
+  Sunrise,
+  Trophy,
+  User,
+  Utensils,
+} from "lucide-react-native";
 import { useState } from "react";
 import {
   SafeAreaView,
@@ -41,6 +55,12 @@ const workouts = [
   { name: "Plank", sets: "3 sets x 45 sec" },
   { name: "Bicycle Crunch", sets: "3 sets x 20 reps" },
 ];
+
+const mealTypeIcon = (type: string) => {
+  if (type === "Breakfast") return Sunrise;
+  if (type === "Lunch") return Sun;
+  return Moon;
+};
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -93,14 +113,23 @@ export default function DashboardScreen() {
             <TouchableOpacity onPress={() => router.push("/profile" as any)}>
               <View style={styles.avatar} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/calendar" as any)}>
+            <TouchableOpacity
+              onPress={() => router.push("/calendar" as any)}
+              style={styles.dateRow}
+            >
               <Text style={[styles.dateText, { color: colors.textSecondary }]}>
-                {today} ▼
+                {today}
               </Text>
+              <ChevronDown size={14} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
           <TouchableOpacity onPress={() => router.push("/achievements" as any)}>
-            <Text style={styles.trophy}>🏆</Text>
+            <Trophy
+              size={24}
+              color="#FF9800"
+              fill="#FF9800"
+              fillOpacity={0.15}
+            />
           </TouchableOpacity>
         </View>
 
@@ -110,7 +139,7 @@ export default function DashboardScreen() {
         </Text>
         <Text style={[styles.subGreeting, { color: colors.textMuted }]}>
           {"You're "}
-          {percentage}% toward {"today's"} goal 🔥
+          {percentage}% toward {"today's"} goal
         </Text>
 
         {/* Calorie Card */}
@@ -169,56 +198,53 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          {mealList.map((meal) => (
-            <View
-              key={meal.id}
-              style={[
-                styles.mealRow,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}
-            >
+          {mealList.map((meal) => {
+            const MealIcon = mealTypeIcon(meal.type);
+            return (
               <View
-                style={[styles.mealIcon, { backgroundColor: colors.input }]}
-              >
-                <Text style={styles.mealEmoji}>
-                  {meal.type === "Breakfast"
-                    ? "🌅"
-                    : meal.type === "Lunch"
-                      ? "☀️"
-                      : "🌙"}
-                </Text>
-              </View>
-              <View style={styles.mealInfo}>
-                <Text style={[styles.mealType, { color: colors.text }]}>
-                  {meal.type}
-                </Text>
-                <Text style={[styles.mealName, { color: colors.textMuted }]}>
-                  {meal.name}
-                </Text>
-              </View>
-              <Text
-                style={[styles.mealCalories, { color: colors.textSecondary }]}
-              >
-                ~{meal.calories} kcal
-              </Text>
-              <TouchableOpacity
+                key={meal.id}
                 style={[
-                  styles.actionBtn,
-                  meal.taken ? styles.takenBtn : styles.takeBtn,
+                  styles.mealRow,
+                  { backgroundColor: colors.card, borderColor: colors.border },
                 ]}
-                onPress={() =>
-                  toggleMeal(meal.id, meal.taken ? "skip" : "take")
-                }
               >
-                <Text style={styles.actionBtnText}>
-                  {meal.taken ? "Skip" : "Take"}
+                <View
+                  style={[styles.mealIcon, { backgroundColor: colors.input }]}
+                >
+                  <MealIcon size={18} color={colors.primary} />
+                </View>
+                <View style={styles.mealInfo}>
+                  <Text style={[styles.mealType, { color: colors.text }]}>
+                    {meal.type}
+                  </Text>
+                  <Text style={[styles.mealName, { color: colors.textMuted }]}>
+                    {meal.name}
+                  </Text>
+                </View>
+                <Text
+                  style={[styles.mealCalories, { color: colors.textSecondary }]}
+                >
+                  ~{meal.calories} kcal
                 </Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+                <TouchableOpacity
+                  style={[
+                    styles.actionBtn,
+                    meal.taken ? styles.takenBtn : styles.takeBtn,
+                  ]}
+                  onPress={() =>
+                    toggleMeal(meal.id, meal.taken ? "skip" : "take")
+                  }
+                >
+                  <Text style={styles.actionBtnText}>
+                    {meal.taken ? "Skip" : "Take"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
 
           <View style={styles.totalRow}>
-            <Text style={styles.fireIcon}>🔥</Text>
+            <Flame size={16} color="#FF9800" fill="#FF9800" fillOpacity={0.2} />
             <Text style={[styles.totalText, { color: colors.text }]}>
               Total kcal |{" "}
               {mealList
@@ -284,7 +310,9 @@ export default function DashboardScreen() {
                 ]}
                 onPress={() => toggleWorkout(index)}
               >
-                {exercise.done && <Text style={styles.checkmark}>✓</Text>}
+                {exercise.done && (
+                  <Check size={14} color="#fff" strokeWidth={3} />
+                )}
               </TouchableOpacity>
             </View>
           ))}
@@ -301,32 +329,39 @@ export default function DashboardScreen() {
         ]}
       >
         {[
-          { name: "Home", icon: "🏠", route: "/dashboard" },
-          { name: "Stats", icon: "📊", route: "/progress" },
-          { name: "Meal", icon: "🍽️", route: "/meal" },
-          { name: "Exercise", icon: "💪", route: "/workout" },
-          { name: "Profile", icon: "👤", route: "/profile" },
-        ].map((tab) => (
-          <TouchableOpacity
-            key={tab.name}
-            style={styles.navItem}
-            onPress={() => {
-              setActiveTab(tab.name);
-              router.push(tab.route as any);
-            }}
-          >
-            <Text style={styles.navIcon}>{tab.icon}</Text>
-            <Text
-              style={[
-                styles.navLabel,
-                { color: colors.textMuted },
-                activeTab === tab.name && styles.navLabelActive,
-              ]}
+          { name: "Home", Icon: Home, route: "/dashboard" },
+          { name: "Stats", Icon: BarChart3, route: "/progress" },
+          { name: "Meal", Icon: Utensils, route: "/meal" },
+          { name: "Exercise", Icon: Dumbbell, route: "/workout" },
+          { name: "Profile", Icon: User, route: "/profile" },
+        ].map((tab) => {
+          const isActive = activeTab === tab.name;
+          return (
+            <TouchableOpacity
+              key={tab.name}
+              style={styles.navItem}
+              onPress={() => {
+                setActiveTab(tab.name);
+                router.push(tab.route as any);
+              }}
             >
-              {tab.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <tab.Icon
+                size={22}
+                color={isActive ? "#4CAF50" : colors.textMuted}
+                strokeWidth={isActive ? 2.4 : 2}
+              />
+              <Text
+                style={[
+                  styles.navLabel,
+                  { color: colors.textMuted },
+                  isActive && styles.navLabelActive,
+                ]}
+              >
+                {tab.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </SafeAreaView>
   );
@@ -350,8 +385,8 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     backgroundColor: "#4CAF50",
   },
+  dateRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   dateText: { fontSize: 13, fontWeight: "500" },
-  trophy: { fontSize: 24 },
   greeting: {
     fontSize: 26,
     fontWeight: "bold",
@@ -449,7 +484,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  mealEmoji: { fontSize: 18 },
   mealInfo: { flex: 1 },
   mealType: { fontSize: 13, fontWeight: "700" },
   mealName: { fontSize: 11 },
@@ -464,7 +498,6 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 4,
   },
-  fireIcon: { fontSize: 16 },
   totalText: { fontSize: 13, fontWeight: "600" },
   logBtn: {
     backgroundColor: "#4CAF50",
@@ -505,7 +538,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   exerciseCheckDone: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
-  checkmark: { color: "#fff", fontSize: 12, fontWeight: "bold" },
   bottomNav: {
     flexDirection: "row",
     paddingVertical: 10,
@@ -516,7 +548,6 @@ const styles = StyleSheet.create({
     right: 0,
   },
   navItem: { flex: 1, alignItems: "center" },
-  navIcon: { fontSize: 22 },
   navLabel: { fontSize: 11, marginTop: 2 },
   navLabelActive: { color: "#4CAF50", fontWeight: "700" },
 });

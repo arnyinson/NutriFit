@@ -12,6 +12,14 @@ import {
   View,
 } from "react-native";
 import { useTheme } from "../../constants/theme";
+import {
+  ChevronLeft, X, Lock, CheckCircle2, Share2,
+  Salad, ClipboardList, NotebookPen, UtensilsCrossed,
+  Medal, Dumbbell, Crown, Flame, Zap, Target,
+  BarChart3, Scale, Sparkle, Trophy, TrendingDown,
+  Utensils, Star,
+} from "lucide-react-native";
+import type { ComponentType } from "react";
 
 type Achievement = {
   id: string;
@@ -19,7 +27,7 @@ type Achievement = {
   description: string;
   xp: number;
   unlocked: boolean;
-  icon: string;
+Icon: ComponentType<any>;
   category: "Nutrition" | "Workout" | "Goals";
 };
 
@@ -30,7 +38,7 @@ const achievements: Achievement[] = [
     description: "Logged your first nutritious meal",
     xp: 50,
     unlocked: true,
-    icon: "🥗",
+    Icon: Salad,
     category: "Nutrition",
   },
   {
@@ -39,7 +47,7 @@ const achievements: Achievement[] = [
     description: "Logged all meals in one day",
     xp: 70,
     unlocked: true,
-    icon: "📋",
+    Icon: ClipboardList,
     category: "Nutrition",
   },
   {
@@ -48,7 +56,7 @@ const achievements: Achievement[] = [
     description: "Selected a recommended meal",
     xp: 50,
     unlocked: true,
-    icon: "✅",
+    Icon: CheckCircle2,
     category: "Nutrition",
   },
   {
@@ -57,7 +65,7 @@ const achievements: Achievement[] = [
     description: "Logged meals for 3 days",
     xp: 100,
     unlocked: true,
-    icon: "📝",
+    Icon: NotebookPen,
     category: "Nutrition",
   },
   {
@@ -66,7 +74,7 @@ const achievements: Achievement[] = [
     description: "Logged 10 different meals",
     xp: 150,
     unlocked: false,
-    icon: "🍱",
+    Icon: UtensilsCrossed,
     category: "Nutrition",
   },
   {
@@ -75,7 +83,7 @@ const achievements: Achievement[] = [
     description: "Logged meals for 30 days",
     xp: 300,
     unlocked: false,
-    icon: "🏅",
+    Icon: Medal,
     category: "Nutrition",
   },
   {
@@ -84,7 +92,7 @@ const achievements: Achievement[] = [
     description: "Completed your first workout",
     xp: 50,
     unlocked: true,
-    icon: "💪",
+    Icon: Dumbbell,
     category: "Workout",
   },
   {
@@ -93,7 +101,7 @@ const achievements: Achievement[] = [
     description: "Worked out 3 days in a row",
     xp: 100,
     unlocked: true,
-    icon: "👑",
+    Icon: Crown,
     category: "Workout",
   },
   {
@@ -102,7 +110,7 @@ const achievements: Achievement[] = [
     description: "Logged 5 full workouts",
     xp: 120,
     unlocked: false,
-    icon: "🏋️",
+    Icon: Dumbbell,
     category: "Workout",
   },
   {
@@ -111,7 +119,7 @@ const achievements: Achievement[] = [
     description: "Completed 10 workouts",
     xp: 200,
     unlocked: false,
-    icon: "🔥",
+    Icon: Flame,
     category: "Workout",
   },
   {
@@ -120,7 +128,7 @@ const achievements: Achievement[] = [
     description: "Worked out 7 days in a row",
     xp: 250,
     unlocked: false,
-    icon: "⚡",
+    Icon: Zap,
     category: "Workout",
   },
   {
@@ -129,7 +137,7 @@ const achievements: Achievement[] = [
     description: "Set your first dietary goal",
     xp: 30,
     unlocked: true,
-    icon: "🎯",
+    Icon: Target,
     category: "Goals",
   },
   {
@@ -138,7 +146,7 @@ const achievements: Achievement[] = [
     description: "Met calorie goal for 3 days",
     xp: 80,
     unlocked: true,
-    icon: "📊",
+    Icon: BarChart3,
     category: "Goals",
   },
   {
@@ -147,7 +155,7 @@ const achievements: Achievement[] = [
     description: "Lost 1kg toward your goal",
     xp: 150,
     unlocked: false,
-    icon: "⚖️",
+    Icon: Scale,
     category: "Goals",
   },
   {
@@ -156,7 +164,7 @@ const achievements: Achievement[] = [
     description: "Reached 50% of weight goal",
     xp: 200,
     unlocked: false,
-    icon: "🌟",
+    Icon: Sparkle,
     category: "Goals",
   },
   {
@@ -165,17 +173,24 @@ const achievements: Achievement[] = [
     description: "Reached your target weight",
     xp: 500,
     unlocked: false,
-    icon: "🏆",
+    Icon: Trophy,
     category: "Goals",
   },
+];
+
+const socialPlatforms = [
+  { name: "Facebook" },
+  { name: "Twitter" },
+  { name: "Instagram" },
+  { name: "TikTok" },
 ];
 
 export default function AchievementsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const [activeCategory, setActiveCategory] = useState<
-    "Nutrition" | "Workout" | "Goals"
-  >("Nutrition");
+  const [activeCategory, setActiveCategory] = useState <
+    "Nutrition" | "Workout" | "Goals" 
+    >("Nutrition");
   const [selectedAchievement, setSelectedAchievement] =
     useState<Achievement | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -200,7 +215,7 @@ export default function AchievementsScreen() {
   const handleShare = async (achievement: Achievement) => {
     try {
       await Share.share({
-        message: `🏆 I just unlocked "${achievement.title}" on NutriFit! ${achievement.icon}\n\n${achievement.description}\n\n+${achievement.xp} XP earned! 💪\n\n#NutriFit #FitnessGoals`,
+        message: `I just unlocked "${achievement.title}" on NutriFit!\n\n${achievement.description}\n\n+${achievement.xp} XP earned!\n\n#NutriFit #FitnessGoals`,
       });
     } catch (error) {
       Alert.alert("Error", "Could not share achievement.");
@@ -210,7 +225,7 @@ export default function AchievementsScreen() {
   const handleShareProgress = async () => {
     try {
       await Share.share({
-        message: `💪 My NutriFit Progress!\n\n📉 Weight Lost: ${weightLost} kg\n🍽️ Meals Taken: ${mealsTaken}/21\n🔥 Calories Burned: ${caloriesBurned.toLocaleString()}\n⭐ Total XP: ${totalXP}\n🏅 Level: ${currentLevel}\n\n#NutriFit #FitnessJourney`,
+        message: `My NutriFit Progress!\n\nWeight Lost: ${weightLost} kg\nMeals Taken: ${mealsTaken}/21\nCalories Burned: ${caloriesBurned.toLocaleString()}\nTotal XP: ${totalXP}\nLevel: ${currentLevel}\n\n#NutriFit #FitnessJourney`,
       });
     } catch (error) {
       Alert.alert("Error", "Could not share progress.");
@@ -230,7 +245,7 @@ export default function AchievementsScreen() {
         ]}
       >
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[styles.backBtn, { color: colors.primary }]}>←</Text>
+          <ChevronLeft size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Achievements
@@ -316,7 +331,7 @@ export default function AchievementsScreen() {
           <View
             style={[styles.recentUnlock, { backgroundColor: colors.input }]}
           >
-            <Text style={styles.recentIcon}>🏆</Text>
+            <Trophy size={28} color="#FF9800" fill="#FF9800" fillOpacity={0.15} />
             <View style={styles.recentInfo}>
               <Text style={styles.recentTitle}>Achievement Unlocked!</Text>
               <Text style={[styles.recentName, { color: colors.text }]}>
@@ -329,18 +344,19 @@ export default function AchievementsScreen() {
             style={styles.shareProgressBtn}
             onPress={() => setShowShareModal(true)}
           >
-            <Text style={[styles.shareProgressIcon, { color: colors.primary }]}>
-              ＜ Share My Progress
+            <Share2 size={14} color={colors.primary} />
+            <Text style={[styles.shareProgressText, { color: colors.primary }]}>
+              Share My Progress
             </Text>
           </TouchableOpacity>
           <View style={styles.socialRow}>
-            {["📘", "🔴", "🐦", "📸", "🎵"].map((icon, i) => (
+            {socialPlatforms.map((platform, i) => (
               <TouchableOpacity
                 key={i}
                 style={[styles.socialBtn, { backgroundColor: colors.input }]}
                 onPress={handleShareProgress}
               >
-                <Text style={styles.socialIcon}>{icon}</Text>
+                <Share2 size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             ))}
           </View>
@@ -413,9 +429,11 @@ export default function AchievementsScreen() {
                   },
                 ]}
               >
-                <Text style={styles.achievementEmoji}>
-                  {achievement.unlocked ? achievement.icon : "🔒"}
-                </Text>
+                {achievement.unlocked ? (
+                  <achievement.Icon size={22} color="#4CAF50" />
+                ) : (
+                  <Lock size={20} color={colors.textMuted} />
+                )}
               </View>
               <View style={styles.achievementInfo}>
                 <Text
@@ -457,7 +475,7 @@ export default function AchievementsScreen() {
                 </TouchableOpacity>
               ) : (
                 <View style={styles.lockedBadge}>
-                  <Text style={styles.lockedText}>🔒</Text>
+                  <Lock size={18} color={colors.textMuted} />
                 </View>
               )}
             </TouchableOpacity>
@@ -478,19 +496,24 @@ export default function AchievementsScreen() {
                     {selectedAchievement.title}
                   </Text>
                   <TouchableOpacity onPress={() => setShowModal(false)}>
-                    <Text
-                      style={[styles.modalClose, { color: colors.textMuted }]}
-                    >
-                      ✕
-                    </Text>
+                    <X size={20} color={colors.textMuted} />
                   </TouchableOpacity>
                 </View>
-                <View style={styles.modalIconContainer}>
-                  <Text style={styles.modalIcon}>
-                    {selectedAchievement.unlocked
-                      ? selectedAchievement.icon
-                      : "🔒"}
-                  </Text>
+                <View
+                  style={[
+                    styles.modalIconContainer,
+                    {
+                      backgroundColor: selectedAchievement.unlocked
+                        ? "#E8F5E9"
+                        : colors.input,
+                    },
+                  ]}
+                >
+                  {selectedAchievement.unlocked ? (
+                    <selectedAchievement.Icon size={48} color="#4CAF50" />
+                  ) : (
+                    <Lock size={44} color={colors.textMuted} />
+                  )}
                 </View>
                 <Text
                   style={[styles.modalDesc, { color: colors.textSecondary }]}
@@ -503,10 +526,16 @@ export default function AchievementsScreen() {
                 >
                   Category: {selectedAchievement.category}
                 </Text>
-                <Text style={[styles.modalStatus, { color: colors.textMuted }]}>
-                  Status:{" "}
-                  {selectedAchievement.unlocked ? "✅ Unlocked" : "🔒 Locked"}
-                </Text>
+                <View style={styles.modalStatusRow}>
+                  {selectedAchievement.unlocked ? (
+                    <CheckCircle2 size={14} color={colors.textMuted} />
+                  ) : (
+                    <Lock size={14} color={colors.textMuted} />
+                  )}
+                  <Text style={[styles.modalStatus, { color: colors.textMuted }]}>
+                    Status: {selectedAchievement.unlocked ? "Unlocked" : "Locked"}
+                  </Text>
+                </View>
                 {selectedAchievement.unlocked && (
                   <TouchableOpacity
                     style={styles.modalShareBtn}
@@ -546,31 +575,29 @@ export default function AchievementsScreen() {
                 Share My Progress
               </Text>
               <TouchableOpacity onPress={() => setShowShareModal(false)}>
-                <Text style={[styles.modalClose, { color: colors.textMuted }]}>
-                  ✕
-                </Text>
+                <X size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
             <View
               style={[styles.sharePreview, { backgroundColor: colors.input }]}
             >
               <Text style={[styles.sharePreviewTitle, { color: colors.text }]}>
-                💪 My NutriFit Progress
+                My NutriFit Progress
               </Text>
               {[
-                { icon: "📉", text: `Weight Lost: ${weightLost} kg` },
-                { icon: "🍽️", text: `Meals Taken: ${mealsTaken}/21` },
+                { Icon: TrendingDown, text: `Weight Lost: ${weightLost} kg` },
+                { Icon: Utensils, text: `Meals Taken: ${mealsTaken}/21` },
                 {
-                  icon: "🔥",
+                  Icon: Flame,
                   text: `Calories Burned: ${caloriesBurned.toLocaleString()}`,
                 },
                 {
-                  icon: "⭐",
+                  Icon: Star,
                   text: `Total XP: ${totalXP} | Level ${currentLevel}`,
                 },
               ].map((item, i) => (
                 <View key={i} style={styles.shareStatRow}>
-                  <Text style={styles.shareStatIcon}>{item.icon}</Text>
+                  <item.Icon size={18} color={colors.textSecondary} />
                   <Text
                     style={[
                       styles.shareStatText,
@@ -583,12 +610,7 @@ export default function AchievementsScreen() {
               ))}
             </View>
             <View style={styles.socialShareRow}>
-              {[
-                { name: "Facebook", icon: "📘" },
-                { name: "Twitter", icon: "🐦" },
-                { name: "Instagram", icon: "📸" },
-                { name: "TikTok", icon: "🎵" },
-              ].map((platform) => (
+              {socialPlatforms.map((platform) => (
                 <TouchableOpacity
                   key={platform.name}
                   style={styles.socialShareBtn}
@@ -597,7 +619,14 @@ export default function AchievementsScreen() {
                     handleShareProgress();
                   }}
                 >
-                  <Text style={styles.socialShareIcon}>{platform.icon}</Text>
+                  <View
+                    style={[
+                      styles.socialShareIconBox,
+                      { backgroundColor: colors.input },
+                    ]}
+                  >
+                    <Share2 size={20} color={colors.textSecondary} />
+                  </View>
                   <Text
                     style={[
                       styles.socialShareName,
@@ -635,7 +664,6 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  backBtn: { fontSize: 22, fontWeight: "bold" },
   headerTitle: { fontSize: 18, fontWeight: "bold" },
   levelCard: { margin: 16, borderRadius: 16, padding: 16, borderWidth: 1 },
   levelRow: {
@@ -683,12 +711,17 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
   },
-  recentIcon: { fontSize: 28 },
   recentInfo: { flex: 1 },
   recentTitle: { fontSize: 12, fontWeight: "600", color: "#FF9800" },
   recentName: { fontSize: 14, fontWeight: "bold", marginTop: 2 },
-  shareProgressBtn: { alignItems: "center", marginBottom: 10 },
-  shareProgressIcon: { fontSize: 14, fontWeight: "600" },
+  shareProgressBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginBottom: 10,
+  },
+  shareProgressText: { fontSize: 14, fontWeight: "600" },
   socialRow: { flexDirection: "row", justifyContent: "center", gap: 12 },
   socialBtn: {
     width: 44,
@@ -697,7 +730,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  socialIcon: { fontSize: 20 },
   progressSummary: { marginHorizontal: 16, marginBottom: 12 },
   progressText: { fontSize: 13, marginBottom: 6, fontWeight: "600" },
   progressBar: { height: 8, borderRadius: 4, overflow: "hidden" },
@@ -737,7 +769,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  achievementEmoji: { fontSize: 24 },
   achievementInfo: { flex: 1 },
   achievementTitle: { fontSize: 14, fontWeight: "700" },
   achievementDesc: { fontSize: 12, marginTop: 2 },
@@ -750,7 +781,6 @@ const styles = StyleSheet.create({
   },
   shareBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   lockedBadge: { padding: 8 },
-  lockedText: { fontSize: 20 },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -769,9 +799,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: { fontSize: 18, fontWeight: "bold", flex: 1 },
-  modalClose: { fontSize: 20, padding: 4 },
-  modalIconContainer: { alignItems: "center", marginBottom: 16 },
-  modalIcon: { fontSize: 64 },
+  modalIconContainer: {
+    alignSelf: "center",
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
   modalDesc: { fontSize: 14, textAlign: "center", marginBottom: 10 },
   modalXP: {
     fontSize: 18,
@@ -781,7 +817,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   modalCategory: { fontSize: 13, textAlign: "center", marginBottom: 4 },
-  modalStatus: { fontSize: 13, textAlign: "center", marginBottom: 16 },
+  modalStatusRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 16,
+  },
+  modalStatus: { fontSize: 13 },
   modalShareBtn: {
     backgroundColor: "#4CAF50",
     padding: 14,
@@ -805,7 +848,6 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 8,
   },
-  shareStatIcon: { fontSize: 18 },
   shareStatText: { fontSize: 14 },
   socialShareRow: {
     flexDirection: "row",
@@ -813,6 +855,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   socialShareBtn: { alignItems: "center", gap: 6 },
-  socialShareIcon: { fontSize: 32 },
+  socialShareIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   socialShareName: { fontSize: 11 },
 });

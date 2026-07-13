@@ -1,4 +1,23 @@
 import { useRouter } from "expo-router";
+import {
+  Activity,
+  AlertTriangle,
+  Bell,
+  Calendar,
+  Camera,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Moon,
+  Ruler,
+  Sun,
+  Target,
+  Ticket,
+  User,
+  VenusAndMars,
+  Weight,
+  X,
+} from "lucide-react-native";
 import { useState } from "react";
 import {
   Alert,
@@ -106,6 +125,15 @@ export default function ProfileScreen() {
 
   const allergenList = ["Eggs", "Peanuts", "Dairy", "Shellfish", "Fish", "Soy"];
 
+  const personalInfoItems = [
+    { Icon: Calendar, label: "Birthday", value: profile.birthday },
+    { Icon: VenusAndMars, label: "Sex", value: profile.sex },
+    { Icon: Ruler, label: "Height", value: profile.height },
+    { Icon: Weight, label: "Weight", value: profile.weight },
+    { Icon: Target, label: "Dietary Goal", value: profile.dietaryGoal },
+    { Icon: Activity, label: "Activity Level", value: profile.activityLevel },
+  ];
+
   const toggleAllergen = (item: string) => {
     setEditForm((prev) => ({
       ...prev,
@@ -118,27 +146,43 @@ export default function ProfileScreen() {
   const saveProfile = () => {
     setProfile({ ...editForm });
     setShowEditModal(false);
-    Alert.alert("✅ Success", "Profile saved successfully!");
+    Alert.alert("Success", "Profile saved successfully!");
   };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
-<View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-  <TouchableOpacity onPress={() => router.back()}>
-    <Text style={[styles.backBtn, { color: colors.primary }]}>←</Text>
-  </TouchableOpacity>
-  <Text style={[styles.headerTitle, { color: colors.text }]}>Profile</Text>
-  <View style={styles.headerRight}>
-    <TouchableOpacity onPress={toggleTheme}>
-      <Text style={styles.notifIcon}>{isDark ? '☀️' : '🌙'}</Text>
-    </TouchableOpacity>
-    <TouchableOpacity onPress={() => router.push("/notifications" as any)}>
-      <Text style={styles.notifIcon}>🔔</Text>
-    </TouchableOpacity>
-  </View>
-</View>
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: colors.background,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
+          <TouchableOpacity onPress={() => router.back()}>
+            <ChevronLeft size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Profile
+          </Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity onPress={toggleTheme}>
+              {isDark ? (
+                <Sun size={22} color={colors.textMuted} />
+              ) : (
+                <Moon size={22} color={colors.textMuted} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/notifications" as any)}
+            >
+              <Bell size={22} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* Avatar + Name */}
         <View style={styles.avatarSection}>
@@ -157,7 +201,7 @@ export default function ProfileScreen() {
                 { backgroundColor: colors.card, borderColor: colors.border },
               ]}
             >
-              <Text style={styles.cameraIcon}>📷</Text>
+              <Camera size={14} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
           <Text style={[styles.profileName, { color: colors.text }]}>
@@ -214,28 +258,19 @@ export default function ProfileScreen() {
           ]}
         >
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>👤</Text>
+            <User size={18} color={colors.text} />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Personal Info
             </Text>
           </View>
-          {[
-            { icon: "📅", label: "Birthday", value: profile.birthday },
-            { icon: "⚧️", label: "Sex", value: profile.sex },
-            { icon: "📏", label: "Height", value: profile.height },
-            { icon: "⚖️", label: "Weight", value: profile.weight },
-            { icon: "🎯", label: "Dietary Goal", value: profile.dietaryGoal },
-            {
-              icon: "🏃",
-              label: "Activity Level",
-              value: profile.activityLevel,
-            },
-          ].map((item, i) => (
+          {personalInfoItems.map((item, i) => (
             <View
               key={i}
               style={[styles.infoRow, { borderBottomColor: colors.border }]}
             >
-              <Text style={styles.infoIcon}>{item.icon}</Text>
+              <View style={styles.infoIconBox}>
+                <item.Icon size={16} color={colors.textSecondary} />
+              </View>
               <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
                 {item.label}
               </Text>
@@ -247,7 +282,9 @@ export default function ProfileScreen() {
 
           {/* Allergens */}
           <View style={styles.allergenRow}>
-            <Text style={styles.infoIcon}>⚠️</Text>
+            <View style={styles.infoIconBox}>
+              <AlertTriangle size={16} color={colors.textSecondary} />
+            </View>
             <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
               Allergens
             </Text>
@@ -367,13 +404,11 @@ export default function ProfileScreen() {
           ]}
           onPress={() => router.push("/ticket" as any)}
         >
-          <Text style={styles.ticketIcon}>🎫</Text>
+          <Ticket size={20} color={colors.primary} />
           <Text style={[styles.ticketText, { color: colors.text }]}>
             Submit Feedback / Support
           </Text>
-          <Text style={[styles.ticketArrow, { color: colors.textMuted }]}>
-            ›
-          </Text>
+          <ChevronRight size={20} color={colors.textMuted} />
         </TouchableOpacity>
 
         {/* Logout */}
@@ -406,11 +441,7 @@ export default function ProfileScreen() {
                   Edit Profile
                 </Text>
                 <TouchableOpacity onPress={() => setShowEditModal(false)}>
-                  <Text
-                    style={[styles.modalClose, { color: colors.textMuted }]}
-                  >
-                    ✕
-                  </Text>
+                  <X size={20} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
 
@@ -590,9 +621,11 @@ export default function ProfileScreen() {
                     setEditForm((p) => ({ ...p, activityLevel: level }))
                   }
                 >
-                  <Text style={styles.optionCheck}>
-                    {editForm.activityLevel === level ? "✓ " : "   "}
-                  </Text>
+                  <View style={styles.optionCheck}>
+                    {editForm.activityLevel === level && (
+                      <Check size={14} color="#4CAF50" strokeWidth={3} />
+                    )}
+                  </View>
                   <Text
                     style={[styles.optionText, { color: colors.textSecondary }]}
                   >
@@ -658,10 +691,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  backBtn: { fontSize: 22, fontWeight: "bold" },
   headerTitle: { fontSize: 18, fontWeight: "bold" },
-  notifIcon: { fontSize: 22 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 14 },
   avatarSection: { alignItems: "center", paddingVertical: 24 },
   avatarContainer: { position: "relative", marginBottom: 12 },
   avatar: {
@@ -684,7 +715,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
   },
-  cameraIcon: { fontSize: 14 },
   profileName: { fontSize: 20, fontWeight: "bold" },
   profileEmail: { fontSize: 13, marginTop: 4 },
   statsRow: {
@@ -717,7 +747,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 14,
   },
-  sectionIcon: { fontSize: 18 },
   sectionTitle: { fontSize: 16, fontWeight: "700" },
   infoRow: {
     flexDirection: "row",
@@ -725,7 +754,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
   },
-  infoIcon: { fontSize: 16, width: 28 },
+  infoIconBox: { width: 28, alignItems: "flex-start" },
   infoLabel: { flex: 1, fontSize: 14 },
   infoValue: { fontSize: 14, fontWeight: "600" },
   allergenRow: {
@@ -791,33 +820,7 @@ const styles = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
   },
-  ticketIcon: { fontSize: 20 },
   ticketText: { flex: 1, fontSize: 14, fontWeight: "600" },
-  ticketArrow: { fontSize: 22 },
-  darkModeBtn: {
-    marginHorizontal: 20,
-    marginBottom: 8,
-    padding: 14,
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderWidth: 1,
-  },
-  darkModeIcon: { fontSize: 20 },
-  darkModeText: { flex: 1, fontSize: 14, fontWeight: "600" },
-  toggleSwitch: {
-    width: 42,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-  },
-  toggleThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-  },
   logoutBtn: {
     marginHorizontal: 20,
     marginBottom: 8,
@@ -845,7 +848,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: { fontSize: 18, fontWeight: "bold" },
-  modalClose: { fontSize: 20, padding: 4 },
   inputLabel: {
     fontSize: 13,
     fontWeight: "600",
@@ -892,7 +894,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   optionBtnActive: { borderColor: "#4CAF50", backgroundColor: "#f0faf0" },
-  optionCheck: { fontSize: 14, color: "#4CAF50", width: 20 },
+  optionCheck: { width: 20, alignItems: "center" },
   optionText: { fontSize: 13, flex: 1 },
   saveBtn: {
     backgroundColor: "#4CAF50",

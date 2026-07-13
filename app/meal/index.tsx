@@ -1,4 +1,24 @@
 import { useRouter } from "expo-router";
+import {
+  AlertTriangle,
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  Dumbbell,
+  Flame,
+  Home,
+  Moon,
+  NotebookPen,
+  Pencil,
+  Repeat,
+  Salad,
+  Search,
+  Sun,
+  Sunrise,
+  User,
+  Utensils,
+  X,
+} from "lucide-react-native";
 import { useState } from "react";
 import {
   Alert,
@@ -59,6 +79,20 @@ const getWeekDates = () => {
 };
 
 const weekDates = getWeekDates();
+
+const MealTypeIcon = ({
+  type,
+  size = 18,
+  color,
+}: {
+  type: string;
+  size?: number;
+  color: string;
+}) => {
+  if (type === "Breakfast") return <Sunrise size={size} color={color} />;
+  if (type === "Lunch") return <Sun size={size} color={color} />;
+  return <Moon size={size} color={color} />;
+};
 
 const mealDatabase: Meal[] = [
   {
@@ -1639,7 +1673,7 @@ export default function MealScreen() {
     };
     if (status !== "safe") {
       Alert.alert(
-        "⚠️ Allergen Warning",
+        "Allergen Warning",
         `This meal contains: ${meal.allergens.filter((a) => userAllergens.includes(a)).join(", ")}. Proceed to edit?`,
         [
           { text: "Cancel", style: "cancel" },
@@ -1748,8 +1782,9 @@ export default function MealScreen() {
       {/* Allergen Notice */}
       {userAllergens.length > 0 && (
         <View style={styles.allergenNotice}>
+          <AlertTriangle size={14} color="#E65100" />
           <Text style={styles.allergenText}>
-            ⚠️ Allergen filter: {userAllergens.join(", ")} — meals adjusted
+            Allergen filter: {userAllergens.join(", ")} — meals adjusted
             automatically
           </Text>
         </View>
@@ -1816,13 +1851,11 @@ export default function MealScreen() {
                   <View
                     style={[styles.mealIcon, { backgroundColor: colors.input }]}
                   >
-                    <Text style={styles.mealEmoji}>
-                      {meal.type === "Breakfast"
-                        ? "🌅"
-                        : meal.type === "Lunch"
-                          ? "☀️"
-                          : "🌙"}
-                    </Text>
+                    <MealTypeIcon
+                      type={meal.type}
+                      size={18}
+                      color={colors.primary}
+                    />
                   </View>
                   <View style={styles.mealInfo}>
                     <View style={styles.mealNameRow}>
@@ -1886,7 +1919,7 @@ export default function MealScreen() {
                       style={styles.pencilBtn}
                       onPress={() => openEditMeal(dayIndex, mealIndex)}
                     >
-                      <Text style={styles.pencilIcon}>✏️</Text>
+                      <Pencil size={16} color={colors.textMuted} />
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
@@ -1894,7 +1927,12 @@ export default function MealScreen() {
             })}
 
             <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
-              <Text style={styles.fireIcon}>🔥</Text>
+              <Flame
+                size={16}
+                color="#FF9800"
+                fill="#FF9800"
+                fillOpacity={0.2}
+              />
               <Text style={[styles.totalText, { color: colors.text }]}>
                 Total kcal | {getDayTotal(day.meals).toLocaleString()} kcal
               </Text>
@@ -1916,11 +1954,7 @@ export default function MealScreen() {
                       {selectedMeal.name}
                     </Text>
                     <TouchableOpacity onPress={() => setShowMealModal(false)}>
-                      <Text
-                        style={[styles.modalClose, { color: colors.textMuted }]}
-                      >
-                        ✕
-                      </Text>
+                      <X size={20} color={colors.textMuted} />
                     </TouchableOpacity>
                   </View>
                   <Text style={[styles.modalSection, { color: colors.text }]}>
@@ -2016,10 +2050,18 @@ export default function MealScreen() {
                     setEditPlanSearch("");
                   } else setShowEditPlanModal(false);
                 }}
+                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
               >
-                <Text style={[styles.modalClose, { color: colors.textMuted }]}>
-                  {editPlanSlot ? "← Back" : "✕"}
-                </Text>
+                {editPlanSlot ? (
+                  <>
+                    <ChevronLeft size={18} color={colors.textMuted} />
+                    <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+                      Back
+                    </Text>
+                  </>
+                ) : (
+                  <X size={20} color={colors.textMuted} />
+                )}
               </TouchableOpacity>
             </View>
             {!editPlanSlot ? (
@@ -2044,13 +2086,18 @@ export default function MealScreen() {
                         ]}
                         onPress={() => setEditPlanSlot(meal.type)}
                       >
-                        <Text style={styles.slotEmoji}>
-                          {meal.type === "Breakfast"
-                            ? "🌅"
-                            : meal.type === "Lunch"
-                              ? "☀️"
-                              : "🌙"}
-                        </Text>
+                        <View
+                          style={[
+                            styles.slotIconBox,
+                            { backgroundColor: colors.input },
+                          ]}
+                        >
+                          <MealTypeIcon
+                            type={meal.type}
+                            size={20}
+                            color={colors.primary}
+                          />
+                        </View>
                         <View style={styles.slotInfo}>
                           <Text
                             style={[styles.slotType, { color: colors.text }]}
@@ -2069,14 +2116,7 @@ export default function MealScreen() {
                             {displayMeal.calories} kcal
                           </Text>
                         </View>
-                        <Text
-                          style={[
-                            styles.slotArrow,
-                            { color: colors.textMuted },
-                          ]}
-                        >
-                          ›
-                        </Text>
+                        <ChevronRight size={20} color={colors.textMuted} />
                       </TouchableOpacity>
                     );
                   })}
@@ -2086,7 +2126,7 @@ export default function MealScreen() {
                 <View
                   style={[styles.searchBar, { backgroundColor: colors.input }]}
                 >
-                  <Text style={styles.searchIcon}>🔍</Text>
+                  <Search size={16} color={colors.textMuted} />
                   <TextInput
                     style={[styles.searchInput, { color: colors.text }]}
                     placeholder={`Search ${editPlanSlot} meals...`}
@@ -2124,9 +2164,19 @@ export default function MealScreen() {
                           <Text style={styles.macroText}>F: {item.fats}g</Text>
                         </View>
                         {item.allergens.length > 0 && (
-                          <Text style={styles.dbMealAllergen}>
-                            ⚠️ {item.allergens.join(", ")}
-                          </Text>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 4,
+                              marginTop: 2,
+                            }}
+                          >
+                            <AlertTriangle size={11} color="#E65100" />
+                            <Text style={styles.dbMealAllergen}>
+                              {item.allergens.join(", ")}
+                            </Text>
+                          </View>
                         )}
                       </View>
                       <Text style={styles.dbMealCal}>{item.calories} kcal</Text>
@@ -2149,39 +2199,46 @@ export default function MealScreen() {
                 Edit Meal
               </Text>
               <TouchableOpacity onPress={() => setShowEditMealModal(false)}>
-                <Text style={[styles.modalClose, { color: colors.textMuted }]}>
-                  ✕
-                </Text>
+                <X size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
 
             <View
               style={[styles.editTabRow, { backgroundColor: colors.input }]}
             >
-              {(["ingredients", "replace", "log"] as const).map((tab) => (
-                <TouchableOpacity
-                  key={tab}
-                  style={[
-                    styles.editTabBtn,
-                    editTab === tab && styles.editTabActive,
-                  ]}
-                  onPress={() => setEditTab(tab)}
-                >
-                  <Text
+              {(
+                [
+                  { key: "ingredients", label: "Ingredients", Icon: Salad },
+                  { key: "replace", label: "Replace", Icon: Repeat },
+                  { key: "log", label: "Log", Icon: NotebookPen },
+                ] as const
+              ).map((tab) => {
+                const isActive = editTab === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
                     style={[
-                      styles.editTabText,
-                      { color: colors.textMuted },
-                      editTab === tab && styles.editTabTextActive,
+                      styles.editTabBtn,
+                      isActive && styles.editTabActive,
                     ]}
+                    onPress={() => setEditTab(tab.key)}
                   >
-                    {tab === "ingredients"
-                      ? "🥄 Ingredients"
-                      : tab === "replace"
-                        ? "🔄 Replace"
-                        : "✏️ Log"}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <tab.Icon
+                      size={14}
+                      color={isActive ? "#fff" : colors.textMuted}
+                    />
+                    <Text
+                      style={[
+                        styles.editTabText,
+                        { color: colors.textMuted },
+                        isActive && styles.editTabTextActive,
+                      ]}
+                    >
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {editTab === "ingredients" && (
@@ -2258,7 +2315,7 @@ export default function MealScreen() {
                 <View
                   style={[styles.searchBar, { backgroundColor: colors.input }]}
                 >
-                  <Text style={styles.searchIcon}>🔍</Text>
+                  <Search size={16} color={colors.textMuted} />
                   <TextInput
                     style={[styles.searchInput, { color: colors.text }]}
                     placeholder="Search replacement meal..."
@@ -2296,9 +2353,19 @@ export default function MealScreen() {
                           <Text style={styles.macroText}>F: {item.fats}g</Text>
                         </View>
                         {item.allergens.length > 0 && (
-                          <Text style={styles.dbMealAllergen}>
-                            ⚠️ {item.allergens.join(", ")}
-                          </Text>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 4,
+                              marginTop: 2,
+                            }}
+                          >
+                            <AlertTriangle size={11} color="#E65100" />
+                            <Text style={styles.dbMealAllergen}>
+                              {item.allergens.join(", ")}
+                            </Text>
+                          </View>
                         )}
                       </View>
                       <Text style={styles.dbMealCal}>{item.calories} kcal</Text>
@@ -2320,12 +2387,12 @@ export default function MealScreen() {
                   Kumain ka sa labas? I-log ang iyong food intake:
                 </Text>
                 <Text style={[styles.logSubLabel, { color: colors.text }]}>
-                  🔍 Search Meal
+                  Search Meal
                 </Text>
                 <View
                   style={[styles.searchBar, { backgroundColor: colors.input }]}
                 >
-                  <Text style={styles.searchIcon}>🔍</Text>
+                  <Search size={16} color={colors.textMuted} />
                   <TextInput
                     style={[styles.searchInput, { color: colors.text }]}
                     placeholder="Search meal to log..."
@@ -2388,7 +2455,7 @@ export default function MealScreen() {
                     { color: colors.text, marginTop: 16 },
                   ]}
                 >
-                  ⚖️ Manual Input
+                  Manual Input
                 </Text>
                 <TextInput
                   style={[
@@ -2470,32 +2537,39 @@ export default function MealScreen() {
         ]}
       >
         {[
-          { name: "Home", icon: "🏠", route: "/dashboard" },
-          { name: "Stats", icon: "📊", route: "/progress" },
-          { name: "Meal", icon: "🍽️", route: "/meal" },
-          { name: "Exercise", icon: "💪", route: "/workout" },
-          { name: "Profile", icon: "👤", route: "/profile" },
-        ].map((tab) => (
-          <TouchableOpacity
-            key={tab.name}
-            style={styles.navItem}
-            onPress={() => {
-              setActiveTab(tab.name);
-              router.push(tab.route as any);
-            }}
-          >
-            <Text style={styles.navIcon}>{tab.icon}</Text>
-            <Text
-              style={[
-                styles.navLabel,
-                { color: colors.textMuted },
-                activeTab === tab.name && styles.navLabelActive,
-              ]}
+          { name: "Home", Icon: Home, route: "/dashboard" },
+          { name: "Stats", Icon: BarChart3, route: "/progress" },
+          { name: "Meal", Icon: Utensils, route: "/meal" },
+          { name: "Exercise", Icon: Dumbbell, route: "/workout" },
+          { name: "Profile", Icon: User, route: "/profile" },
+        ].map((tab) => {
+          const isActive = activeTab === tab.name;
+          return (
+            <TouchableOpacity
+              key={tab.name}
+              style={styles.navItem}
+              onPress={() => {
+                setActiveTab(tab.name);
+                router.push(tab.route as any);
+              }}
             >
-              {tab.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <tab.Icon
+                size={22}
+                color={isActive ? "#4CAF50" : colors.textMuted}
+                strokeWidth={isActive ? 2.4 : 2}
+              />
+              <Text
+                style={[
+                  styles.navLabel,
+                  { color: colors.textMuted },
+                  isActive && styles.navLabelActive,
+                ]}
+              >
+                {tab.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </SafeAreaView>
   );
@@ -2524,6 +2598,9 @@ const styles = StyleSheet.create({
   modeBtnText: { fontSize: 13, fontWeight: "600" },
   modeBtnTextActive: { color: "#fff" },
   allergenNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     marginHorizontal: 16,
     marginBottom: 8,
     padding: 10,
@@ -2532,7 +2609,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: "#FF9800",
   },
-  allergenText: { fontSize: 12, color: "#E65100" },
+  allergenText: { fontSize: 12, color: "#E65100", flex: 1 },
   daySection: {
     marginHorizontal: 16,
     marginTop: 12,
@@ -2581,7 +2658,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  mealEmoji: { fontSize: 18 },
   mealInfo: { flex: 1 },
   mealNameRow: {
     flexDirection: "row",
@@ -2614,7 +2690,6 @@ const styles = StyleSheet.create({
   skipBtn: { backgroundColor: "#FF9800" },
   actionBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   pencilBtn: { padding: 4 },
-  pencilIcon: { fontSize: 16 },
   totalRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2623,7 +2698,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTopWidth: 1,
   },
-  fireIcon: { fontSize: 16 },
   totalText: { fontSize: 13, fontWeight: "600" },
   modalOverlay: {
     flex: 1,
@@ -2643,7 +2717,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: { fontSize: 18, fontWeight: "bold", flex: 1 },
-  modalClose: { fontSize: 16, padding: 4 },
   modalSection: {
     fontSize: 15,
     fontWeight: "700",
@@ -2707,12 +2780,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 10,
   },
-  slotEmoji: { fontSize: 24 },
+  slotIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   slotInfo: { flex: 1 },
   slotType: { fontSize: 13, fontWeight: "700" },
   slotName: { fontSize: 12 },
   slotCal: { fontSize: 11, color: "#4CAF50", marginTop: 2 },
-  slotArrow: { fontSize: 22 },
   dbMealCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -2723,16 +2801,16 @@ const styles = StyleSheet.create({
   },
   dbMealInfo: { flex: 1 },
   dbMealName: { fontSize: 14, fontWeight: "600" },
-  dbMealAllergen: { fontSize: 11, color: "#E65100", marginTop: 2 },
+  dbMealAllergen: { fontSize: 11, color: "#E65100" },
   dbMealCal: { fontSize: 13, fontWeight: "700", color: "#4CAF50" },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
     marginBottom: 8,
     borderRadius: 12,
     paddingHorizontal: 12,
   },
-  searchIcon: { fontSize: 16, marginRight: 8 },
   searchInput: { flex: 1, paddingVertical: 10, fontSize: 14 },
   editTabRow: {
     flexDirection: "row",
@@ -2743,9 +2821,12 @@ const styles = StyleSheet.create({
   },
   editTabBtn: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
     paddingVertical: 8,
     borderRadius: 10,
-    alignItems: "center",
   },
   editTabActive: { backgroundColor: "#4CAF50" },
   editTabText: { fontSize: 11, fontWeight: "600" },
@@ -2790,7 +2871,6 @@ const styles = StyleSheet.create({
     right: 0,
   },
   navItem: { flex: 1, alignItems: "center" },
-  navIcon: { fontSize: 22 },
   navLabel: { fontSize: 11, marginTop: 2 },
   navLabelActive: { color: "#4CAF50", fontWeight: "700" },
 });

@@ -1,4 +1,14 @@
 import { useRouter } from "expo-router";
+import {
+  CalendarX,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Flame,
+  Moon,
+  Sun,
+  Sunrise,
+} from "lucide-react-native";
 import { useState } from "react";
 import {
   SafeAreaView,
@@ -183,6 +193,12 @@ const weeklyMeals = [
 
 const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
+const mealTypeIcon = (type: string) => {
+  if (type === "Breakfast") return Sunrise;
+  if (type === "Lunch") return Sun;
+  return Moon;
+};
+
 export default function CalendarScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -261,9 +277,13 @@ export default function CalendarScreen() {
           },
         ]}
       >
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.headerBackRow}
+        >
+          <ChevronLeft size={20} color={colors.primary} />
           <Text style={[styles.backBtn, { color: colors.primary }]}>
-            ← Calendar
+            Calendar
           </Text>
         </TouchableOpacity>
       </View>
@@ -279,17 +299,13 @@ export default function CalendarScreen() {
           {/* Month Navigation */}
           <View style={styles.monthRow}>
             <TouchableOpacity onPress={prevMonth}>
-              <Text style={[styles.monthArrow, { color: colors.primary }]}>
-                ‹
-              </Text>
+              <ChevronLeft size={26} color={colors.primary} />
             </TouchableOpacity>
             <Text style={[styles.monthTitle, { color: colors.text }]}>
               {monthName}
             </Text>
             <TouchableOpacity onPress={nextMonth}>
-              <Text style={[styles.monthArrow, { color: colors.primary }]}>
-                ›
-              </Text>
+              <ChevronRight size={26} color={colors.primary} />
             </TouchableOpacity>
           </View>
 
@@ -344,51 +360,57 @@ export default function CalendarScreen() {
               <Text style={[styles.dayHeader, { color: colors.text }]}>
                 {getDateLabel()} — {selectedDayData.day}
               </Text>
-              {selectedDayData.meals.map((meal, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.mealCard,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                    },
-                    meal.taken && styles.mealCardTaken,
-                  ]}
-                >
+              {selectedDayData.meals.map((meal, i) => {
+                const MealIcon = mealTypeIcon(meal.type);
+                return (
                   <View
-                    style={[styles.mealIcon, { backgroundColor: colors.input }]}
+                    key={i}
+                    style={[
+                      styles.mealCard,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                      },
+                      meal.taken && styles.mealCardTaken,
+                    ]}
                   >
-                    <Text style={styles.mealEmoji}>
-                      {meal.type === "Breakfast"
-                        ? "🌅"
-                        : meal.type === "Lunch"
-                          ? "☀️"
-                          : "🌙"}
-                    </Text>
-                  </View>
-                  <View style={styles.mealInfo}>
-                    <Text style={[styles.mealType, { color: colors.text }]}>
-                      {meal.type}
-                    </Text>
-                    <Text
-                      style={[styles.mealName, { color: colors.textMuted }]}
+                    <View
+                      style={[
+                        styles.mealIcon,
+                        { backgroundColor: colors.input },
+                      ]}
                     >
-                      {meal.name}
-                    </Text>
-                    <Text style={styles.mealCal}>~{meal.calories} kcal</Text>
-                  </View>
-                  {meal.taken && (
-                    <View style={styles.takenBadge}>
-                      <Text style={styles.takenText}>✓ Taken</Text>
+                      <MealIcon size={18} color={colors.primary} />
                     </View>
-                  )}
-                </View>
-              ))}
+                    <View style={styles.mealInfo}>
+                      <Text style={[styles.mealType, { color: colors.text }]}>
+                        {meal.type}
+                      </Text>
+                      <Text
+                        style={[styles.mealName, { color: colors.textMuted }]}
+                      >
+                        {meal.name}
+                      </Text>
+                      <Text style={styles.mealCal}>~{meal.calories} kcal</Text>
+                    </View>
+                    {meal.taken && (
+                      <View style={styles.takenBadge}>
+                        <Check size={12} color="#fff" strokeWidth={3} />
+                        <Text style={styles.takenText}>Taken</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
               <View
                 style={[styles.totalRow, { backgroundColor: colors.surface }]}
               >
-                <Text style={styles.fireIcon}>🔥</Text>
+                <Flame
+                  size={16}
+                  color="#FF9800"
+                  fill="#FF9800"
+                  fillOpacity={0.2}
+                />
                 <Text style={[styles.totalText, { color: colors.text }]}>
                   Total kcal |{" "}
                   {selectedDayData.meals
@@ -400,7 +422,7 @@ export default function CalendarScreen() {
             </>
           ) : (
             <View style={styles.noPlanCard}>
-              <Text style={styles.noPlanIcon}>📅</Text>
+              <CalendarX size={44} color={colors.textMuted} />
               <Text style={[styles.noPlanTitle, { color: colors.text }]}>
                 No Plan Yet
               </Text>
@@ -427,6 +449,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
+  headerBackRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   backBtn: { fontSize: 16, fontWeight: "600" },
   calendarCard: {
     margin: 16,
@@ -444,7 +467,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  monthArrow: { fontSize: 28, paddingHorizontal: 8 },
   monthTitle: { fontSize: 18, fontWeight: "700" },
   dayLabels: { flexDirection: "row", marginBottom: 8 },
   dayLabel: { flex: 1, textAlign: "center", fontSize: 12, fontWeight: "600" },
@@ -478,12 +500,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  mealEmoji: { fontSize: 20 },
   mealInfo: { flex: 1 },
   mealType: { fontSize: 13, fontWeight: "700" },
   mealName: { fontSize: 12, marginTop: 2 },
   mealCal: { fontSize: 11, color: "#4CAF50", marginTop: 2 },
   takenBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     backgroundColor: "#4CAF50",
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -498,10 +522,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 4,
   },
-  fireIcon: { fontSize: 16 },
   totalText: { fontSize: 13, fontWeight: "600" },
-  noPlanCard: { alignItems: "center", paddingVertical: 40 },
-  noPlanIcon: { fontSize: 48, marginBottom: 12 },
-  noPlanTitle: { fontSize: 18, fontWeight: "700", marginBottom: 6 },
+  noPlanCard: { alignItems: "center", paddingVertical: 40, gap: 8 },
+  noPlanTitle: { fontSize: 18, fontWeight: "700" },
   noPlanSubtitle: { fontSize: 13 },
 });
