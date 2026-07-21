@@ -1,7 +1,10 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { Eye, EyeOff, Lock, User } from "lucide-react-native";
 import { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -12,6 +15,7 @@ import {
   View,
 } from "react-native";
 import Logo from "../../components/Logo";
+import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
 export default function LoginScreen() {
@@ -20,6 +24,37 @@ export default function LoginScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!username || !password) {
+      Alert.alert("Error", "Please enter your username and password.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.post("/auth/login", {
+        username,
+        password,
+      });
+
+      const { token, user } = response.data;
+
+      // Save token and user info to device storage
+      await AsyncStorage.setItem("token", token);
+      await AsyncStorage.setItem("user", JSON.stringify(user));
+
+      router.replace("/dashboard");
+    } catch (err: any) {
+      const message =
+        err.response?.data?.error ||
+        "Unable to connect to server. Please check your connection.";
+      Alert.alert("Login Failed", message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -58,6 +93,7 @@ export default function LoginScreen() {
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
+              editable={!loading}
             />
           </View>
 
@@ -79,6 +115,7 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
+              editable={!loading}
             />
             <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
               {showPassword ? (
@@ -90,7 +127,7 @@ export default function LoginScreen() {
           </View>
 
           {/* Forgot Password */}
-          <TouchableOpacity style={styles.forgotRow}>
+          <TouchableOpacity style={styles.forgotRow} onPress={() => router.push("/forgot-password" as any)}>
             <Text style={[styles.forgot, { color: colors.primary }]}>
               Forgot password?
             </Text>
@@ -98,10 +135,15 @@ export default function LoginScreen() {
 
           {/* Login Button */}
           <TouchableOpacity
-            style={styles.button}
-            onPress={() => router.replace("/dashboard")}
+            style={[styles.button, loading && { opacity: 0.7 }]}
+            onPress={handleLogin}
+            disabled={loading}
           >
-            <Text style={styles.buttonText}>Log In</Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Log In</Text>
+            )}
           </TouchableOpacity>
 
           {/* Sign Up */}

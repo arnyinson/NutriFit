@@ -1,8 +1,34 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
 import {
+  BarChart3,
+  CheckCircle2,
+  ChevronLeft,
+  ClipboardList,
+  Crown,
+  Dumbbell,
+  Flame,
+  Lock,
+  Medal,
+  NotebookPen,
+  Salad,
+  Scale,
+  Share2,
+  Sparkle,
+  Star,
+  Target,
+  TrendingDown,
+  Trophy,
+  Utensils,
+  UtensilsCrossed,
+  X,
+  Zap,
+} from "lucide-react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
   Alert,
   Modal,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   Share,
@@ -11,172 +37,36 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
-import {
-  ChevronLeft, X, Lock, CheckCircle2, Share2,
-  Salad, ClipboardList, NotebookPen, UtensilsCrossed,
-  Medal, Dumbbell, Crown, Flame, Zap, Target,
-  BarChart3, Scale, Sparkle, Trophy, TrendingDown,
-  Utensils, Star,
-} from "lucide-react-native";
-import type { ComponentType } from "react";
+
+const ICON_MAP: Record<string, any> = {
+  salad: Salad,
+  "clipboard-list": ClipboardList,
+  "check-circle": CheckCircle2,
+  "notebook-pen": NotebookPen,
+  "utensils-crossed": UtensilsCrossed,
+  medal: Medal,
+  dumbbell: Dumbbell,
+  crown: Crown,
+  flame: Flame,
+  zap: Zap,
+  target: Target,
+  "bar-chart": BarChart3,
+  scale: Scale,
+  sparkle: Sparkle,
+  trophy: Trophy,
+};
 
 type Achievement = {
   id: string;
   title: string;
   description: string;
   xp: number;
-  unlocked: boolean;
-Icon: ComponentType<any>;
+  iconKey: string;
   category: "Nutrition" | "Workout" | "Goals";
+  unlocked: boolean;
 };
-
-const achievements: Achievement[] = [
-  {
-    id: "a1",
-    title: "First Healthy Meal",
-    description: "Logged your first nutritious meal",
-    xp: 50,
-    unlocked: true,
-    Icon: Salad,
-    category: "Nutrition",
-  },
-  {
-    id: "a2",
-    title: "Food Tracker",
-    description: "Logged all meals in one day",
-    xp: 70,
-    unlocked: true,
-    Icon: ClipboardList,
-    category: "Nutrition",
-  },
-  {
-    id: "a3",
-    title: "Healthy Choice",
-    description: "Selected a recommended meal",
-    xp: 50,
-    unlocked: true,
-    Icon: CheckCircle2,
-    category: "Nutrition",
-  },
-  {
-    id: "a4",
-    title: "Meal Logger",
-    description: "Logged meals for 3 days",
-    xp: 100,
-    unlocked: true,
-    Icon: NotebookPen,
-    category: "Nutrition",
-  },
-  {
-    id: "a5",
-    title: "Food Explorer",
-    description: "Logged 10 different meals",
-    xp: 150,
-    unlocked: false,
-    Icon: UtensilsCrossed,
-    category: "Nutrition",
-  },
-  {
-    id: "a6",
-    title: "Nutrition Recorder",
-    description: "Logged meals for 30 days",
-    xp: 300,
-    unlocked: false,
-    Icon: Medal,
-    category: "Nutrition",
-  },
-  {
-    id: "a7",
-    title: "First Workout",
-    description: "Completed your first workout",
-    xp: 50,
-    unlocked: true,
-    Icon: Dumbbell,
-    category: "Workout",
-  },
-  {
-    id: "a8",
-    title: "Consistency King",
-    description: "Worked out 3 days in a row",
-    xp: 100,
-    unlocked: true,
-    Icon: Crown,
-    category: "Workout",
-  },
-  {
-    id: "a9",
-    title: "Sweat Session",
-    description: "Logged 5 full workouts",
-    xp: 120,
-    unlocked: false,
-    Icon: Dumbbell,
-    category: "Workout",
-  },
-  {
-    id: "a10",
-    title: "Iron Will",
-    description: "Completed 10 workouts",
-    xp: 200,
-    unlocked: false,
-    Icon: Flame,
-    category: "Workout",
-  },
-  {
-    id: "a11",
-    title: "No Days Off",
-    description: "Worked out 7 days in a row",
-    xp: 250,
-    unlocked: false,
-    Icon: Zap,
-    category: "Workout",
-  },
-  {
-    id: "a12",
-    title: "Goal Setter",
-    description: "Set your first dietary goal",
-    xp: 30,
-    unlocked: true,
-    Icon: Target,
-    category: "Goals",
-  },
-  {
-    id: "a13",
-    title: "On Track",
-    description: "Met calorie goal for 3 days",
-    xp: 80,
-    unlocked: true,
-    Icon: BarChart3,
-    category: "Goals",
-  },
-  {
-    id: "a14",
-    title: "Weight Watcher",
-    description: "Lost 1kg toward your goal",
-    xp: 150,
-    unlocked: false,
-    Icon: Scale,
-    category: "Goals",
-  },
-  {
-    id: "a15",
-    title: "Halfway There",
-    description: "Reached 50% of weight goal",
-    xp: 200,
-    unlocked: false,
-    Icon: Sparkle,
-    category: "Goals",
-  },
-  {
-    id: "a16",
-    title: "Goal Crusher",
-    description: "Reached your target weight",
-    xp: 500,
-    unlocked: false,
-    Icon: Trophy,
-    category: "Goals",
-  },
-];
 
 const socialPlatforms = [
   { name: "Facebook" },
@@ -188,25 +78,54 @@ const socialPlatforms = [
 export default function AchievementsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const [activeCategory, setActiveCategory] = useState <
-    "Nutrition" | "Workout" | "Goals" 
-    >("Nutrition");
+const [activeCategory, setActiveCategory] = useState
+<"Nutrition" | "Workout" | "Goals">("Nutrition");
   const [selectedAchievement, setSelectedAchievement] =
     useState<Achievement | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
-  const totalXP = achievements
-    .filter((a) => a.unlocked)
-    .reduce((sum, a) => sum + a.xp, 0);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [totalXP, setTotalXP] = useState(0);
+  const [stats, setStats] = useState({
+    weightLost: 0,
+    mealsTaken: 0,
+    totalCaloriesBurnedEstimate: 0,
+  });
+
+  const loadAchievements = useCallback(async () => {
+    try {
+      const res = await api.get("/achievements/me");
+      setAchievements(res.data.achievements);
+      setTotalXP(res.data.totalXP);
+      setStats(res.data.stats);
+    } catch (err) {
+      console.error("Load achievements error:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAchievements();
+  }, [loadAchievements]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadAchievements();
+  };
+
   const currentLevel = Math.floor(totalXP / 200) + 1;
   const progressToNext = ((totalXP % 200) / 200) * 100;
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
   const totalCount = achievements.length;
 
-  const weightLost = 1.2;
-  const mealsTaken = 21;
-  const caloriesBurned = 4850;
+  const mostRecentUnlocked = achievements
+    .filter((a) => a.unlocked)
+    .slice(-1)[0];
 
   const filteredAchievements = achievements.filter(
     (a) => a.category === activeCategory,
@@ -217,7 +136,7 @@ export default function AchievementsScreen() {
       await Share.share({
         message: `I just unlocked "${achievement.title}" on NutriFit!\n\n${achievement.description}\n\n+${achievement.xp} XP earned!\n\n#NutriFit #FitnessGoals`,
       });
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Could not share achievement.");
     }
   };
@@ -225,12 +144,29 @@ export default function AchievementsScreen() {
   const handleShareProgress = async () => {
     try {
       await Share.share({
-        message: `My NutriFit Progress!\n\nWeight Lost: ${weightLost} kg\nMeals Taken: ${mealsTaken}/21\nCalories Burned: ${caloriesBurned.toLocaleString()}\nTotal XP: ${totalXP}\nLevel: ${currentLevel}\n\n#NutriFit #FitnessJourney`,
+        message: `My NutriFit Progress!\n\nWeight Lost: ${stats.weightLost} kg\nMeals Taken: ${stats.mealsTaken}\nCalories Burned: ${stats.totalCaloriesBurnedEstimate.toLocaleString()}\nTotal XP: ${totalXP}\nLevel: ${currentLevel}\n\n#NutriFit #FitnessJourney`,
       });
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Could not share progress.");
     }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={[
+          styles.safe,
+          {
+            backgroundColor: colors.background,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -253,7 +189,16 @@ export default function AchievementsScreen() {
         <View style={{ width: 30 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#4CAF50"]}
+          />
+        }
+      >
         {/* Level + XP Card */}
         <View
           style={[
@@ -270,7 +215,7 @@ export default function AchievementsScreen() {
                 Explorer
               </Text>
               <Text style={[styles.levelSubtitle, { color: colors.textMuted }]}>
-                +100 exp to Lv. {currentLevel + 1}
+                +{200 - (totalXP % 200)} exp to Lv. {currentLevel + 1}
               </Text>
             </View>
             <Text style={[styles.totalXP, { color: colors.primary }]}>
@@ -298,7 +243,7 @@ export default function AchievementsScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
               <Text style={[styles.statValue, { color: colors.text }]}>
-                -{weightLost} kg
+                -{stats.weightLost} kg
               </Text>
               <Text style={[styles.statLabel, { color: colors.textMuted }]}>
                 Weight Lost
@@ -309,7 +254,7 @@ export default function AchievementsScreen() {
             />
             <View style={styles.statBox}>
               <Text style={[styles.statValue, { color: colors.text }]}>
-                {mealsTaken}/21
+                {stats.mealsTaken}
               </Text>
               <Text style={[styles.statLabel, { color: colors.textMuted }]}>
                 Meal Taken
@@ -320,7 +265,7 @@ export default function AchievementsScreen() {
             />
             <View style={styles.statBox}>
               <Text style={[styles.statValue, { color: colors.text }]}>
-                {caloriesBurned.toLocaleString()}
+                {stats.totalCaloriesBurnedEstimate.toLocaleString()}
               </Text>
               <Text style={[styles.statLabel, { color: colors.textMuted }]}>
                 Cal. Burned
@@ -328,17 +273,24 @@ export default function AchievementsScreen() {
             </View>
           </View>
 
-          <View
-            style={[styles.recentUnlock, { backgroundColor: colors.input }]}
-          >
-            <Trophy size={28} color="#FF9800" fill="#FF9800" fillOpacity={0.15} />
-            <View style={styles.recentInfo}>
-              <Text style={styles.recentTitle}>Achievement Unlocked!</Text>
-              <Text style={[styles.recentName, { color: colors.text }]}>
-                First Weekly Meal
-              </Text>
+          {mostRecentUnlocked && (
+            <View
+              style={[styles.recentUnlock, { backgroundColor: colors.input }]}
+            >
+              <Trophy
+                size={28}
+                color="#FF9800"
+                fill="#FF9800"
+                fillOpacity={0.15}
+              />
+              <View style={styles.recentInfo}>
+                <Text style={styles.recentTitle}>Achievement Unlocked!</Text>
+                <Text style={[styles.recentName, { color: colors.text }]}>
+                  {mostRecentUnlocked.title}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
           <TouchableOpacity
             style={styles.shareProgressBtn}
@@ -373,7 +325,9 @@ export default function AchievementsScreen() {
             <View
               style={[
                 styles.progressFill,
-                { width: `${(unlockedCount / totalCount) * 100}%` },
+                {
+                  width: `${totalCount > 0 ? (unlockedCount / totalCount) * 100 : 0}%`,
+                },
               ]}
             />
           </View>
@@ -405,81 +359,87 @@ export default function AchievementsScreen() {
 
         {/* Achievement List */}
         <View style={styles.achievementList}>
-          {filteredAchievements.map((achievement) => (
-            <TouchableOpacity
-              key={achievement.id}
-              style={[
-                styles.achievementCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                !achievement.unlocked && styles.achievementCardLocked,
-              ]}
-              onPress={() => {
-                setSelectedAchievement(achievement);
-                setShowModal(true);
-              }}
-              activeOpacity={0.8}
-            >
-              <View
+          {filteredAchievements.map((achievement) => {
+            const AchievementIcon = ICON_MAP[achievement.iconKey] || Star;
+            return (
+              <TouchableOpacity
+                key={achievement.id}
                 style={[
-                  styles.achievementIcon,
-                  {
-                    backgroundColor: achievement.unlocked
-                      ? "#E8F5E9"
-                      : colors.input,
-                  },
+                  styles.achievementCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  !achievement.unlocked && styles.achievementCardLocked,
                 ]}
+                onPress={() => {
+                  setSelectedAchievement(achievement);
+                  setShowModal(true);
+                }}
+                activeOpacity={0.8}
               >
-                {achievement.unlocked ? (
-                  <achievement.Icon size={22} color="#4CAF50" />
-                ) : (
-                  <Lock size={20} color={colors.textMuted} />
-                )}
-              </View>
-              <View style={styles.achievementInfo}>
-                <Text
+                <View
                   style={[
-                    styles.achievementTitle,
+                    styles.achievementIcon,
                     {
-                      color: achievement.unlocked
-                        ? colors.text
-                        : colors.textMuted,
+                      backgroundColor: achievement.unlocked
+                        ? "#E8F5E9"
+                        : colors.input,
                     },
                   ]}
                 >
-                  {achievement.title}
-                </Text>
-                <Text
-                  style={[styles.achievementDesc, { color: colors.textMuted }]}
-                >
-                  {achievement.description}
-                </Text>
-                <Text
-                  style={[
-                    styles.achievementXP,
-                    {
-                      color: achievement.unlocked
-                        ? "#4CAF50"
-                        : colors.textMuted,
-                    },
-                  ]}
-                >
-                  +{achievement.xp} XP
-                </Text>
-              </View>
-              {achievement.unlocked ? (
-                <TouchableOpacity
-                  style={styles.shareBtn}
-                  onPress={() => handleShare(achievement)}
-                >
-                  <Text style={styles.shareBtnText}>Share</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.lockedBadge}>
-                  <Lock size={18} color={colors.textMuted} />
+                  {achievement.unlocked ? (
+                    <AchievementIcon size={22} color="#4CAF50" />
+                  ) : (
+                    <Lock size={20} color={colors.textMuted} />
+                  )}
                 </View>
-              )}
-            </TouchableOpacity>
-          ))}
+                <View style={styles.achievementInfo}>
+                  <Text
+                    style={[
+                      styles.achievementTitle,
+                      {
+                        color: achievement.unlocked
+                          ? colors.text
+                          : colors.textMuted,
+                      },
+                    ]}
+                  >
+                    {achievement.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.achievementDesc,
+                      { color: colors.textMuted },
+                    ]}
+                  >
+                    {achievement.description}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.achievementXP,
+                      {
+                        color: achievement.unlocked
+                          ? "#4CAF50"
+                          : colors.textMuted,
+                      },
+                    ]}
+                  >
+                    +{achievement.xp} XP
+                  </Text>
+                </View>
+                {achievement.unlocked ? (
+                  <TouchableOpacity
+                    style={styles.shareBtn}
+                    onPress={() => handleShare(achievement)}
+                  >
+                    <Text style={styles.shareBtnText}>Share</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.lockedBadge}>
+                    <Lock size={18} color={colors.textMuted} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <View style={{ height: 40 }} />
@@ -489,79 +449,103 @@ export default function AchievementsScreen() {
       <Modal visible={showModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            {selectedAchievement && (
-              <>
-                <View style={styles.modalHeader}>
-                  <Text style={[styles.modalTitle, { color: colors.text }]}>
-                    {selectedAchievement.title}
-                  </Text>
-                  <TouchableOpacity onPress={() => setShowModal(false)}>
-                    <X size={20} color={colors.textMuted} />
-                  </TouchableOpacity>
-                </View>
-                <View
-                  style={[
-                    styles.modalIconContainer,
-                    {
-                      backgroundColor: selectedAchievement.unlocked
-                        ? "#E8F5E9"
-                        : colors.input,
-                    },
-                  ]}
-                >
-                  {selectedAchievement.unlocked ? (
-                    <selectedAchievement.Icon size={48} color="#4CAF50" />
-                  ) : (
-                    <Lock size={44} color={colors.textMuted} />
-                  )}
-                </View>
-                <Text
-                  style={[styles.modalDesc, { color: colors.textSecondary }]}
-                >
-                  {selectedAchievement.description}
-                </Text>
-                <Text style={styles.modalXP}>+{selectedAchievement.xp} XP</Text>
-                <Text
-                  style={[styles.modalCategory, { color: colors.textMuted }]}
-                >
-                  Category: {selectedAchievement.category}
-                </Text>
-                <View style={styles.modalStatusRow}>
-                  {selectedAchievement.unlocked ? (
-                    <CheckCircle2 size={14} color={colors.textMuted} />
-                  ) : (
-                    <Lock size={14} color={colors.textMuted} />
-                  )}
-                  <Text style={[styles.modalStatus, { color: colors.textMuted }]}>
-                    Status: {selectedAchievement.unlocked ? "Unlocked" : "Locked"}
-                  </Text>
-                </View>
-                {selectedAchievement.unlocked && (
-                  <TouchableOpacity
-                    style={styles.modalShareBtn}
-                    onPress={() => {
-                      setShowModal(false);
-                      handleShare(selectedAchievement);
-                    }}
-                  >
-                    <Text style={styles.modalShareText}>Share Achievement</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={[
-                    styles.modalCloseBtn,
-                    { backgroundColor: colors.input },
-                  ]}
-                  onPress={() => setShowModal(false)}
-                >
-                  <Text
-                    style={[styles.modalCloseBtnText, { color: colors.text }]}
-                  >
-                    Close
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
+            {selectedAchievement &&
+              (() => {
+                const DetailIcon =
+                  ICON_MAP[selectedAchievement.iconKey] || Star;
+                return (
+                  <>
+                    <View style={styles.modalHeader}>
+                      <Text style={[styles.modalTitle, { color: colors.text }]}>
+                        {selectedAchievement.title}
+                      </Text>
+                      <TouchableOpacity onPress={() => setShowModal(false)}>
+                        <X size={20} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                    <View
+                      style={[
+                        styles.modalIconContainer,
+                        {
+                          backgroundColor: selectedAchievement.unlocked
+                            ? "#E8F5E9"
+                            : colors.input,
+                        },
+                      ]}
+                    >
+                      {selectedAchievement.unlocked ? (
+                        <DetailIcon size={48} color="#4CAF50" />
+                      ) : (
+                        <Lock size={44} color={colors.textMuted} />
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.modalDesc,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {selectedAchievement.description}
+                    </Text>
+                    <Text style={styles.modalXP}>
+                      +{selectedAchievement.xp} XP
+                    </Text>
+                    <Text
+                      style={[
+                        styles.modalCategory,
+                        { color: colors.textMuted },
+                      ]}
+                    >
+                      Category: {selectedAchievement.category}
+                    </Text>
+                    <View style={styles.modalStatusRow}>
+                      {selectedAchievement.unlocked ? (
+                        <CheckCircle2 size={14} color={colors.textMuted} />
+                      ) : (
+                        <Lock size={14} color={colors.textMuted} />
+                      )}
+                      <Text
+                        style={[
+                          styles.modalStatus,
+                          { color: colors.textMuted },
+                        ]}
+                      >
+                        Status:{" "}
+                        {selectedAchievement.unlocked ? "Unlocked" : "Locked"}
+                      </Text>
+                    </View>
+                    {selectedAchievement.unlocked && (
+                      <TouchableOpacity
+                        style={styles.modalShareBtn}
+                        onPress={() => {
+                          setShowModal(false);
+                          handleShare(selectedAchievement);
+                        }}
+                      >
+                        <Text style={styles.modalShareText}>
+                          Share Achievement
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={[
+                        styles.modalCloseBtn,
+                        { backgroundColor: colors.input },
+                      ]}
+                      onPress={() => setShowModal(false)}
+                    >
+                      <Text
+                        style={[
+                          styles.modalCloseBtnText,
+                          { color: colors.text },
+                        ]}
+                      >
+                        Close
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                );
+              })()}
           </View>
         </View>
       </Modal>
@@ -585,11 +569,14 @@ export default function AchievementsScreen() {
                 My NutriFit Progress
               </Text>
               {[
-                { Icon: TrendingDown, text: `Weight Lost: ${weightLost} kg` },
-                { Icon: Utensils, text: `Meals Taken: ${mealsTaken}/21` },
+                {
+                  Icon: TrendingDown,
+                  text: `Weight Lost: ${stats.weightLost} kg`,
+                },
+                { Icon: Utensils, text: `Meals Taken: ${stats.mealsTaken}` },
                 {
                   Icon: Flame,
-                  text: `Calories Burned: ${caloriesBurned.toLocaleString()}`,
+                  text: `Calories Burned: ${stats.totalCaloriesBurnedEstimate.toLocaleString()}`,
                 },
                 {
                   Icon: Star,

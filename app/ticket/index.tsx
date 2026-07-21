@@ -8,8 +8,9 @@ import {
   Star,
   X,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   SafeAreaView,
@@ -20,6 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
 type Ticket = {
@@ -27,8 +29,9 @@ type Ticket = {
   type: string;
   message: string;
   rating: number;
-  date: string;
-  status: "Pending" | "Resolved" | "New";
+  status: "New" | "Pending" | "Resolved";
+  admin_response: string | null;
+  created_at: string;
 };
 
 export default function TicketScreen() {
@@ -39,6 +42,10 @@ export default function TicketScreen() {
   const [message, setMessage] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [myTickets, setMyTickets] = useState<Ticket[]>([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
 
   const feedbackTypes = [
     "Bug Report",
@@ -48,48 +55,23 @@ export default function TicketScreen() {
     "Other",
   ];
 
-  const ticketHistory: Ticket[] = [
-    {
-      id: "t1",
-      type: "Suggestion",
-      message: "Add dark mode to the app",
-      rating: 5,
-      date: "January 10",
-      status: "Pending",
-    },
-    {
-      id: "t2",
-      type: "Bug Report",
-      message: "Every time I open the exercise...",
-      rating: 3,
-      date: "February 24",
-      status: "Pending",
-    },
-    {
-      id: "t3",
-      type: "Complaint",
-      message: "I'm spending time waiting while...",
-      rating: 2,
-      date: "February 29",
-      status: "Resolved",
-    },
-    {
-      id: "t4",
-      type: "Question",
-      message: "For a basic tracker, it takes up too...",
-      rating: 4,
-      date: "March 2",
-      status: "New",
-    },
-    {
-      id: "t5",
-      type: "Suggestion",
-      message: "Despite having a robust internet...",
-      rating: 4,
-      date: "March 3",
-      status: "New",
-    },
-  ];
+  const loadMyTickets = useCallback(async () => {
+    setLoadingTickets(true);
+    try {
+      const res = await api.get("/tickets/me");
+      setMyTickets(res.data.tickets);
+    } catch (err) {
+      console.error("Load my tickets error:", err);
+    } finally {
+      setLoadingTickets(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showHistory) {
+      loadMyTickets();
+    }
+  }, [showHistory, loadMyTickets]);
 
   const getStatusColor = (status: string) => {
     if (status === "Pending") return "#FF9800";
@@ -97,7 +79,7 @@ export default function TicketScreen() {
     return "#2196F3";
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (rating === 0) {
       Alert.alert("Error", "Please rate your experience.");
       return;
@@ -106,7 +88,23 @@ export default function TicketScreen() {
       Alert.alert("Error", "Please enter your feedback.");
       return;
     }
-    setShowSuccessModal(true);
+
+    setSubmitting(true);
+    try {
+      await api.post("/tickets", {
+        type: feedbackType,
+        message,
+        rating,
+      });
+      setShowSuccessModal(true);
+    } catch (err: any) {
+      const errorMessage =
+        err.response?.data?.error ||
+        "Unable to submit feedback. Please try again.";
+      Alert.alert("Error", errorMessage);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -231,7 +229,7 @@ export default function TicketScreen() {
           {/* Message */}
           <View style={styles.messageSection}>
             <Text style={[styles.sectionLabel, { color: colors.text }]}>
-              Tell us more (optional)
+              Tell us more
             </Text>
             <TextInput
               style={[
@@ -256,16 +254,26 @@ export default function TicketScreen() {
           </View>
 
           {/* Submit Button */}
-          <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-            <Send size={18} color="#fff" />
-            <Text style={styles.submitText}>Send Feedback</Text>
+          <TouchableOpacity
+            style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
+            onPress={handleSubmit}
+            disabled={submitting}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Send size={18} color="#fff" />
+                <Text style={styles.submitText}>Send Feedback</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           {/* Anonymous Note */}
           <View style={styles.anonymousNote}>
             <Lock size={14} color={colors.textMuted} />
             <Text style={[styles.anonymousText, { color: colors.textMuted }]}>
-              Your feedback is anonymous and secure
+              Your feedback is securely stored and reviewed by our team
             </Text>
           </View>
         </View>
@@ -285,123 +293,184 @@ export default function TicketScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Summary */}
-            <View style={styles.ticketSummary}>
-              {[
-                {
-                  label: "Total",
-                  value: ticketHistory.length,
-                  color: colors.text,
-                },
-                {
-                  label: "New",
-                  value: ticketHistory.filter((t) => t.status === "New").length,
-                  color: "#2196F3",
-                },
-                {
-                  label: "Pending",
-                  value: ticketHistory.filter((t) => t.status === "Pending")
-                    .length,
-                  color: "#FF9800",
-                },
-                {
-                  label: "Resolved",
-                  value: ticketHistory.filter((t) => t.status === "Resolved")
-                    .length,
-                  color: "#4CAF50",
-                },
-              ].map((item) => (
-                <View
-                  key={item.label}
-                  style={[
-                    styles.ticketSummaryBox,
-                    { backgroundColor: colors.input },
-                  ]}
-                >
-                  <Text
-                    style={[styles.ticketSummaryValue, { color: item.color }]}
-                  >
-                    {item.value}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.ticketSummaryLabel,
-                      { color: colors.textMuted },
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              style={{ maxHeight: 400 }}
-            >
-              {ticketHistory.map((ticket) => (
-                <View
-                  key={ticket.id}
-                  style={[
-                    styles.ticketCard,
+            {loadingTickets ? (
+              <ActivityIndicator
+                color={colors.primary}
+                style={{ marginVertical: 30 }}
+              />
+            ) : (
+              <>
+                {/* Summary */}
+                <View style={styles.ticketSummary}>
+                  {[
                     {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
+                      label: "Total",
+                      value: myTickets.length,
+                      color: colors.text,
                     },
-                  ]}
-                >
-                  <View style={styles.ticketTop}>
-                    <View style={styles.ticketTypeRow}>
-                      <Text style={[styles.ticketType, { color: colors.text }]}>
-                        {ticket.type}
-                      </Text>
-                      <View
+                    {
+                      label: "New",
+                      value: myTickets.filter((t) => t.status === "New").length,
+                      color: "#2196F3",
+                    },
+                    {
+                      label: "Pending",
+                      value: myTickets.filter((t) => t.status === "Pending")
+                        .length,
+                      color: "#FF9800",
+                    },
+                    {
+                      label: "Resolved",
+                      value: myTickets.filter((t) => t.status === "Resolved")
+                        .length,
+                      color: "#4CAF50",
+                    },
+                  ].map((item) => (
+                    <View
+                      key={item.label}
+                      style={[
+                        styles.ticketSummaryBox,
+                        { backgroundColor: colors.input },
+                      ]}
+                    >
+                      <Text
                         style={[
-                          styles.statusBadge,
+                          styles.ticketSummaryValue,
+                          { color: item.color },
+                        ]}
+                      >
+                        {item.value}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.ticketSummaryLabel,
+                          { color: colors.textMuted },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  style={{ maxHeight: 400 }}
+                >
+                  {myTickets.length === 0 ? (
+                    <Text
+                      style={{
+                        color: colors.textMuted,
+                        textAlign: "center",
+                        paddingVertical: 30,
+                        fontSize: 13,
+                      }}
+                    >
+                      You haven&apos;t submitted any feedback yet.
+                    </Text>
+                  ) : (
+                    myTickets.map((ticket) => (
+                      <View
+                        key={ticket.id}
+                        style={[
+                          styles.ticketCard,
                           {
-                            backgroundColor:
-                              getStatusColor(ticket.status) + "20",
+                            backgroundColor: colors.surface,
+                            borderColor: colors.border,
                           },
                         ]}
                       >
+                        <View style={styles.ticketTop}>
+                          <View style={styles.ticketTypeRow}>
+                            <Text
+                              style={[
+                                styles.ticketType,
+                                { color: colors.text },
+                              ]}
+                            >
+                              {ticket.type}
+                            </Text>
+                            <View
+                              style={[
+                                styles.statusBadge,
+                                {
+                                  backgroundColor:
+                                    getStatusColor(ticket.status) + "20",
+                                },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.statusText,
+                                  { color: getStatusColor(ticket.status) },
+                                ]}
+                              >
+                                {ticket.status}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text
+                            style={[
+                              styles.ticketDate,
+                              { color: colors.textMuted },
+                            ]}
+                          >
+                            {new Date(ticket.created_at).toLocaleDateString(
+                              "en-US",
+                              { month: "long", day: "numeric" },
+                            )}
+                          </Text>
+                        </View>
                         <Text
                           style={[
-                            styles.statusText,
-                            { color: getStatusColor(ticket.status) },
+                            styles.ticketMessage,
+                            { color: colors.textSecondary },
                           ]}
+                          numberOfLines={2}
                         >
-                          {ticket.status}
+                          {ticket.message}
                         </Text>
+                        <View style={styles.ticketStars}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star
+                              key={s}
+                              size={14}
+                              color={s <= ticket.rating ? "#FF9800" : "#ddd"}
+                              fill={s <= ticket.rating ? "#FF9800" : "none"}
+                            />
+                          ))}
+                        </View>
+                        {ticket.admin_response && (
+                          <View
+                            style={[
+                              styles.adminResponseBox,
+                              { backgroundColor: colors.input },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.adminResponseLabel,
+                                { color: colors.textMuted },
+                              ]}
+                            >
+                              Admin Response
+                            </Text>
+                            <Text
+                              style={[
+                                styles.adminResponseText,
+                                { color: colors.textSecondary },
+                              ]}
+                            >
+                              {ticket.admin_response}
+                            </Text>
+                          </View>
+                        )}
                       </View>
-                    </View>
-                    <Text
-                      style={[styles.ticketDate, { color: colors.textMuted }]}
-                    >
-                      {ticket.date}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.ticketMessage,
-                      { color: colors.textSecondary },
-                    ]}
-                    numberOfLines={2}
-                  >
-                    {ticket.message}
-                  </Text>
-                  <View style={styles.ticketStars}>
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star
-                        key={s}
-                        size={14}
-                        color={s <= ticket.rating ? "#FF9800" : "#ddd"}
-                        fill={s <= ticket.rating ? "#FF9800" : "none"}
-                      />
-                    ))}
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
+                    ))
+                  )}
+                </ScrollView>
+              </>
+            )}
 
             <TouchableOpacity
               style={styles.modalCloseBtn}
@@ -505,7 +574,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
   },
-  anonymousText: { fontSize: 12 },
+  anonymousText: { fontSize: 12, textAlign: "center", flex: 1 },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -552,6 +621,14 @@ const styles = StyleSheet.create({
   ticketDate: { fontSize: 11 },
   ticketMessage: { fontSize: 13, marginBottom: 8 },
   ticketStars: { flexDirection: "row", gap: 2 },
+  adminResponseBox: { borderRadius: 10, padding: 10, marginTop: 10 },
+  adminResponseLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    marginBottom: 4,
+    textTransform: "uppercase",
+  },
+  adminResponseText: { fontSize: 12, lineHeight: 18 },
   modalCloseBtn: {
     backgroundColor: "#4CAF50",
     padding: 14,
@@ -567,6 +644,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  successIcon: { fontSize: 56 },
   successTitle: { fontSize: 22, fontWeight: "bold" },
   successMessage: {
     fontSize: 14,

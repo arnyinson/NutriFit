@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import {
   Activity,
@@ -18,10 +19,12 @@ import {
   Weight,
   X,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -30,128 +33,264 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
 type UserProfile = {
+  id: string;
   name: string;
   email: string;
   birthday: string;
   sex: string;
   height: string;
   weight: string;
-  dietaryGoal: string;
-  activityLevel: string;
+  dietary_goal: string;
+  activity_level: string;
   allergens: string[];
+  bmi: string;
+  tdee: string;
+};
+
+const formatDateDisplay = (isoDate: string) => {
+  if (!isoDate) return "";
+  const d = new Date(isoDate);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
+};
+
+const parseDateInput = (mmddyyyy: string) => {
+  const parts = mmddyyyy.split("/");
+  if (parts.length !== 3) return null;
+  const [mm, dd, yyyy] = parts;
+  if (!mm || !dd || !yyyy || yyyy.length !== 4) return null;
+  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
 };
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [activeWeightTab, setActiveWeightTab] = useState("1M");
   const { isDark, toggleTheme, colors } = useTheme();
 
-  const [profile, setProfile] = useState<UserProfile>({
-    name: "David Johnson",
-    email: "davidjohnson@gmail.com",
-    birthday: "04/03/1994",
-    sex: "Male",
-    height: "5'7 ft",
-    weight: "69.39 kg",
-    dietaryGoal: "Cutting",
-    activityLevel: "Moderate Active",
-    allergens: ["Fish", "Soy"],
-  });
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const [editForm, setEditForm] = useState<UserProfile>({ ...profile });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState<any>(null);
+  const [birthdayInput, setBirthdayInput] = useState("");
 
-  const weightData = {
-    "1W": [
-      { label: "Mon", value: 70.2 },
-      { label: "Tue", value: 70.0 },
-      { label: "Wed", value: 69.8 },
-      { label: "Thu", value: 69.6 },
-      { label: "Fri", value: 69.5 },
-      { label: "Sat", value: 69.4 },
-      { label: "Today", value: 69.39 },
-    ],
-    "1M": [
-      { label: "Apr 22", value: 72.0 },
-      { label: "Apr 29", value: 71.2 },
-      { label: "May 5", value: 70.5 },
-      { label: "May 10", value: 69.39 },
-    ],
-    "3M": [
-      { label: "Mar", value: 74.5 },
-      { label: "Apr", value: 72.0 },
-      { label: "May", value: 69.39 },
-    ],
-    "6M": [
-      { label: "Dec", value: 78.0 },
-      { label: "Jan", value: 76.5 },
-      { label: "Feb", value: 75.0 },
-      { label: "Mar", value: 74.5 },
-      { label: "Apr", value: 72.0 },
-      { label: "May", value: 69.39 },
-    ],
-    "Last month": [
-      { label: "Apr 1", value: 73.0 },
-      { label: "Apr 8", value: 72.5 },
-      { label: "Apr 15", value: 71.8 },
-      { label: "Apr 22", value: 71.0 },
-      { label: "Apr 30", value: 70.2 },
-    ],
-  } as Record<string, { label: string; value: number }[]>;
+  const [activeWeightTab, setActiveWeightTab] = useState("1M");
+  const [weightHistory, setWeightHistory] = useState<
+    { date: string; weight: string }[]
+  >([]);
+  const [loadingWeight, setLoadingWeight] = useState(true);
 
-  const currentData = weightData[activeWeightTab] || [];
-  const maxWeight = Math.max(...currentData.map((d) => d.value));
-  const minWeight = Math.min(...currentData.map((d) => d.value));
-  const weightDiff =
-    (currentData[currentData.length - 1]?.value ?? 0) -
-    (currentData[0]?.value ?? 0);
+  const allergenList = ["Eggs", "Peanuts", "Dairy", "Shellfish", "Fish", "Soy"];
 
-  const heightInMeters = 1.7;
-  const weightInKg = 69.39;
-  const bmi = (weightInKg / (heightInMeters * heightInMeters)).toFixed(1);
+  const loadProfile = useCallback(async () => {
+    try {
+      const res = await api.get("/users/me");
+      setProfile(res.data.user);
+      await AsyncStorage.setItem("user", JSON.stringify(res.data.user));
+    } catch (err) {
+      console.error("Load profile error:", err);
+      Alert.alert("Error", "Unable to load your profile.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  const loadWeightHistory = useCallback(async (range: string) => {
+    setLoadingWeight(true);
+    try {
+      const res = await api.get("/progress/weight-history", {
+        params: { range },
+      });
+      setWeightHistory(res.data.weightHistory);
+    } catch (err) {
+      console.error("Load weight history error:", err);
+    } finally {
+      setLoadingWeight(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    loadWeightHistory(activeWeightTab);
+  }, [activeWeightTab, loadWeightHistory]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadProfile();
+    loadWeightHistory(activeWeightTab);
+  };
+
+  const openEditModal = () => {
+    if (!profile) return;
+    setEditForm({
+      height: profile.height,
+      weight: profile.weight,
+      dietary_goal: profile.dietary_goal,
+      activity_level: profile.activity_level,
+      allergens: [...profile.allergens],
+      sex: profile.sex,
+    });
+    setBirthdayInput(formatDateDisplay(profile.birthday));
+    setShowEditModal(true);
+  };
+
+  const handleBirthdayChange = (text: string) => {
+    const digitsOnly = text.replace(/\D/g, "");
+    let formatted = digitsOnly;
+    if (digitsOnly.length >= 5) {
+      formatted = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2, 4)}/${digitsOnly.slice(4, 8)}`;
+    } else if (digitsOnly.length >= 3) {
+      formatted = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}`;
+    }
+    setBirthdayInput(formatted);
+  };
+
+  const toggleAllergen = (item: string) => {
+    setEditForm((prev: any) => ({
+      ...prev,
+      allergens: prev.allergens.includes(item)
+        ? prev.allergens.filter((a: string) => a !== item)
+        : [...prev.allergens, item],
+    }));
+  };
+
+  const saveProfile = async () => {
+    const isoBirthday = parseDateInput(birthdayInput);
+    if (!isoBirthday) {
+      Alert.alert(
+        "Error",
+        "Please enter a valid birthday in MM/DD/YYYY format.",
+      );
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await api.put("/users/me", {
+        birthday: isoBirthday,
+        sex: editForm.sex,
+        height: parseFloat(editForm.height),
+        weight: parseFloat(editForm.weight),
+        dietary_goal: editForm.dietary_goal,
+        activity_level: editForm.activity_level,
+        allergens: editForm.allergens,
+      });
+      setProfile(res.data.user);
+      await AsyncStorage.setItem("user", JSON.stringify(res.data.user));
+
+      // I-log din ang weight update sa progress table para lumabas sa graph
+      await api.post("/progress/log", { weight: parseFloat(editForm.weight) });
+      loadWeightHistory(activeWeightTab);
+
+      setShowEditModal(false);
+      Alert.alert("Success", "Profile saved successfully!");
+    } catch (err: any) {
+      const message =
+        err.response?.data?.error ||
+        "Unable to save profile. Please try again.";
+      Alert.alert("Error", message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLogout = () => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          await AsyncStorage.removeItem("token");
+          await AsyncStorage.removeItem("user");
+          router.replace("/login");
+        },
+      },
+    ]);
+  };
+
+  if (loading || !profile) {
+    return (
+      <SafeAreaView
+        style={[
+          styles.safe,
+          {
+            backgroundColor: colors.background,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  const bmiValue = parseFloat(profile.bmi);
   const getBMICategory = (bmi: number) => {
     if (bmi < 18.5) return { label: "Underweight", color: "#2196F3" };
     if (bmi < 25) return { label: "Normal", color: "#4CAF50" };
     if (bmi < 30) return { label: "Overweight", color: "#FF9800" };
     return { label: "Obese", color: "#F44336" };
   };
-  const bmiCategory = getBMICategory(parseFloat(bmi));
-  const tdee = Math.round(
-    (10 * weightInKg + 6.25 * (heightInMeters * 100) - 5 * 30 + 5) * 1.55,
-  );
+  const bmiCategory = getBMICategory(bmiValue);
 
-  const allergenList = ["Eggs", "Peanuts", "Dairy", "Shellfish", "Fish", "Soy"];
+  const chartData = weightHistory.map((w) => ({
+    label: new Date(w.date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    }),
+    value: parseFloat(w.weight),
+  }));
+  const maxWeight =
+    chartData.length > 0 ? Math.max(...chartData.map((d) => d.value)) : 0;
+  const minWeight =
+    chartData.length > 0 ? Math.min(...chartData.map((d) => d.value)) : 0;
+  const weightDiff =
+    chartData.length > 1
+      ? chartData[chartData.length - 1].value - chartData[0].value
+      : 0;
 
   const personalInfoItems = [
-    { Icon: Calendar, label: "Birthday", value: profile.birthday },
+    {
+      Icon: Calendar,
+      label: "Birthday",
+      value: formatDateDisplay(profile.birthday),
+    },
     { Icon: VenusAndMars, label: "Sex", value: profile.sex },
-    { Icon: Ruler, label: "Height", value: profile.height },
-    { Icon: Weight, label: "Weight", value: profile.weight },
-    { Icon: Target, label: "Dietary Goal", value: profile.dietaryGoal },
-    { Icon: Activity, label: "Activity Level", value: profile.activityLevel },
+    { Icon: Ruler, label: "Height", value: `${profile.height} cm` },
+    { Icon: Weight, label: "Weight", value: `${profile.weight} kg` },
+    { Icon: Target, label: "Dietary Goal", value: profile.dietary_goal },
+    {
+      Icon: Activity,
+      label: "Activity Level",
+      value: profile.activity_level.split(" (")[0],
+    },
   ];
-
-  const toggleAllergen = (item: string) => {
-    setEditForm((prev) => ({
-      ...prev,
-      allergens: prev.allergens.includes(item)
-        ? prev.allergens.filter((a) => a !== item)
-        : [...prev.allergens, item],
-    }));
-  };
-
-  const saveProfile = () => {
-    setProfile({ ...editForm });
-    setShowEditModal(false);
-    Alert.alert("Success", "Profile saved successfully!");
-  };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#4CAF50"]}
+          />
+        }
+      >
         {/* Header */}
         <View
           style={[
@@ -192,7 +331,8 @@ export default function ProfileScreen() {
                 {profile.name
                   .split(" ")
                   .map((n) => n[0])
-                  .join("")}
+                  .join("")
+                  .slice(0, 2)}
               </Text>
             </View>
             <TouchableOpacity
@@ -221,7 +361,7 @@ export default function ProfileScreen() {
             ]}
           >
             <Text style={[styles.statValue, { color: colors.text }]}>
-              {bmi}
+              {bmiValue.toFixed(1)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               BMI
@@ -239,13 +379,13 @@ export default function ProfileScreen() {
             ]}
           >
             <Text style={[styles.statValue, { color: colors.text }]}>
-              {tdee}
+              {profile.tdee}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               TDEE (kcal)
             </Text>
             <View style={[styles.statBadge, { backgroundColor: "#4CAF50" }]}>
-              <Text style={styles.statBadgeText}>{profile.dietaryGoal}</Text>
+              <Text style={styles.statBadgeText}>{profile.dietary_goal}</Text>
             </View>
           </View>
         </View>
@@ -303,13 +443,7 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => {
-              setEditForm({ ...profile });
-              setShowEditModal(true);
-            }}
-          >
+          <TouchableOpacity style={styles.editBtn} onPress={openEditModal}>
             <Text style={styles.editBtnText}>Edit</Text>
           </TouchableOpacity>
         </View>
@@ -325,37 +459,57 @@ export default function ProfileScreen() {
             Current Weight
           </Text>
           <Text style={[styles.weightSub, { color: colors.textMuted }]}>
-            {weightInKg} kg • Updated 3 days ago
+            {profile.weight} kg
           </Text>
 
-          <View style={styles.graphContainer}>
-            <View style={styles.graph}>
-              {currentData.map((point, i) => {
-                const height =
-                  ((point.value - minWeight) / (maxWeight - minWeight || 1)) *
-                    80 +
-                  10;
-                return (
-                  <View key={i} style={styles.graphBarWrapper}>
-                    <Text style={styles.graphValue}>{point.value}</Text>
-                    <View style={[styles.graphDot, { marginBottom: height }]} />
-                    <Text
-                      style={[styles.graphLabel, { color: colors.textMuted }]}
-                    >
-                      {point.label}
-                    </Text>
-                  </View>
-                );
-              })}
+          {loadingWeight ? (
+            <ActivityIndicator
+              color={colors.primary}
+              style={{ marginVertical: 40 }}
+            />
+          ) : chartData.length === 0 ? (
+            <Text
+              style={{
+                color: colors.textMuted,
+                fontSize: 12,
+                textAlign: "center",
+                marginVertical: 40,
+              }}
+            >
+              No weight history yet for this period.
+            </Text>
+          ) : (
+            <View style={styles.graphContainer}>
+              <View style={styles.graph}>
+                {chartData.map((point, i) => {
+                  const height =
+                    ((point.value - minWeight) / (maxWeight - minWeight || 1)) *
+                      80 +
+                    10;
+                  return (
+                    <View key={i} style={styles.graphBarWrapper}>
+                      <Text style={styles.graphValue}>{point.value}</Text>
+                      <View
+                        style={[styles.graphDot, { marginBottom: height }]}
+                      />
+                      <Text
+                        style={[styles.graphLabel, { color: colors.textMuted }]}
+                      >
+                        {point.label}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
-          </View>
+          )}
 
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.weightTabs}
           >
-            {["1W", "1M", "3M", "6M", "Last month"].map((tab) => (
+            {["1W", "1M", "3M", "6M"].map((tab) => (
               <TouchableOpacity
                 key={tab}
                 style={[
@@ -378,22 +532,24 @@ export default function ProfileScreen() {
             ))}
           </ScrollView>
 
-          <View
-            style={[
-              styles.weightChangeBadge,
-              { backgroundColor: weightDiff < 0 ? "#E8F5E9" : "#FFF3E0" },
-            ]}
-          >
-            <Text
+          {chartData.length > 1 && (
+            <View
               style={[
-                styles.weightChangeText,
-                { color: weightDiff < 0 ? "#4CAF50" : "#FF9800" },
+                styles.weightChangeBadge,
+                { backgroundColor: weightDiff < 0 ? "#E8F5E9" : "#FFF3E0" },
               ]}
             >
-              {weightDiff < 0 ? "▼" : "▲"} {Math.abs(weightDiff).toFixed(1)} kg
-              this period
-            </Text>
-          </View>
+              <Text
+                style={[
+                  styles.weightChangeText,
+                  { color: weightDiff < 0 ? "#4CAF50" : "#FF9800" },
+                ]}
+              >
+                {weightDiff < 0 ? "▼" : "▲"} {Math.abs(weightDiff).toFixed(1)}{" "}
+                kg this period
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Ticket / Feedback */}
@@ -414,16 +570,7 @@ export default function ProfileScreen() {
         {/* Logout */}
         <TouchableOpacity
           style={[styles.logoutBtn, { borderColor: colors.border }]}
-          onPress={() =>
-            Alert.alert("Logout", "Are you sure you want to logout?", [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Logout",
-                style: "destructive",
-                onPress: () => router.replace("/login"),
-              },
-            ])
-          }
+          onPress={handleLogout}
         >
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
@@ -445,231 +592,242 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
 
-              <Text
-                style={[styles.inputLabel, { color: colors.textSecondary }]}
-              >
-                Full Name
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.input,
-                    borderColor: colors.inputBorder,
-                    color: colors.text,
-                  },
-                ]}
-                value={editForm.name}
-                onChangeText={(v) => setEditForm((p) => ({ ...p, name: v }))}
-                placeholder="Full Name"
-                placeholderTextColor={colors.textMuted}
-              />
-
-              <Text
-                style={[styles.inputLabel, { color: colors.textSecondary }]}
-              >
-                Birthday
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.input,
-                    borderColor: colors.inputBorder,
-                    color: colors.text,
-                  },
-                ]}
-                value={editForm.birthday}
-                onChangeText={(v) =>
-                  setEditForm((p) => ({ ...p, birthday: v }))
-                }
-                placeholder="MM/DD/YYYY"
-                placeholderTextColor={colors.textMuted}
-              />
-
-              <Text
-                style={[styles.inputLabel, { color: colors.textSecondary }]}
-              >
-                Sex
-              </Text>
-              <View style={styles.sexRow}>
-                {["Male", "Female"].map((s) => (
-                  <TouchableOpacity
-                    key={s}
-                    style={[
-                      styles.sexBtn,
-                      {
-                        borderColor: colors.inputBorder,
-                        backgroundColor: colors.input,
-                      },
-                      editForm.sex === s &&
-                        (s === "Male"
-                          ? styles.sexBtnMale
-                          : styles.sexBtnFemale),
-                    ]}
-                    onPress={() => setEditForm((p) => ({ ...p, sex: s }))}
-                  >
-                    <Text
-                      style={[
-                        styles.sexBtnText,
-                        { color: colors.textSecondary },
-                        editForm.sex === s && styles.sexBtnTextActive,
-                      ]}
-                    >
-                      {s}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text
-                style={[styles.inputLabel, { color: colors.textSecondary }]}
-              >
-                Height
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.input,
-                    borderColor: colors.inputBorder,
-                    color: colors.text,
-                  },
-                ]}
-                value={editForm.height}
-                onChangeText={(v) => setEditForm((p) => ({ ...p, height: v }))}
-                placeholder="e.g. 5'7 ft"
-                placeholderTextColor={colors.textMuted}
-              />
-
-              <Text
-                style={[styles.inputLabel, { color: colors.textSecondary }]}
-              >
-                Weight (kg)
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.input,
-                    borderColor: colors.inputBorder,
-                    color: colors.text,
-                  },
-                ]}
-                value={editForm.weight}
-                onChangeText={(v) => setEditForm((p) => ({ ...p, weight: v }))}
-                placeholder="e.g. 69.39 kg"
-                keyboardType="numeric"
-                placeholderTextColor={colors.textMuted}
-              />
-
-              <Text
-                style={[styles.inputLabel, { color: colors.textSecondary }]}
-              >
-                Dietary Goal
-              </Text>
-              <View style={styles.chipRow}>
-                {["Maintenance", "Cutting", "Bulking"].map((goal) => (
-                  <TouchableOpacity
-                    key={goal}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: colors.input,
-                        borderColor: colors.inputBorder,
-                      },
-                      editForm.dietaryGoal === goal && styles.chipActive,
-                    ]}
-                    onPress={() =>
-                      setEditForm((p) => ({ ...p, dietaryGoal: goal }))
-                    }
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        { color: colors.textSecondary },
-                        editForm.dietaryGoal === goal && styles.chipTextActive,
-                      ]}
-                    >
-                      {goal}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text
-                style={[styles.inputLabel, { color: colors.textSecondary }]}
-              >
-                Activity Level
-              </Text>
-              {[
-                "Lightly Active (1-2 days per week)",
-                "Moderate Active (3-4 days per week)",
-                "Very Active (5+ days per week)",
-              ].map((level) => (
-                <TouchableOpacity
-                  key={level}
-                  style={[
-                    styles.optionBtn,
-                    {
-                      backgroundColor: colors.input,
-                      borderColor: colors.inputBorder,
-                    },
-                    editForm.activityLevel === level && styles.optionBtnActive,
-                  ]}
-                  onPress={() =>
-                    setEditForm((p) => ({ ...p, activityLevel: level }))
-                  }
-                >
-                  <View style={styles.optionCheck}>
-                    {editForm.activityLevel === level && (
-                      <Check size={14} color="#4CAF50" strokeWidth={3} />
-                    )}
-                  </View>
+              {editForm && (
+                <>
                   <Text
-                    style={[styles.optionText, { color: colors.textSecondary }]}
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
                   >
-                    {level}
+                    Birthday
                   </Text>
-                </TouchableOpacity>
-              ))}
-
-              <Text
-                style={[styles.inputLabel, { color: colors.textSecondary }]}
-              >
-                Allergens
-              </Text>
-              <View style={styles.chipRow}>
-                {allergenList.map((item) => (
-                  <TouchableOpacity
-                    key={item}
+                  <TextInput
                     style={[
-                      styles.chip,
+                      styles.input,
                       {
                         backgroundColor: colors.input,
                         borderColor: colors.inputBorder,
+                        color: colors.text,
                       },
-                      editForm.allergens.includes(item) && styles.chipActive,
                     ]}
-                    onPress={() => toggleAllergen(item)}
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        { color: colors.textSecondary },
-                        editForm.allergens.includes(item) &&
-                          styles.chipTextActive,
-                      ]}
-                    >
-                      {item}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                    value={birthdayInput}
+                    onChangeText={handleBirthdayChange}
+                    placeholder="MM/DD/YYYY"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
 
-              <TouchableOpacity style={styles.saveBtn} onPress={saveProfile}>
-                <Text style={styles.saveBtnText}>Save Changes</Text>
-              </TouchableOpacity>
+                  <Text
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
+                  >
+                    Sex
+                  </Text>
+                  <View style={styles.sexRow}>
+                    {["Male", "Female"].map((s) => (
+                      <TouchableOpacity
+                        key={s}
+                        style={[
+                          styles.sexBtn,
+                          {
+                            borderColor: colors.inputBorder,
+                            backgroundColor: colors.input,
+                          },
+                          editForm.sex === s &&
+                            (s === "Male"
+                              ? styles.sexBtnMale
+                              : styles.sexBtnFemale),
+                        ]}
+                        onPress={() =>
+                          setEditForm((p: any) => ({ ...p, sex: s }))
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.sexBtnText,
+                            { color: colors.textSecondary },
+                            editForm.sex === s && styles.sexBtnTextActive,
+                          ]}
+                        >
+                          {s}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
+                  >
+                    Height (cm)
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    value={String(editForm.height)}
+                    onChangeText={(v) =>
+                      setEditForm((p: any) => ({ ...p, height: v }))
+                    }
+                    placeholder="e.g. 170"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                  />
+
+                  <Text
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
+                  >
+                    Weight (kg)
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    value={String(editForm.weight)}
+                    onChangeText={(v) =>
+                      setEditForm((p: any) => ({ ...p, weight: v }))
+                    }
+                    placeholder="e.g. 69.39"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                  />
+
+                  <Text
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
+                  >
+                    Dietary Goal
+                  </Text>
+                  <View style={styles.chipRow}>
+                    {["Maintenance", "Cutting", "Bulking"].map((goal) => (
+                      <TouchableOpacity
+                        key={goal}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: colors.input,
+                            borderColor: colors.inputBorder,
+                          },
+                          editForm.dietary_goal === goal && styles.chipActive,
+                        ]}
+                        onPress={() =>
+                          setEditForm((p: any) => ({
+                            ...p,
+                            dietary_goal: goal,
+                          }))
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: colors.textSecondary },
+                            editForm.dietary_goal === goal &&
+                              styles.chipTextActive,
+                          ]}
+                        >
+                          {goal}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
+                  >
+                    Activity Level
+                  </Text>
+                  {[
+                    "Lightly Active (1-2 days per week)",
+                    "Moderate Active (3-4 days per week)",
+                    "Very Active (5+ days per week)",
+                  ].map((level) => (
+                    <TouchableOpacity
+                      key={level}
+                      style={[
+                        styles.optionBtn,
+                        {
+                          backgroundColor: colors.input,
+                          borderColor: colors.inputBorder,
+                        },
+                        editForm.activity_level === level &&
+                          styles.optionBtnActive,
+                      ]}
+                      onPress={() =>
+                        setEditForm((p: any) => ({
+                          ...p,
+                          activity_level: level,
+                        }))
+                      }
+                    >
+                      <View style={styles.optionCheck}>
+                        {editForm.activity_level === level && (
+                          <Check size={14} color="#4CAF50" strokeWidth={3} />
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.optionText,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {level}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+
+                  <Text
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
+                  >
+                    Allergens
+                  </Text>
+                  <View style={styles.chipRow}>
+                    {allergenList.map((item) => (
+                      <TouchableOpacity
+                        key={item}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: colors.input,
+                            borderColor: colors.inputBorder,
+                          },
+                          editForm.allergens.includes(item) &&
+                            styles.chipActive,
+                        ]}
+                        onPress={() => toggleAllergen(item)}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: colors.textSecondary },
+                            editForm.allergens.includes(item) &&
+                              styles.chipTextActive,
+                          ]}
+                        >
+                          {item}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+                    onPress={saveProfile}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.saveBtnText}>Save Changes</Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
 
               <View style={{ height: 20 }} />
             </ScrollView>

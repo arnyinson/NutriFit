@@ -11,10 +11,12 @@ import {
   Utensils,
   X,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -23,558 +25,232 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
 type Exercise = {
   id: string;
   name: string;
+  muscle_group: string;
+  equipment: string;
+  difficulty: string;
+  instructions: string;
+  video_url: string | null;
+};
+
+type ExerciseEntry = {
+  plan_id: string;
   sets: number;
   reps: string;
-  equipment: string;
-  muscleGroup: string;
-  instructions: string[];
   done: boolean;
-  loggedSets: { reps: string; weight: string }[];
+  exercise: Exercise;
 };
 
 type WorkoutDay = {
   day: string;
-  date: string;
-  focus: string;
-  isRest: boolean;
-  exercises: Exercise[];
+  exercises: ExerciseEntry[];
 };
 
-const getWeekDates = () => {
-  const today = new Date();
-  const day = today.getDay();
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
-  return Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + i);
-    return date.toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  });
-};
-
-const weekDates = getWeekDates();
-
-const weeklyWorkout: WorkoutDay[] = [
-  {
-    day: "Monday",
-    date: weekDates[0],
-    focus: "Chest + Core",
-    isRest: false,
-    exercises: [
-      {
-        id: "e1",
-        name: "Push Ups",
-        sets: 4,
-        reps: "12 reps",
-        equipment: "Bodyweight",
-        muscleGroup: "Chest",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Start in plank position.",
-          "Lower chest to floor.",
-          "Push back up.",
-          "Keep core tight throughout.",
-        ],
-      },
-      {
-        id: "e2",
-        name: "Incline Push Ups",
-        sets: 4,
-        reps: "12 reps",
-        equipment: "Chair/Bench",
-        muscleGroup: "Chest",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Place hands on elevated surface.",
-          "Lower chest toward surface.",
-          "Push back up.",
-          "Keep body straight.",
-        ],
-      },
-      {
-        id: "e3",
-        name: "Chair Dips",
-        sets: 3,
-        reps: "10 reps",
-        equipment: "Chair",
-        muscleGroup: "Triceps",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Grip chair edge behind you.",
-          "Lower body by bending elbows.",
-          "Push back up to start.",
-          "Keep back close to chair.",
-        ],
-      },
-      {
-        id: "e4",
-        name: "Plank",
-        sets: 3,
-        reps: "45 sec",
-        equipment: "Bodyweight",
-        muscleGroup: "Core",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Forearms on floor.",
-          "Keep body in straight line.",
-          "Hold position.",
-          "Breathe steadily.",
-        ],
-      },
-      {
-        id: "e5",
-        name: "Bicycle Crunch",
-        sets: 3,
-        reps: "20 reps",
-        equipment: "Bodyweight",
-        muscleGroup: "Core",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Lie on back, hands behind head.",
-          "Bring opposite elbow to knee.",
-          "Alternate sides.",
-          "Keep lower back pressed to floor.",
-        ],
-      },
-    ],
-  },
-  {
-    day: "Tuesday",
-    date: weekDates[1],
-    focus: "Legs + Glutes",
-    isRest: false,
-    exercises: [
-      {
-        id: "e6",
-        name: "Bodyweight Squats",
-        sets: 4,
-        reps: "15 reps",
-        equipment: "Bodyweight",
-        muscleGroup: "Legs",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Stand feet shoulder-width apart.",
-          "Lower hips until thighs parallel.",
-          "Push through heels to stand.",
-          "Keep chest up.",
-        ],
-      },
-      {
-        id: "e7",
-        name: "Lunges",
-        sets: 3,
-        reps: "12 reps each leg",
-        equipment: "Bodyweight",
-        muscleGroup: "Legs",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Stand tall, step forward.",
-          "Lower back knee toward floor.",
-          "Push front foot to return.",
-          "Alternate legs.",
-        ],
-      },
-      {
-        id: "e8",
-        name: "Glute Bridges",
-        sets: 3,
-        reps: "15 reps",
-        equipment: "Bodyweight",
-        muscleGroup: "Glutes",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Lie on back, knees bent.",
-          "Push hips toward ceiling.",
-          "Squeeze glutes at top.",
-          "Lower slowly.",
-        ],
-      },
-      {
-        id: "e9",
-        name: "Calf Raises",
-        sets: 4,
-        reps: "20 reps",
-        equipment: "Bodyweight",
-        muscleGroup: "Calves",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Stand near wall for balance.",
-          "Rise onto toes.",
-          "Hold for 1 second.",
-          "Lower slowly.",
-        ],
-      },
-      {
-        id: "e10",
-        name: "Mountain Climbers",
-        sets: 3,
-        reps: "30 sec",
-        equipment: "Bodyweight",
-        muscleGroup: "Core",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Start in plank.",
-          "Drive knees to chest alternately.",
-          "Keep hips level.",
-          "Move fast but controlled.",
-        ],
-      },
-    ],
-  },
-  {
-    day: "Wednesday",
-    date: weekDates[2],
-    focus: "Rest Day",
-    isRest: true,
-    exercises: [],
-  },
-  {
-    day: "Thursday",
-    date: weekDates[3],
-    focus: "Back + Shoulders",
-    isRest: false,
-    exercises: [
-      {
-        id: "e11",
-        name: "Superman Hold",
-        sets: 3,
-        reps: "12 reps",
-        equipment: "Bodyweight",
-        muscleGroup: "Back",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Lie face down, arms extended.",
-          "Lift arms and legs off floor.",
-          "Hold for 2 seconds.",
-          "Lower slowly.",
-        ],
-      },
-      {
-        id: "e12",
-        name: "Shoulder Press",
-        sets: 3,
-        reps: "12 reps",
-        equipment: "Dumbbells",
-        muscleGroup: "Shoulders",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Hold dumbbells at shoulder height.",
-          "Press overhead until arms straight.",
-          "Lower slowly to start.",
-          "Keep core tight.",
-        ],
-      },
-      {
-        id: "e13",
-        name: "Lateral Raises",
-        sets: 3,
-        reps: "12 reps",
-        equipment: "Dumbbells",
-        muscleGroup: "Shoulders",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Hold dumbbells at sides.",
-          "Raise arms to shoulder height.",
-          "Lower slowly.",
-          "Keep slight bend in elbows.",
-        ],
-      },
-      {
-        id: "e14",
-        name: "Bent Over Rows",
-        sets: 3,
-        reps: "12 reps",
-        equipment: "Dumbbells",
-        muscleGroup: "Back",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Hinge at hips, back flat.",
-          "Pull dumbbells to hips.",
-          "Squeeze shoulder blades.",
-          "Lower slowly.",
-        ],
-      },
-    ],
-  },
-  {
-    day: "Friday",
-    date: weekDates[4],
-    focus: "Arms + Core",
-    isRest: false,
-    exercises: [
-      {
-        id: "e15",
-        name: "Bicep Curl",
-        sets: 3,
-        reps: "12 reps",
-        equipment: "Dumbbells",
-        muscleGroup: "Biceps",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Hold dumbbells at sides.",
-          "Curl weights to shoulders.",
-          "Lower slowly.",
-          "Keep elbows at sides.",
-        ],
-      },
-      {
-        id: "e16",
-        name: "Tricep Kickback",
-        sets: 3,
-        reps: "12 reps",
-        equipment: "Dumbbells",
-        muscleGroup: "Triceps",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Hinge forward at hips.",
-          "Upper arm parallel to floor.",
-          "Extend forearm back.",
-          "Return slowly.",
-        ],
-      },
-      {
-        id: "e17",
-        name: "Hammer Curl",
-        sets: 3,
-        reps: "12 reps",
-        equipment: "Dumbbells",
-        muscleGroup: "Biceps",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Hold dumbbells thumbs up.",
-          "Curl to shoulder height.",
-          "Lower slowly.",
-          "Keep wrists neutral.",
-        ],
-      },
-      {
-        id: "e18",
-        name: "Plank",
-        sets: 3,
-        reps: "45 sec",
-        equipment: "Bodyweight",
-        muscleGroup: "Core",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Hold plank position.",
-          "Keep body straight.",
-          "Breathe steadily.",
-          "Don't let hips sag.",
-        ],
-      },
-      {
-        id: "e19",
-        name: "Russian Twist",
-        sets: 3,
-        reps: "20 reps",
-        equipment: "Bodyweight",
-        muscleGroup: "Core",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Sit with knees bent, lean back.",
-          "Twist torso side to side.",
-          "Keep feet off floor.",
-          "Add weight for more challenge.",
-        ],
-      },
-    ],
-  },
-  {
-    day: "Saturday",
-    date: weekDates[5],
-    focus: "Full Body",
-    isRest: false,
-    exercises: [
-      {
-        id: "e20",
-        name: "Burpees",
-        sets: 3,
-        reps: "10 reps",
-        equipment: "Bodyweight",
-        muscleGroup: "Full Body",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Stand, drop to squat.",
-          "Jump feet back to plank.",
-          "Do a push up.",
-          "Jump feet forward and leap up.",
-        ],
-      },
-      {
-        id: "e21",
-        name: "Jump Squats",
-        sets: 3,
-        reps: "12 reps",
-        equipment: "Bodyweight",
-        muscleGroup: "Legs",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Squat down.",
-          "Explode upward.",
-          "Land softly.",
-          "Immediately go into next squat.",
-        ],
-      },
-      {
-        id: "e22",
-        name: "Mountain Climbers",
-        sets: 3,
-        reps: "30 sec",
-        equipment: "Bodyweight",
-        muscleGroup: "Core",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Start in plank.",
-          "Drive knees to chest alternately.",
-          "Keep hips level.",
-          "Move fast but controlled.",
-        ],
-      },
-      {
-        id: "e23",
-        name: "Push Ups",
-        sets: 3,
-        reps: "12 reps",
-        equipment: "Bodyweight",
-        muscleGroup: "Chest",
-        done: false,
-        loggedSets: [],
-        instructions: [
-          "Plank position.",
-          "Lower chest to floor.",
-          "Push back up.",
-          "Keep core engaged.",
-        ],
-      },
-    ],
-  },
-  {
-    day: "Sunday",
-    date: weekDates[6],
-    focus: "Rest Day",
-    isRest: true,
-    exercises: [],
-  },
+const ALL_DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
 ];
 
 export default function WorkoutScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const [workout, setWorkout] = useState(weeklyWorkout);
+
+  const [workoutPlan, setWorkoutPlan] = useState<WorkoutDay[]>([]);
   const [activeTab, setActiveTab] = useState("Exercise");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
     null,
   );
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
-  const [logDay, setLogDay] = useState<number | null>(null);
-  const [logExercise, setLogExercise] = useState<Exercise | null>(null);
+  const [logEntry, setLogEntry] = useState<ExerciseEntry | null>(null);
   const [logReps, setLogReps] = useState("");
   const [logWeight, setLogWeight] = useState("");
 
-  const toggleExercise = (dayIndex: number, exIndex: number) => {
-    setWorkout((prev) =>
+  const loadWorkoutPlan = useCallback(async () => {
+    try {
+      let res = await api.get("/workouts/plan/me");
+      if (!res.data.workoutPlan || res.data.workoutPlan.length === 0) {
+        await api.post("/workouts/plan/generate", {
+          mode: "weekly",
+          experience_level: "Beginner",
+          available_equipment: ["Bodyweight", "Dumbbell"],
+        });
+        res = await api.get("/workouts/plan/me");
+      }
+
+      // I-fill ang buong linggo (Mon-Sun) para makita ang Rest Days na walang entry mula sa API
+      const existingDays = new Map<string, ExerciseEntry[]>(
+        res.data.workoutPlan.map((d: WorkoutDay) => [d.day, d.exercises]),
+      );
+      const fullWeek: WorkoutDay[] = ALL_DAYS.map((day) => ({
+        day,
+        exercises: existingDays.get(day) || [],
+      }));
+
+      setWorkoutPlan(fullWeek);
+    } catch (err) {
+      console.error("Load workout plan error:", err);
+      Alert.alert(
+        "Error",
+        "Unable to load your workout plan. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadWorkoutPlan();
+  }, [loadWorkoutPlan]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadWorkoutPlan();
+  };
+
+  const toggleExercise = async (dayIndex: number, entry: ExerciseEntry) => {
+    const newDone = !entry.done;
+    setWorkoutPlan((prev) =>
       prev.map((day, di) =>
         di === dayIndex
           ? {
               ...day,
-              exercises: day.exercises.map((ex, ei) =>
-                ei === exIndex ? { ...ex, done: !ex.done } : ex,
+              exercises: day.exercises.map((e) =>
+                e.plan_id === entry.plan_id ? { ...e, done: newDone } : e,
               ),
             }
           : day,
       ),
     );
+    try {
+      await api.patch(`/workouts/plan/${entry.plan_id}/toggle`, {
+        done: newDone,
+      });
+    } catch (err) {
+      console.error("Toggle exercise error:", err);
+      setWorkoutPlan((prev) =>
+        prev.map((day, di) =>
+          di === dayIndex
+            ? {
+                ...day,
+                exercises: day.exercises.map((e) =>
+                  e.plan_id === entry.plan_id ? { ...e, done: entry.done } : e,
+                ),
+              }
+            : day,
+        ),
+      );
+    }
   };
 
-  const logAllExercises = (dayIndex: number) => {
-    setWorkout((prev) =>
-      prev.map((day, di) =>
+  const logAllExercises = async (dayIndex: number) => {
+    const day = workoutPlan[dayIndex];
+    const previous = day.exercises;
+    setWorkoutPlan((prev) =>
+      prev.map((d, di) =>
         di === dayIndex
-          ? {
-              ...day,
-              exercises: day.exercises.map((ex) => ({ ...ex, done: true })),
-            }
-          : day,
+          ? { ...d, exercises: d.exercises.map((e) => ({ ...e, done: true })) }
+          : d,
       ),
     );
+    try {
+      await Promise.all(
+        previous
+          .filter((e) => !e.done)
+          .map((e) =>
+            api.patch(`/workouts/plan/${e.plan_id}/toggle`, { done: true }),
+          ),
+      );
+    } catch (err) {
+      console.error("Log all error:", err);
+    }
   };
 
-  const openLogModal = (dayIndex: number, exercise: Exercise) => {
-    setLogDay(dayIndex);
-    setLogExercise(exercise);
+  const openLogModal = (entry: ExerciseEntry) => {
+    setLogEntry(entry);
     setLogReps("");
     setLogWeight("");
     setShowLogModal(true);
   };
 
-  const saveLog = () => {
+  const saveLog = async () => {
     if (!logReps) {
       Alert.alert("Error", "Please enter reps.");
       return;
     }
-    if (logDay === null || !logExercise) return;
-    setWorkout((prev) =>
-      prev.map((day, di) =>
-        di === logDay
-          ? {
-              ...day,
-              exercises: day.exercises.map((ex) =>
-                ex.id === logExercise.id
-                  ? {
-                      ...ex,
-                      done: true,
-                      loggedSets: [
-                        ...ex.loggedSets,
-                        { reps: logReps, weight: logWeight || "BW" },
-                      ],
-                    }
-                  : ex,
-              ),
-            }
-          : day,
-      ),
-    );
-    setShowLogModal(false);
+    if (!logEntry) return;
+
+    try {
+      await api.post("/workouts/log", {
+        exercise_id: logEntry.exercise.id,
+        sets_completed: logEntry.sets,
+        reps_completed: logReps,
+        weight_used: logWeight || "BW",
+      });
+
+      // markahan din bilang done kung hindi pa
+      if (!logEntry.done) {
+        await api.patch(`/workouts/plan/${logEntry.plan_id}/toggle`, {
+          done: true,
+        });
+        setWorkoutPlan((prev) =>
+          prev.map((day) => ({
+            ...day,
+            exercises: day.exercises.map((e) =>
+              e.plan_id === logEntry.plan_id ? { ...e, done: true } : e,
+            ),
+          })),
+        );
+      }
+
+      setShowLogModal(false);
+      Alert.alert(
+        "Logged!",
+        `${logEntry.exercise.name} — ${logReps} reps @ ${logWeight || "BW"}`,
+      );
+    } catch (err) {
+      console.error("Save log error:", err);
+      Alert.alert("Error", "Unable to save workout log. Please try again.");
+    }
   };
 
-  const getDayProgress = (exercises: Exercise[]) => {
+  const getDayProgress = (exercises: ExerciseEntry[]) => {
     if (exercises.length === 0) return 0;
     return Math.round(
       (exercises.filter((e) => e.done).length / exercises.length) * 100,
     );
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={[
+          styles.safe,
+          {
+            backgroundColor: colors.background,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -596,153 +272,154 @@ export default function WorkoutScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {workout.map((day, dayIndex) => (
-          <View
-            key={day.day}
-            style={[
-              styles.daySection,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            {/* Day Header */}
-            <View style={styles.dayHeader}>
-              <View>
-                <Text style={[styles.dayTitle, { color: colors.text }]}>
-                  {day.day} — {day.focus}
-                </Text>
-                <Text style={[styles.dayDate, { color: colors.textMuted }]}>
-                  {day.date}
-                </Text>
-              </View>
-              {!day.isRest && (
-                <View style={styles.dayActions}>
-                  <TouchableOpacity
-                    style={styles.logAllBtn}
-                    onPress={() => logAllExercises(dayIndex)}
-                  >
-                    <Text style={styles.logAllText}>Log all</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.editPlanBtn}>
-                    <Text style={styles.editPlanText}>Edit Plan</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#4CAF50"]}
+          />
+        }
+      >
+        {workoutPlan.map((day, dayIndex) => {
+          const isRest = day.exercises.length === 0;
+          const focus = isRest
+            ? "Rest Day"
+            : [
+                ...new Set(day.exercises.map((e) => e.exercise.muscle_group)),
+              ].join(" + ");
 
-            {day.isRest ? (
-              <View style={styles.restCard}>
-                <Moon size={36} color={colors.textMuted} />
-                <Text style={[styles.restTitle, { color: colors.text }]}>
-                  Rest Day
-                </Text>
-                <Text
-                  style={[styles.restSubtitle, { color: colors.textMuted }]}
-                >
-                  Recovery is part of progress!
-                </Text>
-              </View>
-            ) : (
-              <>
-                {/* Progress Bar */}
-                <View style={styles.progressRow}>
-                  <View
-                    style={[
-                      styles.progressBar,
-                      { backgroundColor: colors.border },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${getDayProgress(day.exercises)}%` },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.progressText}>
-                    {getDayProgress(day.exercises)}%
+          return (
+            <View
+              key={day.day}
+              style={[
+                styles.daySection,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              {/* Day Header */}
+              <View style={styles.dayHeader}>
+                <View>
+                  <Text style={[styles.dayTitle, { color: colors.text }]}>
+                    {day.day} — {focus}
                   </Text>
                 </View>
+                {!isRest && (
+                  <View style={styles.dayActions}>
+                    <TouchableOpacity
+                      style={styles.logAllBtn}
+                      onPress={() => logAllExercises(dayIndex)}
+                    >
+                      <Text style={styles.logAllText}>Log all</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
 
-                {/* Exercises */}
-                {day.exercises.map((exercise, exIndex) => (
-                  <TouchableOpacity
-                    key={exercise.id}
-                    style={[
-                      styles.exerciseRow,
-                      {
-                        backgroundColor: colors.card,
-                        borderColor: colors.border,
-                      },
-                      exercise.done && styles.exerciseRowDone,
-                    ]}
-                    onPress={() => {
-                      setSelectedExercise(exercise);
-                      setShowDetailModal(true);
-                    }}
-                    activeOpacity={0.8}
+              {isRest ? (
+                <View style={styles.restCard}>
+                  <Moon size={36} color={colors.textMuted} />
+                  <Text style={[styles.restTitle, { color: colors.text }]}>
+                    Rest Day
+                  </Text>
+                  <Text
+                    style={[styles.restSubtitle, { color: colors.textMuted }]}
                   >
-                    <TouchableOpacity
+                    Recovery is part of progress!
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {/* Progress Bar */}
+                  <View style={styles.progressRow}>
+                    <View
                       style={[
-                        styles.exerciseCheck,
-                        { borderColor: colors.border },
-                        exercise.done && styles.exerciseCheckDone,
+                        styles.progressBar,
+                        { backgroundColor: colors.border },
                       ]}
-                      onPress={() => toggleExercise(dayIndex, exIndex)}
                     >
-                      {exercise.done && (
-                        <Check size={14} color="#fff" strokeWidth={3} />
-                      )}
-                    </TouchableOpacity>
-                    <View style={styles.exerciseInfo}>
-                      <Text
+                      <View
                         style={[
-                          styles.exerciseName,
-                          { color: colors.text },
-                          exercise.done && styles.exerciseNameDone,
+                          styles.progressFill,
+                          { width: `${getDayProgress(day.exercises)}%` },
                         ]}
-                      >
-                        {exercise.name}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.exerciseSets,
-                          { color: colors.textMuted },
-                        ]}
-                      >
-                        {exercise.sets} sets × {exercise.reps} •{" "}
-                        {exercise.equipment}
-                      </Text>
-                      <View style={styles.muscleRow}>
-                        <MuscleIcon size={11} color="#4CAF50" />
-                        <Text style={styles.exerciseMuscle}>
-                          {exercise.muscleGroup}
-                        </Text>
-                      </View>
-                      {exercise.loggedSets.length > 0 && (
-                        <View style={styles.loggedRow}>
-                          {exercise.loggedSets.map((log, li) => (
-                            <View key={li} style={styles.loggedBadge}>
-                              <Text style={styles.loggedBadgeText}>
-                                {log.reps} reps @ {log.weight}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
+                      />
                     </View>
+                    <Text style={styles.progressText}>
+                      {getDayProgress(day.exercises)}%
+                    </Text>
+                  </View>
+
+                  {/* Exercises */}
+                  {day.exercises.map((entry) => (
                     <TouchableOpacity
-                      style={styles.logBtn}
-                      onPress={() => openLogModal(dayIndex, exercise)}
+                      key={entry.plan_id}
+                      style={[
+                        styles.exerciseRow,
+                        {
+                          backgroundColor: colors.card,
+                          borderColor: colors.border,
+                        },
+                        entry.done && styles.exerciseRowDone,
+                      ]}
+                      onPress={() => {
+                        setSelectedExercise(entry.exercise);
+                        setShowDetailModal(true);
+                      }}
+                      activeOpacity={0.8}
                     >
-                      <Text style={styles.logBtnText}>Log</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.exerciseCheck,
+                          { borderColor: colors.border },
+                          entry.done && styles.exerciseCheckDone,
+                        ]}
+                        onPress={() => toggleExercise(dayIndex, entry)}
+                      >
+                        {entry.done && (
+                          <Check size={14} color="#fff" strokeWidth={3} />
+                        )}
+                      </TouchableOpacity>
+                      <View style={styles.exerciseInfo}>
+                        <Text
+                          style={[
+                            styles.exerciseName,
+                            { color: colors.text },
+                            entry.done && styles.exerciseNameDone,
+                          ]}
+                        >
+                          {entry.exercise.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.exerciseSets,
+                            { color: colors.textMuted },
+                          ]}
+                        >
+                          {entry.sets} sets × {entry.reps} •{" "}
+                          {entry.exercise.equipment}
+                        </Text>
+                        <View style={styles.muscleRow}>
+                          <MuscleIcon size={11} color="#4CAF50" />
+                          <Text style={styles.exerciseMuscle}>
+                            {entry.exercise.muscle_group}
+                          </Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.logBtn}
+                        onPress={() => openLogModal(entry)}
+                      >
+                        <Text style={styles.logBtnText}>Log</Text>
+                      </TouchableOpacity>
                     </TouchableOpacity>
-                  </TouchableOpacity>
-                ))}
-              </>
-            )}
-          </View>
-        ))}
+                  ))}
+                </>
+              )}
+            </View>
+          );
+        })}
         <View style={{ height: 80 }} />
       </ScrollView>
 
@@ -763,10 +440,12 @@ export default function WorkoutScreen() {
                   </View>
                   <View style={styles.exerciseInfoGrid}>
                     {[
-                      { label: "Sets", value: `${selectedExercise.sets}` },
-                      { label: "Reps", value: selectedExercise.reps },
-                      { label: "Muscle", value: selectedExercise.muscleGroup },
+                      { label: "Muscle", value: selectedExercise.muscle_group },
                       { label: "Equipment", value: selectedExercise.equipment },
+                      {
+                        label: "Difficulty",
+                        value: selectedExercise.difficulty,
+                      },
                     ].map((info) => (
                       <View
                         key={info.label}
@@ -793,27 +472,22 @@ export default function WorkoutScreen() {
                     </View>
                     <Text style={styles.videoText}>Video Demonstration</Text>
                     <Text style={styles.videoSubtext}>
-                      Available in full version
+                      {selectedExercise.video_url
+                        ? "Tap to play"
+                        : "Available in full version"}
                     </Text>
                   </View>
                   <Text style={[styles.modalSection, { color: colors.text }]}>
                     Instructions
                   </Text>
-                  {selectedExercise.instructions.map((step, i) => (
-                    <View key={i} style={styles.stepRow}>
-                      <View style={styles.stepNumber}>
-                        <Text style={styles.stepNumberText}>{i + 1}</Text>
-                      </View>
-                      <Text
-                        style={[
-                          styles.stepText,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {step}
-                      </Text>
-                    </View>
-                  ))}
+                  <Text
+                    style={[
+                      styles.stepText,
+                      { color: colors.textSecondary, marginBottom: 16 },
+                    ]}
+                  >
+                    {selectedExercise.instructions}
+                  </Text>
                   <TouchableOpacity
                     style={styles.modalCloseBtn}
                     onPress={() => setShowDetailModal(false)}
@@ -841,10 +515,10 @@ export default function WorkoutScreen() {
                 <X size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
-            {logExercise && (
+            {logEntry && (
               <>
                 <Text style={[styles.logExerciseName, { color: colors.text }]}>
-                  {logExercise.name}
+                  {logEntry.exercise.name}
                 </Text>
                 <Text
                   style={[styles.logLabel, { color: colors.textSecondary }]}
@@ -860,7 +534,7 @@ export default function WorkoutScreen() {
                       color: colors.text,
                     },
                   ]}
-                  placeholder={`e.g. ${logExercise.reps}`}
+                  placeholder={`e.g. ${logEntry.reps}`}
                   placeholderTextColor={colors.textMuted}
                   value={logReps}
                   onChangeText={setLogReps}
@@ -966,7 +640,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   dayTitle: { fontSize: 15, fontWeight: "700" },
-  dayDate: { fontSize: 11, marginTop: 2 },
   dayActions: { flexDirection: "row", gap: 8 },
   logAllBtn: {
     backgroundColor: "#4CAF50",
@@ -975,13 +648,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   logAllText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  editPlanBtn: {
-    backgroundColor: "#FF9800",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  editPlanText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   restCard: { alignItems: "center", paddingVertical: 20, gap: 8 },
   restTitle: { fontSize: 16, fontWeight: "700" },
   restSubtitle: { fontSize: 12 },
@@ -1029,14 +695,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   exerciseMuscle: { fontSize: 11, color: "#4CAF50" },
-  loggedRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 },
-  loggedBadge: {
-    backgroundColor: "#E8F5E9",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  loggedBadgeText: { fontSize: 10, color: "#2E7D32", fontWeight: "600" },
   logBtn: {
     backgroundColor: "#4CAF50",
     paddingHorizontal: 12,
@@ -1090,21 +748,6 @@ const styles = StyleSheet.create({
   videoText: { fontSize: 16, fontWeight: "600", color: "#fff" },
   videoSubtext: { fontSize: 12, color: "#888" },
   modalSection: { fontSize: 15, fontWeight: "700", marginBottom: 12 },
-  stepRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 10,
-    alignItems: "flex-start",
-  },
-  stepNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#4CAF50",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  stepNumberText: { color: "#fff", fontSize: 12, fontWeight: "bold" },
   stepText: { fontSize: 13, flex: 1, lineHeight: 20 },
   modalCloseBtn: {
     backgroundColor: "#4CAF50",

@@ -9,8 +9,10 @@ import {
   Sun,
   Sunrise,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -18,178 +20,27 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
-const weeklyMeals = [
-  {
-    day: "Monday",
-    date: "2026-06-15",
-    meals: [
-      {
-        type: "Breakfast",
-        name: "Egg White Omelette + Oats",
-        calories: 400,
-        taken: true,
-      },
-      {
-        type: "Lunch",
-        name: "Grilled Chicken + Brown Rice",
-        calories: 550,
-        taken: true,
-      },
-      {
-        type: "Dinner",
-        name: "Grilled Chicken + Sweet Potato",
-        calories: 480,
-        taken: false,
-      },
-    ],
-  },
-  {
-    day: "Tuesday",
-    date: "2026-06-16",
-    meals: [
-      {
-        type: "Breakfast",
-        name: "Coconut Yogurt + Banana + Almonds",
-        calories: 380,
-        taken: false,
-      },
-      {
-        type: "Lunch",
-        name: "Turkey Breast + Quinoa + Veggies",
-        calories: 560,
-        taken: false,
-      },
-      {
-        type: "Dinner",
-        name: "Chicken Breast + Steamed Broccoli",
-        calories: 460,
-        taken: false,
-      },
-    ],
-  },
-  {
-    day: "Wednesday",
-    date: "2026-06-17",
-    meals: [
-      {
-        type: "Breakfast",
-        name: "Protein Smoothie + Peanut Butter Toast",
-        calories: 420,
-        taken: false,
-      },
-      {
-        type: "Lunch",
-        name: "Chicken + Steamed Veggies + Rice",
-        calories: 510,
-        taken: false,
-      },
-      {
-        type: "Dinner",
-        name: "Beef Tinola + Kangkong + Rice",
-        calories: 480,
-        taken: false,
-      },
-    ],
-  },
-  {
-    day: "Thursday",
-    date: "2026-06-18",
-    meals: [
-      {
-        type: "Breakfast",
-        name: "Scrambled Eggs + Whole Wheat Toast",
-        calories: 390,
-        taken: false,
-      },
-      {
-        type: "Lunch",
-        name: "Grilled Chicken + Steamed Rice",
-        calories: 490,
-        taken: false,
-      },
-      {
-        type: "Dinner",
-        name: "Chicken Tinola + Vegetables + Rice",
-        calories: 460,
-        taken: false,
-      },
-    ],
-  },
-  {
-    day: "Friday",
-    date: "2026-06-19",
-    meals: [
-      {
-        type: "Breakfast",
-        name: "Oatmeal + Berries + Honey",
-        calories: 350,
-        taken: false,
-      },
-      {
-        type: "Lunch",
-        name: "Pork Sinigang + Brown Rice",
-        calories: 580,
-        taken: false,
-      },
-      {
-        type: "Dinner",
-        name: "Grilled Chicken + Ensalada",
-        calories: 390,
-        taken: false,
-      },
-    ],
-  },
-  {
-    day: "Saturday",
-    date: "2026-06-20",
-    meals: [
-      {
-        type: "Breakfast",
-        name: "Banana Pancakes + Maple Syrup",
-        calories: 410,
-        taken: false,
-      },
-      {
-        type: "Lunch",
-        name: "Chicken Adobo + Cauliflower Rice",
-        calories: 480,
-        taken: false,
-      },
-      {
-        type: "Dinner",
-        name: "Vegetable Curry + Brown Rice",
-        calories: 490,
-        taken: false,
-      },
-    ],
-  },
-  {
-    day: "Sunday",
-    date: "2026-06-21",
-    meals: [
-      {
-        type: "Breakfast",
-        name: "French Toast + Fresh Fruits",
-        calories: 400,
-        taken: false,
-      },
-      {
-        type: "Lunch",
-        name: "Beef Kaldereta + Rice",
-        calories: 620,
-        taken: false,
-      },
-      {
-        type: "Dinner",
-        name: "Steamed Tofu + Mixed Vegetables",
-        calories: 380,
-        taken: false,
-      },
-    ],
-  },
-];
+type Meal = {
+  id: string;
+  name: string;
+  calories: number;
+};
+
+type MealEntry = {
+  plan_id: string;
+  meal_type: string;
+  taken: boolean;
+  meal: Meal;
+};
+
+type DayPlan = {
+  date: string; // YYYY-MM-DD
+  day: string;
+  meals: MealEntry[];
+};
 
 const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -199,19 +50,60 @@ const mealTypeIcon = (type: string) => {
   return Moon;
 };
 
+const toDateKey = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function CalendarScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const today = new Date();
+
+  const [planMode, setPlanMode] = useState<"weekly" | "continuous">("weekly");
+  const [mealPlan, setMealPlan] = useState<DayPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [currentMonth, setCurrentMonth] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1),
   );
   const [selectedDate, setSelectedDate] = useState(today.getDate());
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
 
   const monthName = currentMonth.toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
   });
+
+  const loadMealPlan = useCallback(async (mode: "weekly" | "continuous") => {
+    try {
+      let res = await api.get("/meals/plan/me", { params: { mode } });
+      if (!res.data.mealPlan || res.data.mealPlan.length === 0) {
+        await api.post("/meals/plan/generate", { mode });
+        res = await api.get("/meals/plan/me", { params: { mode } });
+      }
+      setMealPlan(res.data.mealPlan);
+    } catch (err) {
+      console.error("Load calendar meal plan error:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    loadMealPlan(planMode);
+  }, [planMode, loadMealPlan]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadMealPlan(planMode);
+  };
 
   const getDaysInMonth = () => {
     const year = currentMonth.getFullYear();
@@ -237,26 +129,21 @@ export default function CalendarScreen() {
     currentMonth.getMonth() === today.getMonth() &&
     currentMonth.getFullYear() === today.getFullYear();
 
-  const getSelectedDayData = () => {
-    const selected = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth(),
-      selectedDate,
-    );
-    const dayName = selected.toLocaleDateString("en-US", { weekday: "long" });
-    return weeklyMeals.find((d) => d.day === dayName);
+  const selectDate = (day: number) => {
+    setSelectedDate(day);
+    setSelectedMonth(currentMonth.getMonth());
+    setSelectedYear(currentMonth.getFullYear());
   };
 
-  const selectedDayData = getSelectedDayData();
+  const selectedDateObj = new Date(selectedYear, selectedMonth, selectedDate);
+  const selectedDateKey = toDateKey(selectedDateObj);
+  const selectedDayData = mealPlan.find((d) => d.date === selectedDateKey);
 
   const getDateLabel = () => {
-    const selected = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth(),
-      selectedDate,
-    );
     const diffDays = Math.round(
-      (selected.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+      (selectedDateObj.setHours(0, 0, 0, 0) -
+        new Date(today).setHours(0, 0, 0, 0)) /
+        (1000 * 60 * 60 * 24),
     );
     if (diffDays === 0) return "Today";
     if (diffDays === 1) return "Tomorrow";
@@ -264,6 +151,10 @@ export default function CalendarScreen() {
     if (diffDays > 0) return `In ${diffDays} days`;
     return `${Math.abs(diffDays)} days ago`;
   };
+
+  const selectedDayName = selectedDateObj.toLocaleDateString("en-US", {
+    weekday: "long",
+  });
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -288,155 +179,224 @@ export default function CalendarScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Calendar Card */}
-        <View
-          style={[
-            styles.calendarCard,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          {/* Month Navigation */}
-          <View style={styles.monthRow}>
-            <TouchableOpacity onPress={prevMonth}>
-              <ChevronLeft size={26} color={colors.primary} />
-            </TouchableOpacity>
-            <Text style={[styles.monthTitle, { color: colors.text }]}>
-              {monthName}
+      {/* Plan Mode Toggle */}
+      <View style={[styles.modeRow, { backgroundColor: colors.surface }]}>
+        {(["weekly", "continuous"] as const).map((mode) => (
+          <TouchableOpacity
+            key={mode}
+            style={[styles.modeBtn, planMode === mode && styles.modeBtnActive]}
+            onPress={() => setPlanMode(mode)}
+          >
+            <Text
+              style={[
+                styles.modeBtnText,
+                { color: colors.textMuted },
+                planMode === mode && styles.modeBtnTextActive,
+              ]}
+            >
+              {mode === "weekly" ? "Weekly" : "Continuous"}
             </Text>
-            <TouchableOpacity onPress={nextMonth}>
-              <ChevronRight size={26} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-          {/* Day Labels */}
-          <View style={styles.dayLabels}>
-            {DAYS.map((d, i) => (
-              <Text
-                key={i}
-                style={[styles.dayLabel, { color: colors.textMuted }]}
-              >
-                {d}
-              </Text>
-            ))}
-          </View>
-
-          {/* Date Grid */}
-          <View style={styles.dateGrid}>
-            {getDaysInMonth().map((day, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.dateCell,
-                  day === selectedDate && styles.dateCellSelected,
-                  day !== null &&
-                    isToday(day) &&
-                    day !== selectedDate && { backgroundColor: colors.input },
-                ]}
-                onPress={() => day !== null && setSelectedDate(day)}
-                disabled={day === null}
-              >
-                <Text
-                  style={[
-                    styles.dateText,
-                    { color: colors.text },
-                    day === selectedDate && styles.dateTextSelected,
-                    day !== null &&
-                      isToday(day) &&
-                      day !== selectedDate && { color: colors.primary },
-                  ]}
-                >
-                  {day ?? ""}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+      {loading ? (
+        <View style={{ paddingTop: 60, alignItems: "center" }}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
-
-        {/* Selected Day Meals */}
-        <View style={styles.mealsSection}>
-          {selectedDayData ? (
-            <>
-              <Text style={[styles.dayHeader, { color: colors.text }]}>
-                {getDateLabel()} — {selectedDayData.day}
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#4CAF50"]}
+            />
+          }
+        >
+          {/* Calendar Card */}
+          <View
+            style={[
+              styles.calendarCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            {/* Month Navigation */}
+            <View style={styles.monthRow}>
+              <TouchableOpacity onPress={prevMonth}>
+                <ChevronLeft size={26} color={colors.primary} />
+              </TouchableOpacity>
+              <Text style={[styles.monthTitle, { color: colors.text }]}>
+                {monthName}
               </Text>
-              {selectedDayData.meals.map((meal, i) => {
-                const MealIcon = mealTypeIcon(meal.type);
+              <TouchableOpacity onPress={nextMonth}>
+                <ChevronRight size={26} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Day Labels */}
+            <View style={styles.dayLabels}>
+              {DAYS.map((d, i) => (
+                <Text
+                  key={i}
+                  style={[styles.dayLabel, { color: colors.textMuted }]}
+                >
+                  {d}
+                </Text>
+              ))}
+            </View>
+
+            {/* Date Grid */}
+            <View style={styles.dateGrid}>
+              {getDaysInMonth().map((day, index) => {
+                const isSelected =
+                  day === selectedDate &&
+                  currentMonth.getMonth() === selectedMonth &&
+                  currentMonth.getFullYear() === selectedYear;
+
+                const hasPlan =
+                  day !== null &&
+                  mealPlan.some(
+                    (d) =>
+                      d.date ===
+                      toDateKey(
+                        new Date(
+                          currentMonth.getFullYear(),
+                          currentMonth.getMonth(),
+                          day,
+                        ),
+                      ),
+                  );
+
                 return (
-                  <View
-                    key={i}
+                  <TouchableOpacity
+                    key={index}
                     style={[
-                      styles.mealCard,
-                      {
-                        backgroundColor: colors.surface,
-                        borderColor: colors.border,
-                      },
-                      meal.taken && styles.mealCardTaken,
+                      styles.dateCell,
+                      isSelected && styles.dateCellSelected,
+                      day !== null &&
+                        isToday(day) &&
+                        !isSelected && { backgroundColor: colors.input },
                     ]}
+                    onPress={() => day !== null && selectDate(day)}
+                    disabled={day === null}
                   >
-                    <View
+                    <Text
                       style={[
-                        styles.mealIcon,
-                        { backgroundColor: colors.input },
+                        styles.dateText,
+                        { color: hasPlan ? colors.text : colors.textMuted },
+                        isSelected && styles.dateTextSelected,
+                        day !== null &&
+                          isToday(day) &&
+                          !isSelected && { color: colors.primary },
                       ]}
                     >
-                      <MealIcon size={18} color={colors.primary} />
-                    </View>
-                    <View style={styles.mealInfo}>
-                      <Text style={[styles.mealType, { color: colors.text }]}>
-                        {meal.type}
-                      </Text>
-                      <Text
-                        style={[styles.mealName, { color: colors.textMuted }]}
-                      >
-                        {meal.name}
-                      </Text>
-                      <Text style={styles.mealCal}>~{meal.calories} kcal</Text>
-                    </View>
-                    {meal.taken && (
-                      <View style={styles.takenBadge}>
-                        <Check size={12} color="#fff" strokeWidth={3} />
-                        <Text style={styles.takenText}>Taken</Text>
-                      </View>
+                      {day ?? ""}
+                    </Text>
+                    {day !== null && hasPlan && !isSelected && (
+                      <View
+                        style={[
+                          styles.planDot,
+                          { backgroundColor: colors.primary },
+                        ]}
+                      />
                     )}
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
-              <View
-                style={[styles.totalRow, { backgroundColor: colors.surface }]}
-              >
-                <Flame
-                  size={16}
-                  color="#FF9800"
-                  fill="#FF9800"
-                  fillOpacity={0.2}
-                />
-                <Text style={[styles.totalText, { color: colors.text }]}>
-                  Total kcal |{" "}
-                  {selectedDayData.meals
-                    .reduce((s, m) => s + m.calories, 0)
-                    .toLocaleString()}{" "}
-                  kcal
+            </View>
+          </View>
+
+          {/* Selected Day Meals */}
+          <View style={styles.mealsSection}>
+            {selectedDayData ? (
+              <>
+                <Text style={[styles.dayHeader, { color: colors.text }]}>
+                  {getDateLabel()} — {selectedDayName}
+                </Text>
+                {selectedDayData.meals.map((entry) => {
+                  const MealIcon = mealTypeIcon(entry.meal_type);
+                  return (
+                    <View
+                      key={entry.plan_id}
+                      style={[
+                        styles.mealCard,
+                        {
+                          backgroundColor: colors.surface,
+                          borderColor: colors.border,
+                        },
+                        entry.taken && styles.mealCardTaken,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.mealIcon,
+                          { backgroundColor: colors.input },
+                        ]}
+                      >
+                        <MealIcon size={18} color={colors.primary} />
+                      </View>
+                      <View style={styles.mealInfo}>
+                        <Text style={[styles.mealType, { color: colors.text }]}>
+                          {entry.meal_type}
+                        </Text>
+                        <Text
+                          style={[styles.mealName, { color: colors.textMuted }]}
+                        >
+                          {entry.meal?.name}
+                        </Text>
+                        <Text style={styles.mealCal}>
+                          ~{entry.meal?.calories} kcal
+                        </Text>
+                      </View>
+                      {entry.taken && (
+                        <View style={styles.takenBadge}>
+                          <Check size={12} color="#fff" strokeWidth={3} />
+                          <Text style={styles.takenText}>Taken</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+                <View
+                  style={[styles.totalRow, { backgroundColor: colors.surface }]}
+                >
+                  <Flame
+                    size={16}
+                    color="#FF9800"
+                    fill="#FF9800"
+                    fillOpacity={0.2}
+                  />
+                  <Text style={[styles.totalText, { color: colors.text }]}>
+                    Total kcal |{" "}
+                    {selectedDayData.meals
+                      .reduce((s, m) => s + (m.meal?.calories || 0), 0)
+                      .toLocaleString()}{" "}
+                    kcal
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <View style={styles.noPlanCard}>
+                <CalendarX size={44} color={colors.textMuted} />
+                <Text style={[styles.noPlanTitle, { color: colors.text }]}>
+                  No Plan Yet
+                </Text>
+                <Text
+                  style={[styles.noPlanSubtitle, { color: colors.textMuted }]}
+                >
+                  {planMode === "weekly"
+                    ? "This date is outside your current weekly plan."
+                    : "No meal plan found for this date."}
                 </Text>
               </View>
-            </>
-          ) : (
-            <View style={styles.noPlanCard}>
-              <CalendarX size={44} color={colors.textMuted} />
-              <Text style={[styles.noPlanTitle, { color: colors.text }]}>
-                No Plan Yet
-              </Text>
-              <Text
-                style={[styles.noPlanSubtitle, { color: colors.textMuted }]}
-              >
-                No meal plan found for this date.
-              </Text>
-            </View>
-          )}
-        </View>
+            )}
+          </View>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -451,8 +411,19 @@ const styles = StyleSheet.create({
   },
   headerBackRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   backBtn: { fontSize: 16, fontWeight: "600" },
+  modeRow: { flexDirection: "row", margin: 16, borderRadius: 12, padding: 4 },
+  modeBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  modeBtnActive: { backgroundColor: "#4CAF50" },
+  modeBtnText: { fontSize: 13, fontWeight: "600" },
+  modeBtnTextActive: { color: "#fff" },
   calendarCard: {
-    margin: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
@@ -481,6 +452,7 @@ const styles = StyleSheet.create({
   dateCellSelected: { backgroundColor: "#4CAF50" },
   dateText: { fontSize: 14 },
   dateTextSelected: { color: "#fff", fontWeight: "700" },
+  planDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
   mealsSection: { paddingHorizontal: 16 },
   dayHeader: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
   mealCard: {
@@ -525,5 +497,5 @@ const styles = StyleSheet.create({
   totalText: { fontSize: 13, fontWeight: "600" },
   noPlanCard: { alignItems: "center", paddingVertical: 40, gap: 8 },
   noPlanTitle: { fontSize: 18, fontWeight: "700" },
-  noPlanSubtitle: { fontSize: 13 },
+  noPlanSubtitle: { fontSize: 13, textAlign: "center", paddingHorizontal: 20 },
 });

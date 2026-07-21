@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import {
   Calendar,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react-native";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   SafeAreaView,
@@ -23,6 +25,7 @@ import {
   View,
 } from "react-native";
 import Logo from "../../components/Logo";
+import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
 export default function RegisterScreen() {
@@ -43,6 +46,7 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const allergenList = ["Eggs", "Peanuts", "Dairy", "Shellfish", "Fish", "Soy"];
 
@@ -52,7 +56,30 @@ export default function RegisterScreen() {
     );
   };
 
-  const handleRegister = () => {
+  // Auto-format habang nagta-type: nagdadagdag ng "/" automatic
+  const handleBirthdayChange = (text: string) => {
+    const digitsOnly = text.replace(/\D/g, "");
+    let formatted = digitsOnly;
+
+    if (digitsOnly.length >= 5) {
+      formatted = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2, 4)}/${digitsOnly.slice(4, 8)}`;
+    } else if (digitsOnly.length >= 3) {
+      formatted = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}`;
+    }
+
+    setBirthday(formatted);
+  };
+
+  // Convert MM/DD/YYYY -> YYYY-MM-DD para sa backend
+  const formatBirthdayForAPI = (input: string) => {
+    const parts = input.split("/");
+    if (parts.length !== 3) return null;
+    const [mm, dd, yyyy] = parts;
+    if (!mm || !dd || !yyyy || yyyy.length !== 4) return null;
+    return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  };
+
+  const handleRegister = async () => {
     if (
       !email ||
       !username ||
@@ -75,9 +102,48 @@ export default function RegisterScreen() {
       Alert.alert("Error", "Please agree to the Terms and Privacy Policy.");
       return;
     }
-    Alert.alert("Success", "Account created successfully!", [
-      { text: "OK", onPress: () => router.replace("/login") },
-    ]);
+
+    const formattedBirthday = formatBirthdayForAPI(birthday);
+    if (!formattedBirthday) {
+      Alert.alert(
+        "Error",
+        "Please enter a valid birthday in MM/DD/YYYY format.",
+      );
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.post("/auth/register", {
+        name: username, // walang hiwalay na "full name" field sa form, gamit muna ang username
+        email,
+        username,
+        password,
+        birthday: formattedBirthday,
+        sex,
+        height: parseFloat(height),
+        weight: parseFloat(weight),
+        dietary_goal: dietaryGoal,
+        activity_level: activityLevel,
+        allergens,
+      });
+
+      const { token, user } = response.data;
+
+      await AsyncStorage.setItem("token", token);
+      await AsyncStorage.setItem("user", JSON.stringify(user));
+
+      Alert.alert("Success", "Account created successfully!", [
+        { text: "OK", onPress: () => router.replace("/dashboard") },
+      ]);
+    } catch (err: any) {
+      const message =
+        err.response?.data?.error ||
+        "Unable to connect to server. Please check your connection.";
+      Alert.alert("Registration Failed", message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -117,6 +183,8 @@ export default function RegisterScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
+            editable={!loading}
           />
         </View>
 
@@ -135,6 +203,8 @@ export default function RegisterScreen() {
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
+            autoCorrect={false}
+            editable={!loading}
           />
         </View>
 
@@ -153,6 +223,9 @@ export default function RegisterScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!loading}
           />
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
             {showPassword ? (
@@ -178,6 +251,9 @@ export default function RegisterScreen() {
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry={!showConfirm}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!loading}
           />
           <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
             {showConfirm ? (
@@ -201,8 +277,10 @@ export default function RegisterScreen() {
             placeholder="Birthday (MM/DD/YYYY)"
             placeholderTextColor={colors.textMuted}
             value={birthday}
-            onChangeText={setBirthday}
+            onChangeText={handleBirthdayChange}
             keyboardType="numeric"
+            editable={!loading}
+            maxLength={10}
           />
         </View>
 
@@ -267,6 +345,7 @@ export default function RegisterScreen() {
             value={height}
             onChangeText={setHeight}
             keyboardType="numeric"
+            editable={!loading}
           />
         </View>
 
@@ -285,6 +364,7 @@ export default function RegisterScreen() {
             value={weight}
             onChangeText={setWeight}
             keyboardType="numeric"
+            editable={!loading}
           />
         </View>
 
@@ -407,8 +487,16 @@ export default function RegisterScreen() {
         </View>
 
         {/* Create Account Button */}
-        <TouchableOpacity style={styles.button} onPress={handleRegister}>
-          <Text style={styles.buttonText}>Create Account</Text>
+        <TouchableOpacity
+          style={[styles.button, loading && { opacity: 0.7 }]}
+          onPress={handleRegister}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Create Account</Text>
+          )}
         </TouchableOpacity>
 
         {/* Login Link */}
@@ -514,8 +602,8 @@ export default function RegisterScreen() {
                   },
                 ]}
               >
-                By tapping "I Agree" below, you confirm that you have read and
-                understood this Terms and Privacy Policy.
+              By tapping &quot;I Agree&quot; below, you confirm that you have read and
+              understood this Terms and Privacy Policy.
               </Text>
 
               <View style={{ height: 12 }} />
