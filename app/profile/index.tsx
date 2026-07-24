@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import {
   Activity,
@@ -23,6 +24,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   RefreshControl,
   SafeAreaView,
@@ -49,6 +51,7 @@ type UserProfile = {
   allergens: string[];
   bmi: string;
   tdee: string;
+  avatar_url?: string | null;
 };
 
 const formatDateDisplay = (isoDate: string) => {
@@ -76,6 +79,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
@@ -129,6 +133,68 @@ export default function ProfileScreen() {
     setRefreshing(true);
     loadProfile();
     loadWeightHistory(activeWeightTab);
+  };
+
+  const handlePickAvatar = async () => {
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert(
+        "Permission needed",
+        "Please allow access to your photos to change your profile picture.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+    const asset = result.assets[0];
+    setUploadingAvatar(true);
+
+    try {
+      const formData = new FormData();
+      const filename = asset.uri.split("/").pop() || "avatar.jpg";
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : "image/jpeg";
+
+      formData.append("image", {
+        uri: asset.uri,
+        name: filename,
+        type,
+      } as any);
+
+      const res = await api.post("/upload/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setProfile((prev) =>
+        prev ? { ...prev, avatar_url: res.data.avatar_url } : prev,
+      );
+      const cachedUser = await AsyncStorage.getItem("user");
+      if (cachedUser) {
+        const parsed = JSON.parse(cachedUser);
+        await AsyncStorage.setItem(
+          "user",
+          JSON.stringify({ ...parsed, avatar_url: res.data.avatar_url }),
+        );
+      }
+      Alert.alert("Success", "Profile picture updated!");
+    } catch (err: any) {
+      console.error("Upload avatar error:", err);
+      Alert.alert(
+        "Error",
+        "Unable to upload profile picture. Please try again.",
+      );
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const openEditModal = () => {
@@ -189,7 +255,6 @@ export default function ProfileScreen() {
       setProfile(res.data.user);
       await AsyncStorage.setItem("user", JSON.stringify(res.data.user));
 
-      // I-log din ang weight update sa progress table para lumabas sa graph
       await api.post("/progress/log", { weight: parseFloat(editForm.weight) });
       loadWeightHistory(activeWeightTab);
 
@@ -326,22 +391,35 @@ export default function ProfileScreen() {
         {/* Avatar + Name */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {profile.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .slice(0, 2)}
-              </Text>
-            </View>
+            {profile.avatar_url ? (
+              <Image
+                source={{ uri: profile.avatar_url }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {profile.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)}
+                </Text>
+              </View>
+            )}
             <TouchableOpacity
               style={[
                 styles.cameraBtn,
                 { backgroundColor: colors.card, borderColor: colors.border },
               ]}
+              onPress={handlePickAvatar}
+              disabled={uploadingAvatar}
             >
-              <Camera size={14} color={colors.textSecondary} />
+              {uploadingAvatar ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Camera size={14} color={colors.textSecondary} />
+              )}
             </TouchableOpacity>
           </View>
           <Text style={[styles.profileName, { color: colors.text }]}>
@@ -861,6 +939,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  avatarImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+  },
   avatarText: { fontSize: 28, fontWeight: "bold", color: "#fff" },
   cameraBtn: {
     position: "absolute",
@@ -1063,3 +1146,4 @@ const styles = StyleSheet.create({
   },
   saveBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });
+
