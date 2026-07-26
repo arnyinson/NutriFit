@@ -514,7 +514,7 @@ export default function RegisterScreen() {
       </ScrollView>
 
       {/* Terms and Privacy Policy Modal */}
-      <Modal visible={showTermsModal} animationType="slide" transparent>
+      <Modal visible={showTermsModal} animationType="slide" statusBarTranslucent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>

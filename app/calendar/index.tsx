@@ -1,11 +1,14 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import {
+  CalendarDays,
   CalendarX,
   Check,
   ChevronLeft,
   ChevronRight,
   Flame,
   Moon,
+  Repeat,
   Sun,
   Sunrise,
 } from "lucide-react-native";
@@ -42,6 +45,7 @@ type DayPlan = {
   meals: MealEntry[];
 };
 
+const MEAL_PLAN_MODE_KEY = "mealPlanMode";
 const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 const mealTypeIcon = (type: string) => {
@@ -63,6 +67,7 @@ export default function CalendarScreen() {
   const today = new Date();
 
   const [planMode, setPlanMode] = useState<"weekly" | "continuous">("weekly");
+  const [modeLoaded, setModeLoaded] = useState(false);
   const [mealPlan, setMealPlan] = useState<DayPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,6 +83,22 @@ export default function CalendarScreen() {
     month: "long",
     year: "numeric",
   });
+
+  // Basahin ang saved mode preference mula sa Meal screen — read-only lang dito
+  useEffect(() => {
+    (async () => {
+      try {
+        const savedMode = await AsyncStorage.getItem(MEAL_PLAN_MODE_KEY);
+        if (savedMode === "weekly" || savedMode === "continuous") {
+          setPlanMode(savedMode);
+        }
+      } catch (err) {
+        console.error("Load saved mode error:", err);
+      } finally {
+        setModeLoaded(true);
+      }
+    })();
+  }, []);
 
   const loadMealPlan = useCallback(async (mode: "weekly" | "continuous") => {
     try {
@@ -96,9 +117,10 @@ export default function CalendarScreen() {
   }, []);
 
   useEffect(() => {
+    if (!modeLoaded) return;
     setLoading(true);
     loadMealPlan(planMode);
-  }, [planMode, loadMealPlan]);
+  }, [modeLoaded, planMode, loadMealPlan]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -156,6 +178,23 @@ export default function CalendarScreen() {
     weekday: "long",
   });
 
+  if (!modeLoaded) {
+    return (
+      <SafeAreaView
+        style={[
+          styles.safe,
+          {
+            backgroundColor: colors.background,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -177,27 +216,18 @@ export default function CalendarScreen() {
             Calendar
           </Text>
         </TouchableOpacity>
-      </View>
 
-      {/* Plan Mode Toggle */}
-      <View style={[styles.modeRow, { backgroundColor: colors.surface }]}>
-        {(["weekly", "continuous"] as const).map((mode) => (
-          <TouchableOpacity
-            key={mode}
-            style={[styles.modeBtn, planMode === mode && styles.modeBtnActive]}
-            onPress={() => setPlanMode(mode)}
-          >
-            <Text
-              style={[
-                styles.modeBtnText,
-                { color: colors.textMuted },
-                planMode === mode && styles.modeBtnTextActive,
-              ]}
-            >
-              {mode === "weekly" ? "Weekly" : "Continuous"}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {/* Read-only mode badge — hindi na toggle, sinusunod na lang ang preference sa Meal screen */}
+        <View style={[styles.modeBadge, { backgroundColor: colors.surface }]}>
+          {planMode === "weekly" ? (
+            <CalendarDays size={13} color={colors.primary} />
+          ) : (
+            <Repeat size={13} color={colors.primary} />
+          )}
+          <Text style={[styles.modeBadgeText, { color: colors.text }]}>
+            {planMode === "weekly" ? "Weekly Mode" : "Continuous Mode"}
+          </Text>
+        </View>
       </View>
 
       {loading ? (
@@ -404,6 +434,9 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
@@ -411,18 +444,18 @@ const styles = StyleSheet.create({
   },
   headerBackRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   backBtn: { fontSize: 16, fontWeight: "600" },
-  modeRow: { flexDirection: "row", margin: 16, borderRadius: 12, padding: 4 },
-  modeBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 10,
+  modeBadge: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  modeBtnActive: { backgroundColor: "#4CAF50" },
-  modeBtnText: { fontSize: 13, fontWeight: "600" },
-  modeBtnTextActive: { color: "#fff" },
+  modeBadgeText: { fontSize: 11, fontWeight: "600" },
   calendarCard: {
     marginHorizontal: 16,
+    marginTop: 16,
     marginBottom: 16,
     borderRadius: 16,
     padding: 16,

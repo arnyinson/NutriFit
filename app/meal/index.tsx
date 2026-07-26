@@ -19,7 +19,7 @@ import {
   Utensils,
   X,
 } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -64,6 +64,8 @@ type DayPlan = {
   meals: MealEntry[];
 };
 
+const MEAL_PLAN_MODE_KEY = "mealPlanMode";
+
 const MealTypeIcon = ({
   type,
   size = 18,
@@ -87,13 +89,29 @@ const formatDateLabel = (dateStr: string) => {
   });
 };
 
+const getTodayDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// Rough estimated height (in px) of each collapsed day section card, para sa scroll positioning
+const DAY_SECTION_ESTIMATED_HEIGHT = 340;
+
 export default function MealScreen() {
   const router = useRouter();
   const { colors } = useTheme();
 
+  const scrollViewRef = useRef<ScrollView>(null);
+  const dayPositionsRef = useRef<Record<string, number>>({});
+  const hasAutoScrolledRef = useRef(false);
+
   const [mealPlan, setMealPlan] = useState<DayPlan[]>([]);
   const [activeTab, setActiveTab] = useState("Meal");
   const [planMode, setPlanMode] = useState<"weekly" | "continuous">("weekly");
+  const [modeLoaded, setModeLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userAllergens, setUserAllergens] = useState<string[]>([]);
@@ -117,6 +135,22 @@ export default function MealScreen() {
   const [manualKcal, setManualKcal] = useState("");
   const [manualWeight, setManualWeight] = useState("");
 
+  // Una munang basahin ang naka-save na mode preference bago mag-fetch ng data
+  useEffect(() => {
+    (async () => {
+      try {
+        const savedMode = await AsyncStorage.getItem(MEAL_PLAN_MODE_KEY);
+        if (savedMode === "weekly" || savedMode === "continuous") {
+          setPlanMode(savedMode);
+        }
+      } catch (err) {
+        console.error("Load saved mode error:", err);
+      } finally {
+        setModeLoaded(true);
+      }
+    })();
+  }, []);
+
   const loadMealPlan = useCallback(async (mode: "weekly" | "continuous") => {
     try {
       const cachedUser = await AsyncStorage.getItem("user");
@@ -139,15 +173,45 @@ export default function MealScreen() {
     }
   }, []);
 
+  // Mag-fetch lang pagkatapos mabasa ang saved mode (iwasan ang double-fetch: weekly muna tapos continuous)
   useEffect(() => {
+    if (!modeLoaded) return;
+    hasAutoScrolledRef.current = false;
     setLoading(true);
     loadMealPlan(planMode);
-  }, [planMode, loadMealPlan]);
+  }, [modeLoaded, planMode, loadMealPlan]);
+
+  const handleModeChange = async (mode: "weekly" | "continuous") => {
+    setPlanMode(mode);
+    try {
+      await AsyncStorage.setItem(MEAL_PLAN_MODE_KEY, mode);
+    } catch (err) {
+      console.error("Save mode error:", err);
+    }
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
     loadMealPlan(planMode);
   };
+
+  // Auto-scroll papuntang kasalukuyang araw sa unang pagkakataon lang na na-load ang plan
+  useEffect(() => {
+    if (loading || mealPlan.length === 0 || hasAutoScrolledRef.current) return;
+
+    const todayKey = getTodayDateString();
+    const todayIndex = mealPlan.findIndex((d) => d.date === todayKey);
+
+    if (todayIndex > 0) {
+      const timeout = setTimeout(() => {
+        const yOffset = todayIndex * DAY_SECTION_ESTIMATED_HEIGHT;
+        scrollViewRef.current?.scrollTo({ y: yOffset, animated: true });
+      }, 300);
+      hasAutoScrolledRef.current = true;
+      return () => clearTimeout(timeout);
+    }
+    hasAutoScrolledRef.current = true;
+  }, [loading, mealPlan]);
 
   const toggleMeal = async (dayIndex: number, entry: MealEntry) => {
     const newTaken = !entry.taken;
@@ -210,7 +274,10 @@ export default function MealScreen() {
   };
 
   const getDayTotal = (meals: MealEntry[]) =>
-    meals.reduce((sum, m) => sum + (m.meal?.calories || 0), 0);
+    meals.reduce(
+      (sum, m) => sum + parseFloat(String(m.meal?.calories || 0)),
+      0,
+    );
 
   // ============ EDIT PLAN (replace a slot) ============
   const openEditPlan = (dayIndex: number) => {
@@ -442,7 +509,7 @@ export default function MealScreen() {
           <TouchableOpacity
             key={mode}
             style={[styles.modeBtn, planMode === mode && styles.modeBtnActive]}
-            onPress={() => setPlanMode(mode)}
+            onPress={() => handleModeChange(mode)}
           >
             <Text
               style={[
@@ -469,6 +536,7 @@ export default function MealScreen() {
       )}
 
       <ScrollView
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -489,136 +557,168 @@ export default function MealScreen() {
             No meal plan available yet.
           </Text>
         ) : (
-          mealPlan.map((day, dayIndex) => (
-            <View
-              key={day.date}
-              style={[
-                styles.daySection,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <View style={styles.dayHeader}>
-                <View>
-                  <Text style={[styles.dayTitle, { color: colors.text }]}>
-                    {day.day}
-                  </Text>
-                  <Text style={[styles.dayDate, { color: colors.textMuted }]}>
-                    {formatDateLabel(day.date)}
-                  </Text>
-                </View>
-                <View style={styles.dayActions}>
-                  <TouchableOpacity
-                    style={styles.takeAllBtn}
-                    onPress={() => takeAllMeals(dayIndex)}
-                  >
-                    <Text style={styles.takeAllText}>Take all</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.editBtn}
-                    onPress={() => openEditPlan(dayIndex)}
-                  >
-                    <Text style={styles.editText}>Edit Plan</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {day.meals.map((entry) => (
-                <TouchableOpacity
-                  key={entry.plan_id}
-                  style={[
-                    styles.mealRow,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    setSelectedMeal(entry.meal);
-                    setShowMealModal(true);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <View
-                    style={[styles.mealIcon, { backgroundColor: colors.input }]}
-                  >
-                    <MealTypeIcon
-                      type={entry.meal_type}
-                      size={18}
-                      color={colors.primary}
-                    />
-                  </View>
-                  <View style={styles.mealInfo}>
-                    <Text style={[styles.mealType, { color: colors.text }]}>
-                      {entry.meal_type}
-                    </Text>
-                    <Text
-                      style={[styles.mealName, { color: colors.textMuted }]}
-                    >
-                      {entry.meal?.name}
-                    </Text>
-                    <View style={styles.macroRow}>
-                      <Text style={styles.macroText}>
-                        P: {entry.meal?.protein}g
-                      </Text>
-                      <Text style={styles.macroText}>
-                        C: {entry.meal?.carbs}g
-                      </Text>
-                      <Text style={styles.macroText}>
-                        F: {entry.meal?.fats}g
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.mealRight}>
-                    <Text
-                      style={[
-                        styles.mealCalories,
-                        { color: colors.textSecondary },
-                      ]}
-                    >
-                      ~{entry.meal?.calories} kcal
-                    </Text>
-                    <TouchableOpacity
-                      style={[
-                        styles.actionBtn,
-                        entry.taken ? styles.skipBtn : styles.takeBtn,
-                      ]}
-                      onPress={() => toggleMeal(dayIndex, entry)}
-                    >
-                      <Text style={styles.actionBtnText}>
-                        {entry.taken ? "Skip" : "Take"}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.pencilBtn}
-                      onPress={() => openEditMeal(dayIndex, entry)}
-                    >
-                      <Pencil size={16} color={colors.textMuted} />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              ))}
-
+          mealPlan.map((day, dayIndex) => {
+            const isToday = day.date === getTodayDateString();
+            return (
               <View
-                style={[styles.totalRow, { borderTopColor: colors.border }]}
+                key={day.date}
+                onLayout={(event) => {
+                  dayPositionsRef.current[day.date] =
+                    event.nativeEvent.layout.y;
+                }}
+                style={[
+                  styles.daySection,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                  isToday && styles.daySectionToday,
+                ]}
               >
-                <Flame
-                  size={16}
-                  color="#FF9800"
-                  fill="#FF9800"
-                  fillOpacity={0.2}
-                />
-                <Text style={[styles.totalText, { color: colors.text }]}>
-                  Total kcal | {getDayTotal(day.meals).toLocaleString()} kcal
-                </Text>
+                <View style={styles.dayHeader}>
+                  <View>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <Text style={[styles.dayTitle, { color: colors.text }]}>
+                        {day.day}
+                      </Text>
+                      {isToday && (
+                        <View style={styles.todayBadge}>
+                          <Text style={styles.todayBadgeText}>Today</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.dayDate, { color: colors.textMuted }]}>
+                      {formatDateLabel(day.date)}
+                    </Text>
+                  </View>
+                  <View style={styles.dayActions}>
+                    <TouchableOpacity
+                      style={styles.takeAllBtn}
+                      onPress={() => takeAllMeals(dayIndex)}
+                    >
+                      <Text style={styles.takeAllText}>Take all</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.editBtn}
+                      onPress={() => openEditPlan(dayIndex)}
+                    >
+                      <Text style={styles.editText}>Edit Plan</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {day.meals.map((entry) => (
+                  <TouchableOpacity
+                    key={entry.plan_id}
+                    style={[
+                      styles.mealRow,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedMeal(entry.meal);
+                      setShowMealModal(true);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View
+                      style={[
+                        styles.mealIcon,
+                        { backgroundColor: colors.input },
+                      ]}
+                    >
+                      <MealTypeIcon
+                        type={entry.meal_type}
+                        size={18}
+                        color={colors.primary}
+                      />
+                    </View>
+                    <View style={styles.mealInfo}>
+                      <Text style={[styles.mealType, { color: colors.text }]}>
+                        {entry.meal_type}
+                      </Text>
+                      <Text
+                        style={[styles.mealName, { color: colors.textMuted }]}
+                      >
+                        {entry.meal?.name}
+                      </Text>
+                      <View style={styles.macroRow}>
+                        <Text style={styles.macroText}>
+                          P: {entry.meal?.protein}g
+                        </Text>
+                        <Text style={styles.macroText}>
+                          C: {entry.meal?.carbs}g
+                        </Text>
+                        <Text style={styles.macroText}>
+                          F: {entry.meal?.fats}g
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.mealRight}>
+                      <Text
+                        style={[
+                          styles.mealCalories,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        ~{entry.meal?.calories} kcal
+                      </Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          entry.taken ? styles.skipBtn : styles.takeBtn,
+                        ]}
+                        onPress={() => toggleMeal(dayIndex, entry)}
+                      >
+                        <Text style={styles.actionBtnText}>
+                          {entry.taken ? "Skip" : "Take"}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.pencilBtn}
+                        onPress={() => openEditMeal(dayIndex, entry)}
+                      >
+                        <Pencil size={16} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+
+                <View
+                  style={[styles.totalRow, { borderTopColor: colors.border }]}
+                >
+                  <Flame
+                    size={16}
+                    color="#FF9800"
+                    fill="#FF9800"
+                    fillOpacity={0.2}
+                  />
+                  <Text style={[styles.totalText, { color: colors.text }]}>
+                    Total kcal | {getDayTotal(day.meals).toLocaleString()} kcal
+                  </Text>
+                </View>
               </View>
-            </View>
-          ))
+            );
+          })
         )}
         <View style={{ height: 80 }} />
       </ScrollView>
 
       {/* MEAL DETAIL MODAL */}
-      <Modal visible={showMealModal} animationType="slide" transparent>
+      <Modal
+        visible={showMealModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -1222,6 +1322,14 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
   },
+  daySectionToday: { borderColor: "#4CAF50", borderWidth: 2 },
+  todayBadge: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  todayBadgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
   dayHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

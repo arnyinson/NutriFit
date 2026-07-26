@@ -11,7 +11,7 @@ import {
   Utensils,
   X,
 } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -48,6 +48,7 @@ type ExerciseEntry = {
 
 type WorkoutDay = {
   day: string;
+  date: string; // YYYY-MM-DD
   exercises: ExerciseEntry[];
 };
 
@@ -61,9 +62,51 @@ const ALL_DAYS = [
   "Sunday",
 ];
 
+const formatLocalDate = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getTodayDateString = () => formatLocalDate(new Date());
+
+// Kinukuha ang petsa ng Lunes ng kasalukuyang linggo, tapos ang bawat araw pagkatapos nito
+const getWeekDates = () => {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // Sunday = 0
+  const monday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  monday.setDate(monday.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+
+  return ALL_DAYS.map((_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return formatLocalDate(d);
+  });
+};
+
+const formatDateLabel = (dateStr: string) => {
+  const date = new Date(dateStr + "T00:00:00");
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+// Rough estimated height (in px) ng bawat collapsed day card, para sa scroll positioning
+const DAY_SECTION_ESTIMATED_HEIGHT = 280;
+
 export default function WorkoutScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const hasAutoScrolledRef = useRef(false);
 
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutDay[]>([]);
   const [activeTab, setActiveTab] = useState("Exercise");
@@ -92,11 +135,18 @@ export default function WorkoutScreen() {
       }
 
       // I-fill ang buong linggo (Mon-Sun) para makita ang Rest Days na walang entry mula sa API
+      const weekDates = getWeekDates();
       const existingDays = new Map<string, ExerciseEntry[]>(
-        res.data.workoutPlan.map((d: WorkoutDay) => [d.day, d.exercises]),
+        res.data.workoutPlan.map(
+          (d: { day: string; exercises: ExerciseEntry[] }) => [
+            d.day,
+            d.exercises,
+          ],
+        ),
       );
-      const fullWeek: WorkoutDay[] = ALL_DAYS.map((day) => ({
+      const fullWeek: WorkoutDay[] = ALL_DAYS.map((day, i) => ({
         day,
+        date: weekDates[i],
         exercises: existingDays.get(day) || [],
       }));
 
@@ -114,6 +164,7 @@ export default function WorkoutScreen() {
   }, []);
 
   useEffect(() => {
+    hasAutoScrolledRef.current = false;
     loadWorkoutPlan();
   }, [loadWorkoutPlan]);
 
@@ -121,6 +172,25 @@ export default function WorkoutScreen() {
     setRefreshing(true);
     loadWorkoutPlan();
   };
+
+  // Auto-scroll papuntang kasalukuyang araw sa unang pagkakataon lang na na-load ang plan
+  useEffect(() => {
+    if (loading || workoutPlan.length === 0 || hasAutoScrolledRef.current)
+      return;
+
+    const todayKey = getTodayDateString();
+    const todayIndex = workoutPlan.findIndex((d) => d.date === todayKey);
+
+    if (todayIndex > 0) {
+      const timeout = setTimeout(() => {
+        const yOffset = todayIndex * DAY_SECTION_ESTIMATED_HEIGHT;
+        scrollViewRef.current?.scrollTo({ y: yOffset, animated: true });
+      }, 300);
+      hasAutoScrolledRef.current = true;
+      return () => clearTimeout(timeout);
+    }
+    hasAutoScrolledRef.current = true;
+  }, [loading, workoutPlan]);
 
   const toggleExercise = async (dayIndex: number, entry: ExerciseEntry) => {
     const newDone = !entry.done;
@@ -273,6 +343,7 @@ export default function WorkoutScreen() {
       </View>
 
       <ScrollView
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -284,6 +355,7 @@ export default function WorkoutScreen() {
       >
         {workoutPlan.map((day, dayIndex) => {
           const isRest = day.exercises.length === 0;
+          const isToday = day.date === getTodayDateString();
           const focus = isRest
             ? "Rest Day"
             : [
@@ -292,17 +364,34 @@ export default function WorkoutScreen() {
 
           return (
             <View
-              key={day.day}
+              key={day.date}
               style={[
                 styles.daySection,
                 { backgroundColor: colors.surface, borderColor: colors.border },
+                isToday && styles.daySectionToday,
               ]}
             >
               {/* Day Header */}
               <View style={styles.dayHeader}>
-                <View>
-                  <Text style={[styles.dayTitle, { color: colors.text }]}>
-                    {day.day} — {focus}
+                <View style={{ flex: 1 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={[styles.dayTitle, { color: colors.text }]}>
+                      {day.day} — {focus}
+                    </Text>
+                    {isToday && (
+                      <View style={styles.todayBadge}>
+                        <Text style={styles.todayBadgeText}>Today</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.dayDate, { color: colors.textMuted }]}>
+                    {formatDateLabel(day.date)}
                   </Text>
                 </View>
                 {!isRest && (
@@ -424,7 +513,12 @@ export default function WorkoutScreen() {
       </ScrollView>
 
       {/* Exercise Detail Modal */}
-      <Modal visible={showDetailModal} animationType="slide" transparent>
+      <Modal
+        visible={showDetailModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -502,7 +596,12 @@ export default function WorkoutScreen() {
       </Modal>
 
       {/* Log Exercise Modal */}
-      <Modal visible={showLogModal} animationType="slide" transparent>
+      <Modal
+        visible={showLogModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
         <View style={styles.modalOverlay}>
           <View
             style={[styles.logModalContent, { backgroundColor: colors.card }]}
@@ -633,6 +732,14 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
   },
+  daySectionToday: { borderColor: "#4CAF50", borderWidth: 2 },
+  todayBadge: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  todayBadgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
   dayHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -640,6 +747,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   dayTitle: { fontSize: 15, fontWeight: "700" },
+  dayDate: { fontSize: 11, marginTop: 2 },
   dayActions: { flexDirection: "row", gap: 8 },
   logAllBtn: {
     backgroundColor: "#4CAF50",

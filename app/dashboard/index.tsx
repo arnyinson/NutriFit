@@ -1,5 +1,21 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useEffect, useState, useCallback } from "react";
+import {
+  BarChart3,
+  Check,
+  ChevronDown,
+  Dumbbell,
+  Flame,
+  Home,
+  Moon,
+  Plus,
+  Sun,
+  Sunrise,
+  Trophy,
+  User,
+  Utensils,
+} from "lucide-react-native";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -10,13 +26,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useTheme } from "../../constants/theme";
 import api from "../../constants/api";
-import {
-  Home, BarChart3, Utensils, Dumbbell, User,
-  Trophy, ChevronDown, Sunrise, Sun, Moon, Flame, Check
-} from 'lucide-react-native';
+import { useTheme } from "../../constants/theme";
 
 type MealEntry = {
   plan_id: string;
@@ -42,13 +53,30 @@ type ExerciseEntry = {
   };
 };
 
+type FoodLogEntry = {
+  id: string;
+  food_name: string;
+  calories: number;
+  weight_grams: number | null;
+  logged_at: string;
+};
+
+const MEAL_PLAN_MODE_KEY = "mealPlanMode";
+
 const mealTypeIcon = (type: string) => {
   if (type === "Breakfast") return Sunrise;
   if (type === "Lunch") return Sun;
   return Moon;
 };
 
-const getTodayDateString = () => new Date().toISOString().split("T")[0];
+const getTodayDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const getTodayDayName = () =>
   new Date().toLocaleDateString("en-US", { weekday: "long" });
 
@@ -66,6 +94,7 @@ export default function DashboardScreen() {
   const [todayMeals, setTodayMeals] = useState<MealEntry[]>([]);
   const [todayWorkoutFocus, setTodayWorkoutFocus] = useState("Rest Day");
   const [todayExercises, setTodayExercises] = useState<ExerciseEntry[]>([]);
+  const [todayFoodLogs, setTodayFoodLogs] = useState<FoodLogEntry[]>([]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -97,19 +126,43 @@ export default function DashboardScreen() {
       if (user.tdee) setGoalCalories(toNumber(user.tdee));
       await AsyncStorage.setItem("user", JSON.stringify(user));
 
-      // Get meal plan
-      let mealPlanRes = await api.get("/meals/plan/me", { params: { mode: "weekly" } });
-      if (!mealPlanRes.data.mealPlan || mealPlanRes.data.mealPlan.length === 0) {
-        await api.post("/meals/plan/generate", { mode: "weekly" });
-        mealPlanRes = await api.get("/meals/plan/me", { params: { mode: "weekly" } });
-      }
       const todayDate = getTodayDateString();
-      const todayEntry = mealPlanRes.data.mealPlan.find((d: any) => d.date === todayDate);
+
+      // Gamitin ang naka-save na plan mode preference (Weekly o Continuous)
+      const savedMode = await AsyncStorage.getItem(MEAL_PLAN_MODE_KEY);
+      const mealMode: "weekly" | "continuous" =
+        savedMode === "continuous" ? "continuous" : "weekly";
+
+      // Get meal plan
+      let mealPlanRes = await api.get("/meals/plan/me", {
+        params: { mode: mealMode },
+      });
+      if (
+        !mealPlanRes.data.mealPlan ||
+        mealPlanRes.data.mealPlan.length === 0
+      ) {
+        await api.post("/meals/plan/generate", { mode: mealMode });
+        mealPlanRes = await api.get("/meals/plan/me", {
+          params: { mode: mealMode },
+        });
+      }
+      const todayEntry = mealPlanRes.data.mealPlan.find(
+        (d: any) => d.date === todayDate,
+      );
       setTodayMeals(todayEntry ? todayEntry.meals : []);
+
+      // Get manually logged food ("Log Outside Food") for today
+      const foodLogsRes = await api.get("/meals/log", {
+        params: { date: todayDate },
+      });
+      setTodayFoodLogs(foodLogsRes.data.foodLogs || []);
 
       // Get workout plan
       let workoutPlanRes = await api.get("/workouts/plan/me");
-      if (!workoutPlanRes.data.workoutPlan || workoutPlanRes.data.workoutPlan.length === 0) {
+      if (
+        !workoutPlanRes.data.workoutPlan ||
+        workoutPlanRes.data.workoutPlan.length === 0
+      ) {
         await api.post("/workouts/plan/generate", {
           mode: "weekly",
           experience_level: "Beginner",
@@ -119,19 +172,22 @@ export default function DashboardScreen() {
       }
       const todayDayName = getTodayDayName();
       const todayWorkoutEntry = workoutPlanRes.data.workoutPlan.find(
-        (d: any) => d.day === todayDayName
+        (d: any) => d.day === todayDayName,
       );
       if (todayWorkoutEntry && todayWorkoutEntry.exercises.length > 0) {
         setTodayExercises(todayWorkoutEntry.exercises);
         const muscleGroups = [
-          ...new Set(todayWorkoutEntry.exercises.map((e: ExerciseEntry) => e.exercise.muscle_group)),
+          ...new Set(
+            todayWorkoutEntry.exercises.map(
+              (e: ExerciseEntry) => e.exercise.muscle_group,
+            ),
+          ),
         ];
         setTodayWorkoutFocus(muscleGroups.join(" + "));
       } else {
         setTodayExercises([]);
         setTodayWorkoutFocus("Rest Day");
       }
-
     } catch (err) {
       console.error("Dashboard load error:", err);
     } finally {
@@ -152,15 +208,21 @@ export default function DashboardScreen() {
   const toggleMeal = async (planId: string, currentlyTaken: boolean) => {
     // Optimistic UI update
     setTodayMeals((prev) =>
-      prev.map((m) => (m.plan_id === planId ? { ...m, taken: !currentlyTaken } : m))
+      prev.map((m) =>
+        m.plan_id === planId ? { ...m, taken: !currentlyTaken } : m,
+      ),
     );
     try {
-      await api.patch(`/meals/plan/${planId}/toggle`, { taken: !currentlyTaken });
+      await api.patch(`/meals/plan/${planId}/toggle`, {
+        taken: !currentlyTaken,
+      });
     } catch (err) {
       console.error("Toggle meal error:", err);
       // revert on failure
       setTodayMeals((prev) =>
-        prev.map((m) => (m.plan_id === planId ? { ...m, taken: currentlyTaken } : m))
+        prev.map((m) =>
+          m.plan_id === planId ? { ...m, taken: currentlyTaken } : m,
+        ),
       );
     }
   };
@@ -170,7 +232,11 @@ export default function DashboardScreen() {
     setTodayMeals((prev) => prev.map((m) => ({ ...m, taken: true })));
     try {
       await Promise.all(
-        previous.filter((m) => !m.taken).map((m) => api.patch(`/meals/plan/${m.plan_id}/toggle`, { taken: true }))
+        previous
+          .filter((m) => !m.taken)
+          .map((m) =>
+            api.patch(`/meals/plan/${m.plan_id}/toggle`, { taken: true }),
+          ),
       );
     } catch (err) {
       console.error("Take all meals error:", err);
@@ -179,30 +245,56 @@ export default function DashboardScreen() {
 
   const toggleWorkout = async (planId: string, currentlyDone: boolean) => {
     setTodayExercises((prev) =>
-      prev.map((e) => (e.plan_id === planId ? { ...e, done: !currentlyDone } : e))
+      prev.map((e) =>
+        e.plan_id === planId ? { ...e, done: !currentlyDone } : e,
+      ),
     );
     try {
-      await api.patch(`/workouts/plan/${planId}/toggle`, { done: !currentlyDone });
+      await api.patch(`/workouts/plan/${planId}/toggle`, {
+        done: !currentlyDone,
+      });
     } catch (err) {
       console.error("Toggle workout error:", err);
       setTodayExercises((prev) =>
-        prev.map((e) => (e.plan_id === planId ? { ...e, done: currentlyDone } : e))
+        prev.map((e) =>
+          e.plan_id === planId ? { ...e, done: currentlyDone } : e,
+        ),
       );
     }
   };
 
-  const totalCalories = todayMeals
+  const takenMealsTotal = todayMeals
     .filter((m) => m.taken)
     .reduce((sum, m) => sum + toNumber(m.meal?.calories), 0);
+
+  const foodLogsTotal = todayFoodLogs.reduce(
+    (sum, f) => sum + toNumber(f.calories),
+    0,
+  );
+
+  const totalCalories = takenMealsTotal + foodLogsTotal;
   const remainingCalories = Math.max(goalCalories - totalCalories, 0);
-  const percentageConsumed = goalCalories > 0 ? Math.round((totalCalories / goalCalories) * 100) : 0;
+  const percentageConsumed =
+    goalCalories > 0 ? Math.round((totalCalories / goalCalories) * 100) : 0;
   const isGoalMet = percentageConsumed >= 90;
 
-  const todayMealsTotal = todayMeals.reduce((sum, m) => sum + toNumber(m.meal?.calories), 0);
+  const todayMealsTotal = todayMeals.reduce(
+    (sum, m) => sum + toNumber(m.meal?.calories),
+    0,
+  );
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }]}>
+      <SafeAreaView
+        style={[
+          styles.safe,
+          {
+            backgroundColor: colors.background,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
         <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
@@ -213,14 +305,22 @@ export default function DashboardScreen() {
       <ScrollView
         style={[styles.container, { backgroundColor: colors.background }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#4CAF50"]} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#4CAF50"]}
+          />
+        }
       >
         {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.background }]}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.push("/profile" as any)}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarInitial}>{userName ? userName[0] : "U"}</Text>
+                <Text style={styles.avatarInitial}>
+                  {userName ? userName[0] : "U"}
+                </Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity
@@ -234,16 +334,23 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
           <TouchableOpacity onPress={() => router.push("/achievements" as any)}>
-            <Trophy size={24} color="#FF9800" fill="#FF9800" fillOpacity={0.15} />
+            <Trophy
+              size={24}
+              color="#FF9800"
+              fill="#FF9800"
+              fillOpacity={0.15}
+            />
           </TouchableOpacity>
         </View>
 
         {/* Greeting */}
         <Text style={[styles.greeting, { color: colors.text }]}>
-          {getGreeting()}{userName ? `, ${userName.split(" ")[0]}` : ""}
+          {getGreeting()}
+          {userName ? `, ${userName.split(" ")[0]}` : ""}
         </Text>
         <Text style={[styles.subGreeting, { color: colors.textMuted }]}>
-          {remainingCalories.toLocaleString()} kcal left of your {goalCalories.toLocaleString()} kcal goal
+          {remainingCalories.toLocaleString()} kcal left of your{" "}
+          {goalCalories.toLocaleString()} kcal goal
         </Text>
 
         {/* Calorie Card */}
@@ -261,9 +368,16 @@ export default function DashboardScreen() {
               <Text style={styles.calorieUnit}>kcal left</Text>
             </View>
           </View>
-          <Text style={styles.percentageText}>{totalCalories.toLocaleString()} kcal consumed</Text>
+          <Text style={styles.percentageText}>
+            {totalCalories.toLocaleString()} kcal consumed
+          </Text>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${Math.min(percentageConsumed, 100)}%` }]} />
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${Math.min(percentageConsumed, 100)}%` },
+              ]}
+            />
           </View>
           <Text style={styles.goalText}>
             {goalCalories.toLocaleString()} kcal daily goal
@@ -282,17 +396,30 @@ export default function DashboardScreen() {
               {"Today's Meal Plan"}
             </Text>
             <View style={styles.sectionActions}>
-              <TouchableOpacity style={styles.takeAllBtn} onPress={takeAllMeals}>
+              <TouchableOpacity
+                style={styles.takeAllBtn}
+                onPress={takeAllMeals}
+              >
                 <Text style={styles.takeAllText}>Take all</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.editBtn} onPress={() => router.push("/meal" as any)}>
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => router.push("/meal" as any)}
+              >
                 <Text style={styles.editText}>View Plan</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {todayMeals.length === 0 ? (
-            <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center", paddingVertical: 16 }}>
+            <Text
+              style={{
+                color: colors.textMuted,
+                fontSize: 13,
+                textAlign: "center",
+                paddingVertical: 16,
+              }}
+            >
               No meals planned for today yet.
             </Text>
           ) : (
@@ -303,7 +430,10 @@ export default function DashboardScreen() {
                   key={meal.plan_id}
                   style={[
                     styles.mealRow,
-                    { backgroundColor: colors.card, borderColor: colors.border },
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
                   ]}
                 >
                   <View
@@ -315,12 +445,17 @@ export default function DashboardScreen() {
                     <Text style={[styles.mealType, { color: colors.text }]}>
                       {meal.meal_type}
                     </Text>
-                    <Text style={[styles.mealName, { color: colors.textMuted }]}>
+                    <Text
+                      style={[styles.mealName, { color: colors.textMuted }]}
+                    >
                       {meal.meal?.name}
                     </Text>
                   </View>
                   <Text
-                    style={[styles.mealCalories, { color: colors.textSecondary }]}
+                    style={[
+                      styles.mealCalories,
+                      { color: colors.textSecondary },
+                    ]}
                   >
                     ~{toNumber(meal.meal?.calories)} kcal
                   </Text>
@@ -340,11 +475,59 @@ export default function DashboardScreen() {
             })
           )}
 
-          {todayMeals.length > 0 && (
+          {/* Manually logged food ("Log Outside Food") */}
+          {todayFoodLogs.length > 0 && (
+            <>
+              {todayFoodLogs.map((log) => (
+                <View
+                  key={log.id}
+                  style={[
+                    styles.mealRow,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[styles.mealIcon, { backgroundColor: colors.input }]}
+                  >
+                    <Plus size={18} color={colors.primary} />
+                  </View>
+                  <View style={styles.mealInfo}>
+                    <Text style={[styles.mealType, { color: colors.text }]}>
+                      Logged Food
+                    </Text>
+                    <Text
+                      style={[styles.mealName, { color: colors.textMuted }]}
+                    >
+                      {log.food_name}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.mealCalories,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    ~{toNumber(log.calories)} kcal
+                  </Text>
+                </View>
+              ))}
+            </>
+          )}
+
+          {(todayMeals.length > 0 || todayFoodLogs.length > 0) && (
             <View style={styles.totalRow}>
-              <Flame size={16} color="#FF9800" fill="#FF9800" fillOpacity={0.2} />
+              <Flame
+                size={16}
+                color="#FF9800"
+                fill="#FF9800"
+                fillOpacity={0.2}
+              />
               <Text style={[styles.totalText, { color: colors.text }]}>
-                Total kcal | {todayMealsTotal.toLocaleString()} kcal
+                Total kcal |{" "}
+                {(todayMealsTotal + foodLogsTotal).toLocaleString()} kcal
               </Text>
             </View>
           )}
@@ -359,7 +542,8 @@ export default function DashboardScreen() {
         >
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {"Today's Workout Plan"}{todayExercises.length > 0 ? ` - ${todayWorkoutFocus}` : ""}
+              {"Today's Workout Plan"}
+              {todayExercises.length > 0 ? ` - ${todayWorkoutFocus}` : ""}
             </Text>
             <View style={styles.sectionActions}>
               <TouchableOpacity
@@ -372,14 +556,24 @@ export default function DashboardScreen() {
           </View>
 
           {todayExercises.length === 0 ? (
-            <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center", paddingVertical: 16 }}>
+            <Text
+              style={{
+                color: colors.textMuted,
+                fontSize: 13,
+                textAlign: "center",
+                paddingVertical: 16,
+              }}
+            >
               Rest day — no workout scheduled today.
             </Text>
           ) : (
             todayExercises.map((exercise) => (
               <View
                 key={exercise.plan_id}
-                style={[styles.exerciseRow, { borderBottomColor: colors.border }]}
+                style={[
+                  styles.exerciseRow,
+                  { borderBottomColor: colors.border },
+                ]}
               >
                 <View style={styles.exerciseBullet} />
                 <View style={styles.exerciseInfo}>
@@ -400,7 +594,9 @@ export default function DashboardScreen() {
                   ]}
                   onPress={() => toggleWorkout(exercise.plan_id, exercise.done)}
                 >
-                  {exercise.done && <Check size={14} color="#fff" strokeWidth={3} />}
+                  {exercise.done && (
+                    <Check size={14} color="#fff" strokeWidth={3} />
+                  )}
                 </TouchableOpacity>
               </View>
             ))

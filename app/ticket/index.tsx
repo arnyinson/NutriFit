@@ -281,7 +281,7 @@ export default function TicketScreen() {
       </ScrollView>
 
       {/* Ticket History Modal */}
-      <Modal visible={showHistory} animationType="slide" transparent>
+      <Modal visible={showHistory} animationType="slide" statusBarTranslucent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
