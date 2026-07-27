@@ -135,8 +135,9 @@ export default function TicketScreen() {
         <TouchableOpacity
           onPress={() => setShowHistory(true)}
           style={styles.historyRow}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <History size={14} color={colors.primary} />
+          <History size={18} color={colors.primary} />
           <Text style={[styles.historyBtn, { color: colors.primary }]}>
             History
           </Text>
@@ -281,7 +282,12 @@ export default function TicketScreen() {
       </ScrollView>
 
       {/* Ticket History Modal */}
-      <Modal visible={showHistory} animationType="slide" statusBarTranslucent>
+      <Modal
+        visible={showHistory}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
@@ -483,7 +489,12 @@ export default function TicketScreen() {
       </Modal>
 
       {/* Success Modal */}
-      <Modal visible={showSuccessModal} animationType="fade" transparent>
+      <Modal
+        visible={showSuccessModal}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+      >
         <View style={styles.modalOverlay}>
           <View style={[styles.successModal, { backgroundColor: colors.card }]}>
             <CheckCircle2 size={56} color="#4CAF50" />
@@ -515,8 +526,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: { fontSize: 18, fontWeight: "bold" },
-  historyRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  historyBtn: { fontSize: 14, fontWeight: "600" },
+  historyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  historyBtn: { fontSize: 15, fontWeight: "600" },
   container: { padding: 20 },
   topSection: { alignItems: "center", marginBottom: 24 },
   topTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 6 },

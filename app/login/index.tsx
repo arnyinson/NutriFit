@@ -69,7 +69,7 @@ export default function LoginScreen() {
             <Text style={styles.logo}>NutriFit</Text>
           </View>
           <Text style={[styles.title, { color: colors.text }]}>
-            Welcome Back
+            Welcome!!!
           </Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             Log in to continue your fitness and meal plan journey
