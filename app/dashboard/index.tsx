@@ -18,6 +18,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -90,6 +91,7 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [userName, setUserName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [goalCalories, setGoalCalories] = useState(2000);
   const [todayMeals, setTodayMeals] = useState<MealEntry[]>([]);
   const [todayWorkoutFocus, setTodayWorkoutFocus] = useState("Rest Day");
@@ -116,6 +118,7 @@ export default function DashboardScreen() {
       if (cachedUser) {
         const parsed = JSON.parse(cachedUser);
         setUserName(parsed.name || "");
+        setAvatarUrl(parsed.avatar_url || null);
         if (parsed.tdee) setGoalCalories(toNumber(parsed.tdee));
       }
 
@@ -123,6 +126,7 @@ export default function DashboardScreen() {
       const profileRes = await api.get("/users/me");
       const user = profileRes.data.user;
       setUserName(user.name);
+      setAvatarUrl(user.avatar_url || null);
       if (user.tdee) setGoalCalories(toNumber(user.tdee));
       await AsyncStorage.setItem("user", JSON.stringify(user));
 
@@ -317,11 +321,15 @@ export default function DashboardScreen() {
         <View style={[styles.header, { backgroundColor: colors.background }]}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={() => router.push("/profile" as any)}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarInitial}>
-                  {userName ? userName[0] : "U"}
-                </Text>
-              </View>
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarInitial}>
+                    {userName ? userName[0] : "U"}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push("/calendar" as any)}
@@ -671,6 +679,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
     alignItems: "center",
     justifyContent: "center",
+  },
+  avatarImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
   avatarInitial: { color: "#fff", fontWeight: "700", fontSize: 15 },
   dateRow: { flexDirection: "row", alignItems: "center", gap: 4 },

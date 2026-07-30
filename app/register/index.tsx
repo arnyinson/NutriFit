@@ -28,6 +28,14 @@ import Logo from "../../components/Logo";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
+const ACTIVITY_LEVELS = [
+  "Sedentary (little or no exercise)",
+  "Lightly Active (1-3 days per week)",
+  "Moderately Active (3-5 days per week)",
+  "Very Active (6-7 days per week)",
+  "Extra Active (very hard exercise / physical job)",
+];
+
 export default function RegisterScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -48,7 +56,19 @@ export default function RegisterScreen() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const allergenList = ["Eggs", "Peanuts", "Dairy", "Shellfish", "Fish", "Soy"];
+  const allergenList = [
+    "Eggs",
+    "Peanuts",
+    "Tree Nuts",
+    "Dairy",
+    "Shellfish",
+    "Fish",
+    "Soy",
+    "Wheat",
+    "Sesame",
+    "Lupin",
+  
+  ];
 
   const toggleAllergen = (item: string) => {
     setAllergens((prev) =>
@@ -403,11 +423,7 @@ export default function RegisterScreen() {
         <Text style={[styles.sectionLabel, { color: colors.text }]}>
           Activity Level
         </Text>
-        {[
-          "Lightly Active (1-2 days per week)",
-          "Moderate Active (3-4 days per week)",
-          "Very Active (5+ days per week)",
-        ].map((level) => (
+        {ACTIVITY_LEVELS.map((level) => (
           <TouchableOpacity
             key={level}
             style={[
@@ -514,7 +530,12 @@ export default function RegisterScreen() {
       </ScrollView>
 
       {/* Terms and Privacy Policy Modal */}
-      <Modal visible={showTermsModal} animationType="slide" statusBarTranslucent>
+      <Modal
+        visible={showTermsModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
@@ -602,8 +623,8 @@ export default function RegisterScreen() {
                   },
                 ]}
               >
-              By tapping &quot;I Agree&quot; below, you confirm that you have read and
-              understood this Terms and Privacy Policy.
+                By tapping &quot;I Agree&quot; below, you confirm that you have
+                read and understood this Terms and Privacy Policy.
               </Text>
 
               <View style={{ height: 12 }} />

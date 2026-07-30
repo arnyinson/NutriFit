@@ -54,6 +54,16 @@ type UserProfile = {
   avatar_url?: string | null;
 };
 
+const ACTIVITY_LEVELS = [
+  "Sedentary (little or no exercise)",
+  "Lightly Active (1-3 days per week)",
+  "Moderately Active (3-5 days per week)",
+  "Very Active (6-7 days per week)",
+  "Extra Active (very hard exercise / physical job)",
+];
+
+const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
 const formatDateDisplay = (isoDate: string) => {
   if (!isoDate) return "";
   const d = new Date(isoDate);
@@ -86,13 +96,11 @@ export default function ProfileScreen() {
   const [birthdayInput, setBirthdayInput] = useState("");
 
   const [activeWeightTab, setActiveWeightTab] = useState("1M");
-  const [weightHistory, setWeightHistory] = useState<
-    { date: string; weight: string }[]
-  >([]);
+ const [weightHistory, setWeightHistory] = useState<{ date: string; weight: string }[]>([]);
   const [loadingWeight, setLoadingWeight] = useState(true);
 
-  const allergenList = ["Eggs", "Peanuts", "Dairy", "Shellfish", "Fish", "Soy"];
-
+const allergenList = ["Eggs", "Peanuts", "Tree Nuts", "Dairy", "Shellfish", "Fish", 
+  "Soy", "Wheat", "Sesame", "Lupin"];
   const loadProfile = useCallback(async () => {
     try {
       const res = await api.get("/users/me");
@@ -366,14 +374,14 @@ export default function ProfileScreen() {
             },
           ]}
         >
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={HIT_SLOP}>
             <ChevronLeft size={24} color={colors.primary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
             Profile
           </Text>
           <View style={styles.headerRight}>
-            <TouchableOpacity onPress={toggleTheme}>
+            <TouchableOpacity onPress={toggleTheme} hitSlop={HIT_SLOP}>
               {isDark ? (
                 <Sun size={22} color={colors.textMuted} />
               ) : (
@@ -382,6 +390,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push("/notifications" as any)}
+              hitSlop={HIT_SLOP}
             >
               <Bell size={22} color={colors.textMuted} />
             </TouchableOpacity>
@@ -414,6 +423,7 @@ export default function ProfileScreen() {
               ]}
               onPress={handlePickAvatar}
               disabled={uploadingAvatar}
+              hitSlop={HIT_SLOP}
             >
               {uploadingAvatar ? (
                 <ActivityIndicator size="small" color={colors.primary} />
@@ -657,7 +667,7 @@ export default function ProfileScreen() {
       </ScrollView>
 
       {/* Edit Profile Modal */}
-      <Modal visible={showEditModal} animationType="slide" statusBarTranslucent>
+      <Modal visible={showEditModal} animationType="slide" transparent statusBarTranslucent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -665,7 +675,7 @@ export default function ProfileScreen() {
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
                   Edit Profile
                 </Text>
-                <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <TouchableOpacity onPress={() => setShowEditModal(false)} hitSlop={HIT_SLOP}>
                   <X size={20} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
@@ -820,11 +830,7 @@ export default function ProfileScreen() {
                   >
                     Activity Level
                   </Text>
-                  {[
-                    "Lightly Active (1-2 days per week)",
-                    "Moderate Active (3-4 days per week)",
-                    "Very Active (5+ days per week)",
-                  ].map((level) => (
+                  {ACTIVITY_LEVELS.map((level) => (
                     <TouchableOpacity
                       key={level}
                       style={[
@@ -1146,4 +1152,3 @@ const styles = StyleSheet.create({
   },
   saveBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });
-
