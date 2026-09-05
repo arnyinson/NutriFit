@@ -26,6 +26,8 @@ import {
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
+const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
 type Meal = {
   id: string;
   name: string;
@@ -210,6 +212,7 @@ export default function CalendarScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.headerBackRow}
+          hitSlop={HIT_SLOP}
         >
           <ChevronLeft size={20} color={colors.primary} />
           <Text style={[styles.backBtn, { color: colors.primary }]}>
@@ -254,13 +257,13 @@ export default function CalendarScreen() {
           >
             {/* Month Navigation */}
             <View style={styles.monthRow}>
-              <TouchableOpacity onPress={prevMonth}>
+              <TouchableOpacity onPress={prevMonth} hitSlop={HIT_SLOP}>
                 <ChevronLeft size={26} color={colors.primary} />
               </TouchableOpacity>
               <Text style={[styles.monthTitle, { color: colors.text }]}>
                 {monthName}
               </Text>
-              <TouchableOpacity onPress={nextMonth}>
+              <TouchableOpacity onPress={nextMonth} hitSlop={HIT_SLOP}>
                 <ChevronRight size={26} color={colors.primary} />
               </TouchableOpacity>
             </View>

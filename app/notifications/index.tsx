@@ -23,6 +23,8 @@ import {
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
+const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
 type Notification = {
   id: string;
   title: string;
@@ -60,7 +62,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [activeFilter, setActiveFilter] = useState<
+  const [activeFilter, setActiveFilter] = useState <
     "all" | "meal" | "workout" | "progress" | "achievement"
   >("all");
   const [loading, setLoading] = useState(true);
@@ -182,7 +184,7 @@ export default function NotificationsScreen() {
           },
         ]}
       >
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={HIT_SLOP}>
           <ChevronLeft size={24} color={colors.primary} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
@@ -196,13 +198,13 @@ export default function NotificationsScreen() {
           )}
         </View>
         {unreadCount > 0 ? (
-          <TouchableOpacity onPress={markAllAsRead}>
+          <TouchableOpacity onPress={markAllAsRead} hitSlop={HIT_SLOP}>
             <Text style={[styles.markAllBtn, { color: colors.primary }]}>
               Mark all read
             </Text>
           </TouchableOpacity>
         ) : (
-          <View style={{ width: 30 }} />
+          <View style={{ width: 24 }} />
         )}
       </View>
 
@@ -317,6 +319,7 @@ export default function NotificationsScreen() {
                 <TouchableOpacity
                   style={styles.deleteBtn}
                   onPress={() => deleteNotification(notif.id)}
+                  hitSlop={HIT_SLOP}
                 >
                   <X size={16} color={colors.textMuted} />
                 </TouchableOpacity>

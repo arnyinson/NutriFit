@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BarChart3,
   Check,
+  ChevronLeft,
   Dumbbell,
   Home,
   Target,
@@ -22,6 +23,8 @@ import {
 } from "react-native";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
+
+const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
 type Summary = {
   dailyCalories: { day: string; target: number; actual: number }[];
@@ -129,9 +132,15 @@ export default function ProgressScreen() {
           },
         ]}
       >
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Status & Progress
-        </Text>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={HIT_SLOP}>
+            <ChevronLeft size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Status & Progress
+          </Text>
+          <View style={{ width: 24 }} />
+        </View>
         <View style={[styles.periodRow, { backgroundColor: colors.surface }]}>
           {["Weekly", "Monthly"].map((p) => (
             <TouchableOpacity
@@ -669,7 +678,13 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  headerTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 10 },
+  headerTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  headerTitle: { fontSize: 18, fontWeight: "bold" },
   periodRow: { flexDirection: "row", borderRadius: 12, padding: 4, gap: 4 },
   periodBtn: {
     flex: 1,

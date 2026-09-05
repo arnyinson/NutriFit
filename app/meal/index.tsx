@@ -37,6 +37,8 @@ import {
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
+const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
 type Meal = {
   id: string;
   name: string;
@@ -497,10 +499,13 @@ export default function MealScreen() {
           },
         ]}
       >
+        <TouchableOpacity onPress={() => router.back()} hitSlop={HIT_SLOP}>
+          <ChevronLeft size={24} color={colors.primary} />
+        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Weekly Meal Plan
         </Text>
-        <View style={{ width: 30 }} />
+        <View style={{ width: 24 }} />
       </View>
 
       {/* Plan Mode Toggle */}
@@ -685,6 +690,7 @@ export default function MealScreen() {
                       <TouchableOpacity
                         style={styles.pencilBtn}
                         onPress={() => openEditMeal(dayIndex, entry)}
+                        hitSlop={HIT_SLOP}
                       >
                         <Pencil size={16} color={colors.textMuted} />
                       </TouchableOpacity>
@@ -728,7 +734,10 @@ export default function MealScreen() {
                     <Text style={[styles.modalTitle, { color: colors.text }]}>
                       {selectedMeal.name}
                     </Text>
-                    <TouchableOpacity onPress={() => setShowMealModal(false)}>
+                    <TouchableOpacity
+                      onPress={() => setShowMealModal(false)}
+                      hitSlop={HIT_SLOP}
+                    >
                       <X size={20} color={colors.textMuted} />
                     </TouchableOpacity>
                   </View>
@@ -858,6 +867,7 @@ export default function MealScreen() {
                   } else setShowEditPlanModal(false);
                 }}
                 style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                hitSlop={HIT_SLOP}
               >
                 {editPlanSlot ? (
                   <>
@@ -1010,7 +1020,10 @@ export default function MealScreen() {
               <Text style={[styles.modalTitle, { color: colors.text }]}>
                 Edit Meal
               </Text>
-              <TouchableOpacity onPress={() => setShowEditMealModal(false)}>
+              <TouchableOpacity
+                onPress={() => setShowEditMealModal(false)}
+                hitSlop={HIT_SLOP}
+              >
                 <X size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -1291,7 +1304,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  headerTitle: { fontSize: 20, fontWeight: "bold" },
+  headerTitle: { fontSize: 18, fontWeight: "bold" },
   modeRow: { flexDirection: "row", margin: 16, borderRadius: 12, padding: 4 },
   modeBtn: {
     flex: 1,

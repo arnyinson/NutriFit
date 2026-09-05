@@ -30,6 +30,8 @@ import {
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
+const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
 type MealEntry = {
   plan_id: string;
   meal_type: string;
@@ -320,7 +322,10 @@ export default function DashboardScreen() {
         {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.background }]}>
           <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={() => router.push("/profile" as any)}>
+            <TouchableOpacity
+              onPress={() => router.push("/profile" as any)}
+              hitSlop={HIT_SLOP}
+            >
               {avatarUrl ? (
                 <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
               ) : (
@@ -334,6 +339,7 @@ export default function DashboardScreen() {
             <TouchableOpacity
               onPress={() => router.push("/calendar" as any)}
               style={styles.dateRow}
+              hitSlop={HIT_SLOP}
             >
               <Text style={[styles.dateText, { color: colors.textSecondary }]}>
                 {today}
@@ -341,9 +347,12 @@ export default function DashboardScreen() {
               <ChevronDown size={14} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={() => router.push("/achievements" as any)}>
+          <TouchableOpacity
+            onPress={() => router.push("/achievements" as any)}
+            hitSlop={HIT_SLOP}
+          >
             <Trophy
-              size={24}
+              size={26}
               color="#FF9800"
               fill="#FF9800"
               fillOpacity={0.15}
@@ -407,12 +416,14 @@ export default function DashboardScreen() {
               <TouchableOpacity
                 style={styles.takeAllBtn}
                 onPress={takeAllMeals}
+                hitSlop={HIT_SLOP}
               >
                 <Text style={styles.takeAllText}>Take all</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.editBtn}
                 onPress={() => router.push("/meal" as any)}
+                hitSlop={HIT_SLOP}
               >
                 <Text style={styles.editText}>View Plan</Text>
               </TouchableOpacity>
@@ -473,6 +484,7 @@ export default function DashboardScreen() {
                       meal.taken ? styles.takenBtn : styles.takeBtn,
                     ]}
                     onPress={() => toggleMeal(meal.plan_id, meal.taken)}
+                    hitSlop={HIT_SLOP}
                   >
                     <Text style={styles.actionBtnText}>
                       {meal.taken ? "Skip" : "Take"}
@@ -557,6 +569,7 @@ export default function DashboardScreen() {
               <TouchableOpacity
                 style={styles.seeAllBtn}
                 onPress={() => router.push("/workout" as any)}
+                hitSlop={HIT_SLOP}
               >
                 <Text style={styles.seeAllText}>See all</Text>
               </TouchableOpacity>
@@ -601,6 +614,7 @@ export default function DashboardScreen() {
                     exercise.done && styles.exerciseCheckDone,
                   ]}
                   onPress={() => toggleWorkout(exercise.plan_id, exercise.done)}
+                  hitSlop={HIT_SLOP}
                 >
                   {exercise.done && (
                     <Check size={14} color="#fff" strokeWidth={3} />
@@ -671,21 +685,21 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
   },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: "#4CAF50",
     alignItems: "center",
     justifyContent: "center",
   },
   avatarImage: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
-  avatarInitial: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  avatarInitial: { color: "#fff", fontWeight: "700", fontSize: 20 },
   dateRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   dateText: { fontSize: 13, fontWeight: "500" },
   greeting: {

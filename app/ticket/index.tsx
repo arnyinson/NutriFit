@@ -24,6 +24,8 @@ import {
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
+const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
 type Ticket = {
   id: string;
   type: string;
@@ -126,7 +128,7 @@ export default function TicketScreen() {
           },
         ]}
       >
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={HIT_SLOP}>
           <ChevronLeft size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -135,7 +137,7 @@ export default function TicketScreen() {
         <TouchableOpacity
           onPress={() => setShowHistory(true)}
           style={styles.historyRow}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          hitSlop={HIT_SLOP}
         >
           <History size={18} color={colors.primary} />
           <Text style={[styles.historyBtn, { color: colors.primary }]}>
@@ -168,6 +170,7 @@ export default function TicketScreen() {
                   key={star}
                   onPress={() => setRating(star)}
                   style={styles.starBtn}
+                  hitSlop={HIT_SLOP}
                 >
                   <Star
                     size={32}
@@ -294,7 +297,10 @@ export default function TicketScreen() {
               <Text style={[styles.modalTitle, { color: colors.text }]}>
                 My Tickets
               </Text>
-              <TouchableOpacity onPress={() => setShowHistory(false)}>
+              <TouchableOpacity
+                onPress={() => setShowHistory(false)}
+                hitSlop={HIT_SLOP}
+              >
                 <X size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>

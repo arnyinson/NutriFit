@@ -41,6 +41,8 @@ import ViewShot from "react-native-view-shot";
 import Logo from "../../components/Logo";
 import { useTheme } from "../../constants/theme";
 
+const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
 type Achievement = {
   id: string;
   title: string;
@@ -201,8 +203,7 @@ const achievements: Achievement[] = [
 export default function AchievementsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const [activeCategory, setActiveCategory] = useState<
-  "Nutrition" | "Workout" | "Goals" > ("Nutrition");
+ const [activeCategory, setActiveCategory] = useState<"Nutrition" | "Workout" | "Goals">("Nutrition");
   const [selectedAchievement, setSelectedAchievement] =
     useState<Achievement | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -277,13 +278,13 @@ export default function AchievementsScreen() {
           },
         ]}
       >
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={HIT_SLOP}>
           <ChevronLeft size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Achievements
         </Text>
-        <View style={{ width: 30 }} />
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -381,6 +382,7 @@ export default function AchievementsScreen() {
           <TouchableOpacity
             style={styles.shareProgressBtn}
             onPress={() => setShowShareModal(true)}
+            hitSlop={HIT_SLOP}
           >
             <Share2 size={14} color={colors.primary} />
             <Text style={[styles.shareProgressText, { color: colors.primary }]}>
@@ -497,6 +499,7 @@ export default function AchievementsScreen() {
                 <TouchableOpacity
                   style={styles.shareBtn}
                   onPress={() => handleShare(achievement)}
+                  hitSlop={HIT_SLOP}
                 >
                   <Text style={styles.shareBtnText}>Share</Text>
                 </TouchableOpacity>
@@ -513,7 +516,12 @@ export default function AchievementsScreen() {
       </ScrollView>
 
       {/* Achievement Detail Modal */}
-      <Modal visible={showModal} animationType="slide" statusBarTranslucent>
+      <Modal
+        visible={showModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             {selectedAchievement && (
@@ -522,7 +530,10 @@ export default function AchievementsScreen() {
                   <Text style={[styles.modalTitle, { color: colors.text }]}>
                     {selectedAchievement.title}
                   </Text>
-                  <TouchableOpacity onPress={() => setShowModal(false)}>
+                  <TouchableOpacity
+                    onPress={() => setShowModal(false)}
+                    hitSlop={HIT_SLOP}
+                  >
                     <X size={20} color={colors.textMuted} />
                   </TouchableOpacity>
                 </View>
@@ -597,14 +608,22 @@ export default function AchievementsScreen() {
       </Modal>
 
       {/* Share Progress Modal — with visual card preview */}
-      <Modal visible={showShareModal} animationType="slide" transparent>
+      <Modal
+        visible={showShareModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>
                 Share My Progress
               </Text>
-              <TouchableOpacity onPress={() => setShowShareModal(false)}>
+              <TouchableOpacity
+                onPress={() => setShowShareModal(false)}
+                hitSlop={HIT_SLOP}
+              >
                 <X size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>

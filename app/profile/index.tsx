@@ -531,7 +531,7 @@ const allergenList = ["Eggs", "Peanuts", "Tree Nuts", "Dairy", "Shellfish", "Fis
             </View>
           </View>
 
-          <TouchableOpacity style={styles.editBtn} onPress={openEditModal}>
+          <TouchableOpacity style={styles.editBtn} onPress={openEditModal} hitSlop={HIT_SLOP}>
             <Text style={styles.editBtnText}>Edit</Text>
           </TouchableOpacity>
         </View>
@@ -647,6 +647,7 @@ const allergenList = ["Eggs", "Peanuts", "Tree Nuts", "Dairy", "Shellfish", "Fis
             { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
           onPress={() => router.push("/ticket" as any)}
+          hitSlop={HIT_SLOP}
         >
           <Ticket size={20} color={colors.primary} />
           <Text style={[styles.ticketText, { color: colors.text }]}>
@@ -658,7 +659,8 @@ const allergenList = ["Eggs", "Peanuts", "Tree Nuts", "Dairy", "Shellfish", "Fis
         {/* Logout */}
         <TouchableOpacity
           style={[styles.logoutBtn, { borderColor: colors.border }]}
-          onPress={handleLogout}
+           onPress={handleLogout}
+            hitSlop={HIT_SLOP}
         >
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>

@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import {
   BarChart3,
   Check,
+  ChevronLeft,
   Dumbbell,
   Home,
   Moon,
@@ -27,6 +28,8 @@ import {
 } from "react-native";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
+
+const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
 type Exercise = {
   id: string;
@@ -334,10 +337,16 @@ export default function WorkoutScreen() {
           },
         ]}
       >
+        <TouchableOpacity onPress={() => router.back()} hitSlop={HIT_SLOP}>
+          <ChevronLeft size={24} color={colors.primary} />
+        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Weekly Workout Plan
         </Text>
-        <TouchableOpacity onPress={() => router.push("/dashboard" as any)}>
+        <TouchableOpacity
+          onPress={() => router.push("/dashboard" as any)}
+          hitSlop={HIT_SLOP}
+        >
           <X size={20} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
@@ -465,6 +474,7 @@ export default function WorkoutScreen() {
                           entry.done && styles.exerciseCheckDone,
                         ]}
                         onPress={() => toggleExercise(dayIndex, entry)}
+                        hitSlop={HIT_SLOP}
                       >
                         {entry.done && (
                           <Check size={14} color="#fff" strokeWidth={3} />
@@ -499,6 +509,7 @@ export default function WorkoutScreen() {
                       <TouchableOpacity
                         style={styles.logBtn}
                         onPress={() => openLogModal(entry)}
+                        hitSlop={HIT_SLOP}
                       >
                         <Text style={styles.logBtnText}>Log</Text>
                       </TouchableOpacity>
@@ -528,7 +539,10 @@ export default function WorkoutScreen() {
                     <Text style={[styles.modalTitle, { color: colors.text }]}>
                       {selectedExercise.name}
                     </Text>
-                    <TouchableOpacity onPress={() => setShowDetailModal(false)}>
+                    <TouchableOpacity
+                      onPress={() => setShowDetailModal(false)}
+                      hitSlop={HIT_SLOP}
+                    >
                       <X size={20} color={colors.textMuted} />
                     </TouchableOpacity>
                   </View>
@@ -610,7 +624,10 @@ export default function WorkoutScreen() {
               <Text style={[styles.modalTitle, { color: colors.text }]}>
                 Log Exercise
               </Text>
-              <TouchableOpacity onPress={() => setShowLogModal(false)}>
+              <TouchableOpacity
+                onPress={() => setShowLogModal(false)}
+                hitSlop={HIT_SLOP}
+              >
                 <X size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -724,7 +741,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  headerTitle: { fontSize: 20, fontWeight: "bold" },
+  headerTitle: { fontSize: 18, fontWeight: "bold" },
   daySection: {
     marginHorizontal: 16,
     marginTop: 14,
