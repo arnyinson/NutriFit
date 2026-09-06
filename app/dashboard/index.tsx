@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { registerAndSavePushToken } from "../../constants/pushNotifications";
 import { useRouter } from "expo-router";
 import {
   BarChart3,
@@ -202,9 +203,10 @@ export default function DashboardScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+ useEffect(() => {
+  loadDashboardData();
+  registerAndSavePushToken();
+}, [loadDashboardData]);
 
   const onRefresh = () => {
     setRefreshing(true);
