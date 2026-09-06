@@ -38,6 +38,7 @@ export default function RootLayout() {
         <Stack.Screen name="login/index" />
         <Stack.Screen name="forgot-password/index" />
         <Stack.Screen name="register/index" />
+        <Stack.Screen name="verify-otp/index" />
         <Stack.Screen name="dashboard/index" />
         <Stack.Screen name="meal/index" />
         <Stack.Screen name="workout/index" />

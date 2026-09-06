@@ -47,8 +47,19 @@ export default function LoginScreen() {
 
       router.replace("/dashboard");
     } catch (err: any) {
+      const errorData = err.response?.data;
+
+      // Account exists but email is not verified yet - redirect to OTP screen
+      if (errorData?.requiresVerification && errorData?.email) {
+        router.push({
+          pathname: "/verify-otp",
+          params: { email: errorData.email },
+        } as any);
+        return;
+      }
+
       const message =
-        err.response?.data?.error ||
+        errorData?.error ||
         "Unable to connect to server. Please check your connection.";
       Alert.alert("Login Failed", message);
     } finally {
@@ -68,9 +79,7 @@ export default function LoginScreen() {
             <Logo size={56} />
             <Text style={styles.logo}>NutriFit</Text>
           </View>
-          <Text style={[styles.title, { color: colors.text }]}>
-            Welcome!!!
-          </Text>
+          <Text style={[styles.title, { color: colors.text }]}>Welcome!!!</Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             Log in to continue your fitness and meal plan journey
           </Text>
@@ -127,7 +136,10 @@ export default function LoginScreen() {
           </View>
 
           {/* Forgot Password */}
-          <TouchableOpacity style={styles.forgotRow} onPress={() => router.push("/forgot-password" as any)}>
+          <TouchableOpacity
+            style={styles.forgotRow}
+            onPress={() => router.push("/forgot-password" as any)}
+          >
             <Text style={[styles.forgot, { color: colors.primary }]}>
               Forgot password?
             </Text>

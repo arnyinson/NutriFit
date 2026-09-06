@@ -1,32 +1,35 @@
 import { useRouter } from "expo-router";
-import { ChevronLeft, Mail } from "lucide-react-native";
+import { ChevronLeft, Lock, Mail } from "lucide-react-native";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
+const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const [step, setStep] = useState<"email" | "reset">("email");
   const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{
-    username: string;
-    tempPassword: string;
-  } | null>(null);
+  const [resending, setResending] = useState(false);
 
-  const handleSubmit = async () => {
+  const handleRequestOtp = async () => {
     if (!email) {
       Alert.alert("Error", "Please enter your email address.");
       return;
@@ -34,11 +37,62 @@ export default function ForgotPasswordScreen() {
 
     setLoading(true);
     try {
-      const response = await api.post("/auth/forgot-password", { email });
-      setResult({
-        username: response.data.username,
-        tempPassword: response.data.tempPassword,
+      await api.post("/auth/forgot-password", { email });
+      setStep("reset");
+      Alert.alert(
+        "Code Sent",
+        "A verification code has been sent to your email.",
+      );
+    } catch (err: any) {
+      const message =
+        err.response?.data?.error || "Something went wrong. Please try again.";
+      Alert.alert("Error", message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setResending(true);
+    try {
+      await api.post("/auth/resend-otp", { email, purpose: "forgot_password" });
+      Alert.alert(
+        "Code Sent",
+        "A new verification code has been sent to your email.",
+      );
+    } catch (err: any) {
+      const message =
+        err.response?.data?.error || "Unable to resend code. Please try again.";
+      Alert.alert("Error", message);
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!otp || otp.length !== 6) {
+      Alert.alert("Error", "Please enter the 6-digit verification code.");
+      return;
+    }
+    if (!newPassword || newPassword.length < 6) {
+      Alert.alert("Error", "New password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await api.post("/auth/reset-password", {
+        email,
+        otp,
+        new_password: newPassword,
       });
+      Alert.alert("Success", "Your password has been reset successfully!", [
+        { text: "OK", onPress: () => router.replace("/login") },
+      ]);
     } catch (err: any) {
       const message =
         err.response?.data?.error || "Something went wrong. Please try again.";
@@ -56,7 +110,12 @@ export default function ForgotPasswordScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity
+            onPress={() =>
+              step === "reset" ? setStep("email") : router.back()
+            }
+            hitSlop={HIT_SLOP}
+          >
             <ChevronLeft size={24} color={colors.primary} />
           </TouchableOpacity>
         </View>
@@ -65,19 +124,23 @@ export default function ForgotPasswordScreen() {
           <View
             style={[styles.iconCircle, { backgroundColor: colors.surface }]}
           >
-            <Mail size={32} color={colors.primary} />
+            {step === "email" ? (
+              <Mail size={32} color={colors.primary} />
+            ) : (
+              <Lock size={32} color={colors.primary} />
+            )}
           </View>
 
-          <Text style={[styles.title, { color: colors.text }]}>
-            Forgot Password?
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            Enter the email address linked to your account. We will generate a
-            temporary password for you.
-          </Text>
-
-          {!result ? (
+          {step === "email" ? (
             <>
+              <Text style={[styles.title, { color: colors.text }]}>
+                Forgot Password?
+              </Text>
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+                Enter the email address linked to your account. We will send you
+                a verification code.
+              </Text>
+
               <View
                 style={[
                   styles.inputWrapper,
@@ -103,56 +166,124 @@ export default function ForgotPasswordScreen() {
 
               <TouchableOpacity
                 style={[styles.button, loading && { opacity: 0.7 }]}
-                onPress={handleSubmit}
+                onPress={handleRequestOtp}
                 disabled={loading}
               >
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.buttonText}>
-                    Generate Temporary Password
-                  </Text>
+                  <Text style={styles.buttonText}>Send Verification Code</Text>
                 )}
               </TouchableOpacity>
             </>
           ) : (
-            <View
-              style={[
-                styles.resultCard,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.resultLabel, { color: colors.textMuted }]}>
-                Username
+            <>
+              <Text style={[styles.title, { color: colors.text }]}>
+                Enter Verification Code
               </Text>
-              <Text style={[styles.resultValue, { color: colors.text }]}>
-                {result.username}
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+                We sent a 6-digit code to {email}. Enter it below along with
+                your new password.
               </Text>
 
-              <Text
+              <View
                 style={[
-                  styles.resultLabel,
-                  { color: colors.textMuted, marginTop: 16 },
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                  },
                 ]}
               >
-                Temporary Password
-              </Text>
-              <Text style={[styles.resultValue, { color: colors.primary }]}>
-                {result.tempPassword}
-              </Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      color: colors.text,
+                      textAlign: "center",
+                      letterSpacing: 8,
+                      fontSize: 20,
+                    },
+                  ]}
+                  placeholder="------"
+                  placeholderTextColor={colors.textMuted}
+                  value={otp}
+                  onChangeText={(v) =>
+                    setOtp(v.replace(/[^0-9]/g, "").slice(0, 6))
+                  }
+                  keyboardType="numeric"
+                  maxLength={6}
+                  editable={!loading}
+                />
+              </View>
 
-              <Text style={[styles.resultNote, { color: colors.textMuted }]}>
-                Please log in using this temporary password. You can change it
-                anytime in your Profile settings.
-              </Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                  },
+                ]}
+              >
+                <Lock size={18} color={colors.textMuted} />
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="New password"
+                  placeholderTextColor={colors.textMuted}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  editable={!loading}
+                />
+              </View>
+
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                  },
+                ]}
+              >
+                <Lock size={18} color={colors.textMuted} />
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="Confirm new password"
+                  placeholderTextColor={colors.textMuted}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  editable={!loading}
+                />
+              </View>
 
               <TouchableOpacity
-                style={styles.button}
-                onPress={() => router.replace("/login")}
+                style={[styles.button, loading && { opacity: 0.7 }]}
+                onPress={handleResetPassword}
+                disabled={loading}
               >
-                <Text style={styles.buttonText}>Go to Login</Text>
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Reset Password</Text>
+                )}
               </TouchableOpacity>
-            </View>
+
+              <TouchableOpacity
+                onPress={handleResendOtp}
+                disabled={resending}
+                style={styles.resendBtn}
+                hitSlop={HIT_SLOP}
+              >
+                <Text style={[styles.resendText, { color: colors.primary }]}>
+                  {resending ? "Sending..." : "Didn't get the code? Resend"}
+                </Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </KeyboardAvoidingView>
@@ -200,13 +331,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   buttonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  resultCard: {
-    width: "100%",
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-  },
-  resultLabel: { fontSize: 12, fontWeight: "600" },
-  resultValue: { fontSize: 18, fontWeight: "bold", marginTop: 4 },
-  resultNote: { fontSize: 12, lineHeight: 18, marginTop: 16, marginBottom: 16 },
+  resendBtn: { marginTop: 16, padding: 8 },
+  resendText: { fontSize: 13, fontWeight: "600" },
 });

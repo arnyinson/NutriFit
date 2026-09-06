@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import {
   Calendar,
@@ -67,7 +66,6 @@ export default function RegisterScreen() {
     "Wheat",
     "Sesame",
     "Lupin",
-  
   ];
 
   const toggleAllergen = (item: string) => {
@@ -134,7 +132,7 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const response = await api.post("/auth/register", {
+      await api.post("/auth/register", {
         name: username, // walang hiwalay na "full name" field sa form, gamit muna ang username
         email,
         username,
@@ -148,14 +146,11 @@ export default function RegisterScreen() {
         allergens,
       });
 
-      const { token, user } = response.data;
-
-      await AsyncStorage.setItem("token", token);
-      await AsyncStorage.setItem("user", JSON.stringify(user));
-
-      Alert.alert("Success", "Account created successfully!", [
-        { text: "OK", onPress: () => router.replace("/dashboard") },
-      ]);
+      // Registration no longer logs the user in directly — email must be verified first
+      router.push({
+        pathname: "/verify-otp",
+        params: { email },
+      } as any);
     } catch (err: any) {
       const message =
         err.response?.data?.error ||
