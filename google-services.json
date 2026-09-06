@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "794876103184",
+    "project_id": "nutrifit-5d88f",
+    "storage_bucket": "nutrifit-5d88f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:794876103184:android:4649d365a0f6c913831895",
+        "android_client_info": {
+          "package_name": "com.arnyinson.NutriFit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBonjaFAvF0rwqThn_VxoxU12PHNJ0iihk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

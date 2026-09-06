@@ -2,14 +2,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
+import { Alert } from "react-native";
 import api from "./api";
 
 export async function registerForPushNotificationsAsync(): Promise<
   string | null
 > {
-  // Push notifications require a physical device, not an emulator/simulator
   if (!Device.isDevice) {
-    console.log("Push notifications require a physical device.");
+    Alert.alert("Push Debug", "Not a physical device.");
     return null;
   }
 
@@ -22,32 +22,45 @@ export async function registerForPushNotificationsAsync(): Promise<
   }
 
   if (finalStatus !== "granted") {
-    console.log("Push notification permission not granted.");
+    Alert.alert("Push Debug", "Permission not granted: " + finalStatus);
     return null;
   }
 
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-  return tokenData.data;
+  try {
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    Alert.alert("Push Debug", "Project ID: " + String(projectId));
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+    Alert.alert("Push Debug", "Got token: " + tokenData.data);
+    return tokenData.data;
+  } catch (err: any) {
+    Alert.alert("Push Debug", "Error getting token: " + err.message);
+    return null;
+  }
 }
 
-// Call this AFTER the user is confirmed logged in (e.g. on Dashboard mount)
 export async function registerAndSavePushToken(): Promise<void> {
   try {
     const pushToken = await registerForPushNotificationsAsync();
-    if (!pushToken) return;
-
-    // Skip the API call if this exact token was already saved before
-    const savedPushToken = await AsyncStorage.getItem("pushToken");
-    if (savedPushToken === pushToken) {
-      console.log("Push token unchanged, skipping save.");
+    if (!pushToken) {
+      Alert.alert("Push Debug", "No push token returned, stopping here.");
       return;
     }
 
+    const savedPushToken = await AsyncStorage.getItem("pushToken");
+    if (savedPushToken === pushToken) {
+      Alert.alert("Push Debug", "Token unchanged, skipping save.");
+      return;
+    }
+
+    Alert.alert("Push Debug", "Sending token to backend...");
     await api.post("/users/push-token", { push_token: pushToken });
     await AsyncStorage.setItem("pushToken", pushToken);
-    console.log("Push token registered successfully:", pushToken);
-  } catch (err) {
-    console.error("Push notification registration error:", err);
+    Alert.alert("Push Debug", "Successfully saved to backend!");
+  } catch (err: any) {
+    Alert.alert(
+      "Push Debug",
+      "SAVE ERROR: " + (err.response?.data?.error || err.message),
+    );
   }
 }
