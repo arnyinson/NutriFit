@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   RefreshControl,
   SafeAreaView,
@@ -124,6 +125,13 @@ export default function WorkoutScreen() {
   const [logEntry, setLogEntry] = useState<ExerciseEntry | null>(null);
   const [logReps, setLogReps] = useState("");
   const [logWeight, setLogWeight] = useState("");
+
+  // Video/GIF fetching state — separate from the exercise object itself
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoSource, setVideoSource] = useState<
+    "uploaded" | "exercisedb" | "none" | null
+  >(null);
+  const [loadingVideo, setLoadingVideo] = useState(false);
 
   const loadWorkoutPlan = useCallback(async () => {
     try {
@@ -250,6 +258,26 @@ export default function WorkoutScreen() {
       );
     } catch (err) {
       console.error("Log all error:", err);
+    }
+  };
+
+  // Kapag binuksan ang Exercise Detail modal, kunin ang video/GIF mula sa backend
+  const openExerciseDetail = async (exercise: Exercise) => {
+    setSelectedExercise(exercise);
+    setShowDetailModal(true);
+    setVideoUrl(null);
+    setVideoSource(null);
+    setLoadingVideo(true);
+
+    try {
+      const res = await api.get(`/workouts/${exercise.id}/video`);
+      setVideoUrl(res.data.url);
+      setVideoSource(res.data.source);
+    } catch (err) {
+      console.error("Load exercise video error:", err);
+      setVideoSource("none");
+    } finally {
+      setLoadingVideo(false);
     }
   };
 
@@ -461,10 +489,7 @@ export default function WorkoutScreen() {
                         },
                         entry.done && styles.exerciseRowDone,
                       ]}
-                      onPress={() => {
-                        setSelectedExercise(entry.exercise);
-                        setShowDetailModal(true);
-                      }}
+                      onPress={() => openExerciseDetail(entry.exercise)}
                       activeOpacity={0.8}
                     >
                       <TouchableOpacity
@@ -574,17 +599,42 @@ export default function WorkoutScreen() {
                       </View>
                     ))}
                   </View>
-                  <View style={styles.videoPlaceholder}>
-                    <View style={styles.playButtonCircle}>
-                      <Play size={24} color="#fff" fill="#fff" />
+
+                  {/* Video / GIF section */}
+                  {loadingVideo ? (
+                    <View style={styles.videoPlaceholder}>
+                      <ActivityIndicator color="#fff" />
+                      <Text style={styles.videoText}>
+                        Loading demonstration...
+                      </Text>
                     </View>
-                    <Text style={styles.videoText}>Video Demonstration</Text>
-                    <Text style={styles.videoSubtext}>
-                      {selectedExercise.video_url
-                        ? "Tap to play"
-                        : "Available in full version"}
-                    </Text>
-                  </View>
+                  ) : videoUrl ? (
+                    <View style={styles.videoImageWrapper}>
+                      <Image
+                        source={{ uri: videoUrl }}
+                        style={styles.videoImage}
+                        resizeMode="cover"
+                      />
+                      {videoSource === "exercisedb" && (
+                        <View style={styles.videoSourceBadge}>
+                          <Text style={styles.videoSourceBadgeText}>
+                            GIF Demo
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  ) : (
+                    <View style={styles.videoPlaceholder}>
+                      <View style={styles.playButtonCircle}>
+                        <Play size={24} color="#fff" fill="#fff" />
+                      </View>
+                      <Text style={styles.videoText}>Video Demonstration</Text>
+                      <Text style={styles.videoSubtext}>
+                        Not available for this exercise
+                      </Text>
+                    </View>
+                  )}
+
                   <Text style={[styles.modalSection, { color: colors.text }]}>
                     Instructions
                   </Text>
@@ -862,6 +912,27 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 8,
   },
+  videoImageWrapper: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 16,
+    backgroundColor: "#1a1a1a",
+    position: "relative",
+  },
+  videoImage: {
+    width: "100%",
+    height: 220,
+  },
+  videoSourceBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  videoSourceBadgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
   playButtonCircle: {
     width: 48,
     height: 48,
