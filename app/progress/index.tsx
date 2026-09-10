@@ -6,18 +6,26 @@ import {
   ChevronLeft,
   Dumbbell,
   Home,
+  RefreshCw,
+  Scale,
   Target,
   User,
   Utensils,
+  X,
 } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -44,6 +52,10 @@ export default function ProgressScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
 
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [weightInput, setWeightInput] = useState("");
+  const [syncing, setSyncing] = useState(false);
+
   const loadSummary = useCallback(async () => {
     try {
       const res = await api.get("/progress/weekly-summary");
@@ -63,6 +75,42 @@ export default function ProgressScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     loadSummary();
+  };
+
+  const openUpdateModal = async () => {
+    // Pre-fill with the user's last known weight, for convenience
+    try {
+      const cached = await api.get("/users/me");
+      if (cached.data.user?.weight) {
+        setWeightInput(String(cached.data.user.weight));
+      }
+    } catch {
+      // ignore, just leave the field blank
+    }
+    setShowUpdateModal(true);
+  };
+
+  const handleSyncProgress = async () => {
+    const weightNum = parseFloat(weightInput);
+    if (!weightInput || isNaN(weightNum) || weightNum <= 0) {
+      Alert.alert("Error", "Please enter a valid weight.");
+      return;
+    }
+
+    setSyncing(true);
+    try {
+      await api.post("/progress/sync-today", { weight: weightNum });
+      setShowUpdateModal(false);
+      await loadSummary();
+      Alert.alert("Success", "Your progress has been updated!");
+    } catch (err: any) {
+      const message =
+        err.response?.data?.error ||
+        "Unable to update progress. Please try again.";
+      Alert.alert("Error", message);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   if (loading || !summary) {
@@ -175,7 +223,7 @@ export default function ProgressScreen() {
           />
         }
       >
-        {/* Week Label */}
+        {/* Week Label + Update Progress Button */}
         <View style={styles.weekHeader}>
           <View>
             <Text style={[styles.weekLabel, { color: colors.text }]}>
@@ -190,6 +238,15 @@ export default function ProgressScreen() {
             <Text style={styles.phaseText}>This Week</Text>
           </View>
         </View>
+
+        <TouchableOpacity
+          style={styles.updateBtn}
+          onPress={openUpdateModal}
+          hitSlop={HIT_SLOP}
+        >
+          <RefreshCw size={16} color="#fff" />
+          <Text style={styles.updateBtnText}>Update Progress</Text>
+        </TouchableOpacity>
 
         {!hasData ? (
           <View
@@ -210,8 +267,9 @@ export default function ProgressScreen() {
                 textAlign: "center",
               }}
             >
-              No progress data logged yet this week. Log your meals and weight
-              to see your stats here.
+              No progress data logged yet this week. Tap &quot;Update
+              Progress&quot; above to log your weight and sync today&apos;s
+              stats.
             </Text>
           </View>
         ) : (
@@ -624,6 +682,84 @@ export default function ProgressScreen() {
         <View style={{ height: 80 }} />
       </ScrollView>
 
+      {/* Update Progress Modal */}
+      <Modal
+        visible={showUpdateModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalOverlay}>
+            <View
+              style={[styles.modalContent, { backgroundColor: colors.card }]}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  Update Progress
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowUpdateModal(false)}
+                  hitSlop={HIT_SLOP}
+                >
+                  <X size={20} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <View
+                style={[styles.iconCircle, { backgroundColor: colors.input }]}
+              >
+                <Scale size={26} color={colors.primary} />
+              </View>
+
+              <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
+                Enter your current weight. Your meal, workout, and calorie stats
+                for today will be synced automatically.
+              </Text>
+
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                  },
+                ]}
+              >
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="e.g. 69.5"
+                  placeholderTextColor={colors.textMuted}
+                  value={weightInput}
+                  onChangeText={setWeightInput}
+                  keyboardType="numeric"
+                  editable={!syncing}
+                  autoFocus
+                />
+                <Text style={[styles.inputUnit, { color: colors.textMuted }]}>
+                  kg
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.syncBtn, syncing && { opacity: 0.7 }]}
+                onPress={handleSyncProgress}
+                disabled={syncing}
+              >
+                {syncing ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.syncBtnText}>Save & Sync Progress</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Bottom Navigation */}
       <View
         style={[
@@ -715,6 +851,18 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   phaseText: { fontSize: 12, color: "#4CAF50", fontWeight: "600" },
+  updateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#4CAF50",
+    marginHorizontal: 20,
+    marginBottom: 16,
+    paddingVertical: 13,
+    borderRadius: 12,
+  },
+  updateBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
   card: {
     marginHorizontal: 20,
     marginBottom: 14,
@@ -827,6 +975,56 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   recommendText: { fontSize: 13, flex: 1 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: { fontSize: 18, fontWeight: "bold" },
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginBottom: 14,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  input: { flex: 1, paddingVertical: 14, fontSize: 20, fontWeight: "600" },
+  inputUnit: { fontSize: 14, fontWeight: "600" },
+  syncBtn: {
+    backgroundColor: "#4CAF50",
+    padding: 15,
+    borderRadius: 12,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  syncBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
   bottomNav: {
     flexDirection: "row",
     paddingVertical: 10,
