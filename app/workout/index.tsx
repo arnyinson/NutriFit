@@ -271,7 +271,13 @@ export default function WorkoutScreen() {
 
     try {
       const res = await api.get(`/workouts/${exercise.id}/video`);
-      setVideoUrl(res.data.url);
+      const url = res.data.url;
+      // If it's our own relative proxy path, prepend the backend base URL
+      const fullUrl =
+        url && url.startsWith("/api/")
+          ? `https://nutrifit-backend-api-t21p.onrender.com${url}`
+          : url;
+      setVideoUrl(fullUrl);
       setVideoSource(res.data.source);
     } catch (err) {
       console.error("Load exercise video error:", err);
