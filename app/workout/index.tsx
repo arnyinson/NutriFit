@@ -27,6 +27,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { WebView } from "react-native-webview";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -105,6 +106,8 @@ const formatDateLabel = (dateStr: string) => {
 // Rough estimated height (in px) ng bawat collapsed day card, para sa scroll positioning
 const DAY_SECTION_ESTIMATED_HEIGHT = 280;
 
+type VideoType = "uploaded" | "youtube" | "exercisedb" | "none" | null;
+
 export default function WorkoutScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -126,11 +129,10 @@ export default function WorkoutScreen() {
   const [logReps, setLogReps] = useState("");
   const [logWeight, setLogWeight] = useState("");
 
-  // Video/GIF fetching state — separate from the exercise object itself
+  // Video fetching state — separate from the exercise object itself
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [videoSource, setVideoSource] = useState<
-    "uploaded" | "exercisedb" | "none" | null
-  >(null);
+  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
+  const [videoSource, setVideoSource] = useState<VideoType>(null);
   const [loadingVideo, setLoadingVideo] = useState(false);
 
   const loadWorkoutPlan = useCallback(async () => {
@@ -261,24 +263,33 @@ export default function WorkoutScreen() {
     }
   };
 
-  // Kapag binuksan ang Exercise Detail modal, kunin ang video/GIF mula sa backend
+  // Kapag binuksan ang Exercise Detail modal, kunin ang video mula sa backend
+  // (pwedeng: admin-uploaded video, YouTube video, o ExerciseDB GIF, depende sa availability)
   const openExerciseDetail = async (exercise: Exercise) => {
     setSelectedExercise(exercise);
     setShowDetailModal(true);
     setVideoUrl(null);
+    setYoutubeVideoId(null);
     setVideoSource(null);
     setLoadingVideo(true);
 
     try {
       const res = await api.get(`/workouts/${exercise.id}/video`);
-      const url = res.data.url;
-      // If it's our own relative proxy path, prepend the backend base URL
-      const fullUrl =
-        url && url.startsWith("/api/")
-          ? `https://nutrifit-backend-api-t21p.onrender.com${url}`
-          : url;
-      setVideoUrl(fullUrl);
-      setVideoSource(res.data.source);
+
+      if (res.data.type === "youtube") {
+        setYoutubeVideoId(res.data.videoId);
+        setVideoSource("youtube");
+      } else if (res.data.type === "image" || res.data.type === "video") {
+        const url = res.data.url;
+        const fullUrl =
+          url && url.startsWith("/api/")
+            ? `https://nutrifit-backend-api-t21p.onrender.com${url}`
+            : url;
+        setVideoUrl(fullUrl);
+        setVideoSource(res.data.source);
+      } else {
+        setVideoSource("none");
+      }
     } catch (err) {
       console.error("Load exercise video error:", err);
       setVideoSource("none");
@@ -606,13 +617,24 @@ export default function WorkoutScreen() {
                     ))}
                   </View>
 
-                  {/* Video / GIF section */}
+                  {/* Video section — handles YouTube embed, uploaded video image/GIF, or fallback */}
                   {loadingVideo ? (
                     <View style={styles.videoPlaceholder}>
                       <ActivityIndicator color="#fff" />
                       <Text style={styles.videoText}>
                         Loading demonstration...
                       </Text>
+                    </View>
+                  ) : videoSource === "youtube" && youtubeVideoId ? (
+                    <View style={styles.webviewWrapper}>
+                      <WebView
+                        source={{
+                          uri: `https://www.youtube.com/embed/${youtubeVideoId}?rel=0`,
+                        }}
+                        style={styles.webview}
+                        allowsFullscreenVideo
+                        javaScriptEnabled
+                      />
                     </View>
                   ) : videoUrl ? (
                     <View style={styles.videoImageWrapper}>
@@ -917,6 +939,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
     gap: 8,
+  },
+  webviewWrapper: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 16,
+    backgroundColor: "#000",
+    height: 220,
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: "#000",
   },
   videoImageWrapper: {
     borderRadius: 16,
