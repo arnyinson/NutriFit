@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
   RefreshControl,
   SafeAreaView,
@@ -134,6 +135,7 @@ export default function WorkoutScreen() {
   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
   const [videoSource, setVideoSource] = useState<VideoType>(null);
   const [loadingVideo, setLoadingVideo] = useState(false);
+  const [youtubeEmbedFailed, setYoutubeEmbedFailed] = useState(false);
 
   const loadWorkoutPlan = useCallback(async () => {
     try {
@@ -271,6 +273,7 @@ export default function WorkoutScreen() {
     setVideoUrl(null);
     setYoutubeVideoId(null);
     setVideoSource(null);
+    setYoutubeEmbedFailed(false);
     setLoadingVideo(true);
 
     try {
@@ -617,7 +620,7 @@ export default function WorkoutScreen() {
                     ))}
                   </View>
 
-                  {/* Video section — handles YouTube embed, uploaded video image/GIF, or fallback */}
+                  {/* Video section — handles YouTube embed (with fallback), uploaded video image/GIF, or "not available" */}
                   {loadingVideo ? (
                     <View style={styles.videoPlaceholder}>
                       <ActivityIndicator color="#fff" />
@@ -625,17 +628,44 @@ export default function WorkoutScreen() {
                         Loading demonstration...
                       </Text>
                     </View>
-                  ) : videoSource === "youtube" && youtubeVideoId ? (
+                  ) : videoSource === "youtube" && youtubeVideoId && !youtubeEmbedFailed ? (
                     <View style={styles.webviewWrapper}>
                       <WebView
                         source={{
-                          uri: `https://www.youtube.com/embed/${youtubeVideoId}?rel=0`,
+                          uri: `https://www.youtube.com/embed/${youtubeVideoId}?rel=0&playsinline=1`,
                         }}
                         style={styles.webview}
                         allowsFullscreenVideo
                         javaScriptEnabled
+                        onError={() => setYoutubeEmbedFailed(true)}
+                        onHttpError={() => setYoutubeEmbedFailed(true)}
                       />
                     </View>
+                  ) : videoSource === "youtube" && youtubeVideoId && youtubeEmbedFailed ? (
+                    <TouchableOpacity
+                      style={styles.youtubeFallback}
+                      onPress={() =>
+                        Linking.openURL(
+                          `https://www.youtube.com/watch?v=${youtubeVideoId}`,
+                        )
+                      }
+                    >
+                      <Image
+                        source={{
+                          uri: `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`,
+                        }}
+                        style={styles.videoImage}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.youtubeFallbackOverlay}>
+                        <View style={styles.playButtonCircle}>
+                          <Play size={24} color="#fff" fill="#fff" />
+                        </View>
+                        <Text style={styles.youtubeFallbackText}>
+                          Watch on YouTube
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
                   ) : videoUrl ? (
                     <View style={styles.videoImageWrapper}>
                       <Image
@@ -950,6 +980,27 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: "#000",
+  },
+  youtubeFallback: {
+    width: "100%",
+    height: 220,
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 16,
+    backgroundColor: "#1a1a1a",
+    position: "relative",
+  },
+  youtubeFallbackOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  youtubeFallbackText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 13,
   },
   videoImageWrapper: {
     borderRadius: 16,
