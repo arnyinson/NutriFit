@@ -35,6 +35,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Svg, { Circle, Path } from "react-native-svg";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -81,6 +82,11 @@ const parseDateInput = (mmddyyyy: string) => {
   return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
 };
 
+// Line chart layout constants
+const CHART_HEIGHT = 130;
+const CHART_TOP_PADDING = 20;
+const CHART_BOTTOM_PADDING = 10;
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { isDark, toggleTheme, colors } = useTheme();
@@ -96,11 +102,25 @@ export default function ProfileScreen() {
   const [birthdayInput, setBirthdayInput] = useState("");
 
   const [activeWeightTab, setActiveWeightTab] = useState("1M");
- const [weightHistory, setWeightHistory] = useState<{ date: string; weight: string }[]>([]);
+  const [weightHistory, setWeightHistory] = useState<
+    { date: string; weight: string }[]
+  >([]);
   const [loadingWeight, setLoadingWeight] = useState(true);
+  const [chartWidth, setChartWidth] = useState(0);
 
-const allergenList = ["Eggs", "Peanuts", "Tree Nuts", "Dairy", "Shellfish", "Fish", 
-  "Soy", "Wheat", "Sesame", "Lupin"];
+  const allergenList = [
+    "Eggs",
+    "Peanuts",
+    "Tree Nuts",
+    "Dairy",
+    "Shellfish",
+    "Fish",
+    "Soy",
+    "Wheat",
+    "Sesame",
+    "Lupin",
+  ];
+
   const loadProfile = useCallback(async () => {
     try {
       const res = await api.get("/users/me");
@@ -335,6 +355,28 @@ const allergenList = ["Eggs", "Peanuts", "Tree Nuts", "Dairy", "Shellfish", "Fis
       ? chartData[chartData.length - 1].value - chartData[0].value
       : 0;
 
+  // Compute pixel positions for each data point along the line chart
+  const getPointCoordinates = () => {
+    if (chartData.length === 0 || chartWidth === 0) return [];
+    const usableHeight =
+      CHART_HEIGHT - CHART_TOP_PADDING - CHART_BOTTOM_PADDING;
+    const range = maxWeight - minWeight || 1;
+    const stepX =
+      chartData.length > 1 ? chartWidth / (chartData.length - 1) : 0;
+
+    return chartData.map((point, i) => {
+      const x = chartData.length === 1 ? chartWidth / 2 : stepX * i;
+      const normalized = (point.value - minWeight) / range;
+      const y = CHART_TOP_PADDING + (usableHeight - normalized * usableHeight);
+      return { x, y, value: point.value, label: point.label };
+    });
+  };
+
+  const points = getPointCoordinates();
+  const linePath = points
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
+    .join(" ");
+
   const personalInfoItems = [
     {
       Icon: Calendar,
@@ -531,7 +573,11 @@ const allergenList = ["Eggs", "Peanuts", "Tree Nuts", "Dairy", "Shellfish", "Fis
             </View>
           </View>
 
-          <TouchableOpacity style={styles.editBtn} onPress={openEditModal} hitSlop={HIT_SLOP}>
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={openEditModal}
+            hitSlop={HIT_SLOP}
+          >
             <Text style={styles.editBtnText}>Edit</Text>
           </TouchableOpacity>
         </View>
@@ -567,27 +613,49 @@ const allergenList = ["Eggs", "Peanuts", "Tree Nuts", "Dairy", "Shellfish", "Fis
               No weight history yet for this period.
             </Text>
           ) : (
-            <View style={styles.graphContainer}>
-              <View style={styles.graph}>
-                {chartData.map((point, i) => {
-                  const height =
-                    ((point.value - minWeight) / (maxWeight - minWeight || 1)) *
-                      80 +
-                    10;
-                  return (
-                    <View key={i} style={styles.graphBarWrapper}>
-                      <Text style={styles.graphValue}>{point.value}</Text>
-                      <View
-                        style={[styles.graphDot, { marginBottom: height }]}
-                      />
-                      <Text
-                        style={[styles.graphLabel, { color: colors.textMuted }]}
-                      >
-                        {point.label}
-                      </Text>
-                    </View>
-                  );
-                })}
+            <View
+              style={styles.graphContainer}
+              onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}
+            >
+              {chartWidth > 0 && (
+                <Svg width={chartWidth} height={CHART_HEIGHT}>
+                  {/* Line connecting all weight points */}
+                  {points.length > 1 && (
+                    <Path
+                      d={linePath}
+                      stroke="#4CAF50"
+                      strokeWidth={2.5}
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  )}
+                  {/* A dot + label at each data point */}
+                  {points.map((p, i) => (
+                    <Circle
+                      key={i}
+                      cx={p.x}
+                      cy={p.y}
+                      r={4}
+                      fill="#4CAF50"
+                      stroke={colors.surface}
+                      strokeWidth={2}
+                    />
+                  ))}
+                </Svg>
+              )}
+              {/* Labels below the chart (value + date), positioned to line up with each point */}
+              <View style={styles.graphLabelsRow}>
+                {chartData.map((point, i) => (
+                  <View key={i} style={styles.graphLabelItem}>
+                    <Text style={styles.graphValue}>{point.value}</Text>
+                    <Text
+                      style={[styles.graphLabel, { color: colors.textMuted }]}
+                    >
+                      {point.label}
+                    </Text>
+                  </View>
+                ))}
               </View>
             </View>
           )}
@@ -659,8 +727,8 @@ const allergenList = ["Eggs", "Peanuts", "Tree Nuts", "Dairy", "Shellfish", "Fis
         {/* Logout */}
         <TouchableOpacity
           style={[styles.logoutBtn, { borderColor: colors.border }]}
-           onPress={handleLogout}
-            hitSlop={HIT_SLOP}
+          onPress={handleLogout}
+          hitSlop={HIT_SLOP}
         >
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
@@ -669,7 +737,12 @@ const allergenList = ["Eggs", "Peanuts", "Tree Nuts", "Dairy", "Shellfish", "Fis
       </ScrollView>
 
       {/* Edit Profile Modal */}
-      <Modal visible={showEditModal} animationType="slide" transparent statusBarTranslucent>
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -677,7 +750,10 @@ const allergenList = ["Eggs", "Peanuts", "Tree Nuts", "Dairy", "Shellfish", "Fis
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
                   Edit Profile
                 </Text>
-                <TouchableOpacity onPress={() => setShowEditModal(false)} hitSlop={HIT_SLOP}>
+                <TouchableOpacity
+                  onPress={() => setShowEditModal(false)}
+                  hitSlop={HIT_SLOP}
+                >
                   <X size={20} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
@@ -1032,21 +1108,14 @@ const styles = StyleSheet.create({
   weightTitle: { fontSize: 16, fontWeight: "700", marginBottom: 4 },
   weightSub: { fontSize: 12, marginBottom: 16 },
   graphContainer: { marginBottom: 12 },
-  graph: {
+  graphLabelsRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
     justifyContent: "space-between",
-    height: 120,
+    marginTop: 6,
   },
-  graphBarWrapper: { alignItems: "center", flex: 1 },
-  graphValue: { fontSize: 9, color: "#4CAF50", marginBottom: 4 },
-  graphDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#4CAF50",
-  },
-  graphLabel: { fontSize: 9, marginTop: 4 },
+  graphLabelItem: { alignItems: "center", flex: 1 },
+  graphValue: { fontSize: 9, color: "#4CAF50", marginBottom: 2 },
+  graphLabel: { fontSize: 9 },
   weightTabs: { marginBottom: 12 },
   weightTab: {
     paddingHorizontal: 14,
