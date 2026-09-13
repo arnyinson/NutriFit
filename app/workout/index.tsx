@@ -648,52 +648,52 @@ export default function WorkoutScreen() {
                       </Text>
                     </View>
                   ) : videoSource === "youtube" &&
-                    currentYoutubeVideoId &&
-                    !allYoutubeAttemptsFailed ? (
-                    <View style={styles.webviewWrapper}>
-                      <WebView
-                        // key forces WebView to remount when we move to the next candidate
-                        key={currentYoutubeVideoId}
-                        source={{
-                          html: `
-          <html>
-            <body style="margin:0;padding:0;background:#000;">
-              <div id="player"></div>
-              <script src="https://www.youtube.com/iframe_api"></script>
-              <script>
-                var player;
-                function onYouTubeIframeAPIReady() {
-                  player = new YT.Player('player', {
-                    height: '100%',
-                    width: '100%',
-                    videoId: '${currentYoutubeVideoId}',
-                    playerVars: { rel: 0, playsinline: 1 },
-                    events: {
-                      onError: function(e) {
-                        window.ReactNativeWebView.postMessage('EMBED_ERROR');
-                      }
-                    }
-                  });
-                }
-              </script>
-            </body>
-          </html>
-        `,
-                        }}
-                        style={styles.webview}
-                        allowsFullscreenVideo
-                        javaScriptEnabled
-                        domStorageEnabled
-                        onMessage={(event) => {
-                          if (event.nativeEvent.data === "EMBED_ERROR") {
-                            tryNextYoutubeVideo();
-                          }
-                        }}
-                      />
-                    </View>
-                  ) : videoSource === "youtube" &&
-                    youtubeVideoIds.length > 0 &&
-                    allYoutubeAttemptsFailed ? (
+  currentYoutubeVideoId &&
+  !allYoutubeAttemptsFailed ? (
+  <View style={styles.webviewWrapper}>
+    <WebView
+      key={currentYoutubeVideoId}
+      source={{
+        html: `
+  <html>
+    <body style="margin:0;padding:0;background:#000;">
+      <div id="player"></div>
+      <script src="https://www.youtube.com/iframe_api"></script>
+      <script>
+        var player;
+        function onYouTubeIframeAPIReady() {
+          player = new YT.Player('player', {
+            height: '100%',
+            width: '100%',
+            videoId: '${currentYoutubeVideoId}',
+            playerVars: { rel: 0, playsinline: 1 },
+            events: {
+              onError: function(e) {
+                window.ReactNativeWebView.postMessage('EMBED_ERROR');
+              }
+            }
+          });
+        }
+      </script>
+    </body>
+  </html>
+`,
+      }}
+      style={styles.webview}
+      allowsFullscreenVideo
+      javaScriptEnabled
+      domStorageEnabled
+      onMessage={(event) => {
+        if (event.nativeEvent.data === "EMBED_ERROR") {
+          // One attempt only — if it fails, go straight to the "Watch on YouTube" fallback
+          setAllYoutubeAttemptsFailed(true);
+        }
+      }}
+    />
+  </View>
+) : videoSource === "youtube" &&
+  youtubeVideoIds.length > 0 &&
+  allYoutubeAttemptsFailed ? (
                     <TouchableOpacity
                       style={styles.youtubeFallback}
                       onPress={() =>
