@@ -132,10 +132,13 @@ export default function WorkoutScreen() {
 
   // Video fetching state — separate from the exercise object itself
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
+  // List of YouTube candidates + which index we're currently trying
+  const [youtubeVideoIds, setYoutubeVideoIds] = useState<string[]>([]);
+  const [youtubeAttemptIndex, setYoutubeAttemptIndex] = useState(0);
   const [videoSource, setVideoSource] = useState<VideoType>(null);
   const [loadingVideo, setLoadingVideo] = useState(false);
-  const [youtubeEmbedFailed, setYoutubeEmbedFailed] = useState(false);
+  const [allYoutubeAttemptsFailed, setAllYoutubeAttemptsFailed] =
+    useState(false);
 
   const loadWorkoutPlan = useCallback(async () => {
     try {
@@ -271,16 +274,18 @@ export default function WorkoutScreen() {
     setSelectedExercise(exercise);
     setShowDetailModal(true);
     setVideoUrl(null);
-    setYoutubeVideoId(null);
+    setYoutubeVideoIds([]);
+    setYoutubeAttemptIndex(0);
     setVideoSource(null);
-    setYoutubeEmbedFailed(false);
+    setAllYoutubeAttemptsFailed(false);
     setLoadingVideo(true);
 
     try {
       const res = await api.get(`/workouts/${exercise.id}/video`);
 
-      if (res.data.type === "youtube") {
-        setYoutubeVideoId(res.data.videoId);
+      if (res.data.type === "youtube" && res.data.videoIds?.length > 0) {
+        setYoutubeVideoIds(res.data.videoIds);
+        setYoutubeAttemptIndex(0);
         setVideoSource("youtube");
       } else if (res.data.type === "image" || res.data.type === "video") {
         const url = res.data.url;
@@ -298,6 +303,17 @@ export default function WorkoutScreen() {
       setVideoSource("none");
     } finally {
       setLoadingVideo(false);
+    }
+  };
+
+  // Kapag mag-fail ang kasalukuyang video (embedding disabled, atbp.), subukan ang susunod sa listahan
+  const tryNextYoutubeVideo = () => {
+    const nextIndex = youtubeAttemptIndex + 1;
+    if (nextIndex < youtubeVideoIds.length) {
+      setYoutubeAttemptIndex(nextIndex);
+    } else {
+      // Naubos na ang lahat ng candidates, ipakita na lang ang "Watch on YouTube" gamit ang una
+      setAllYoutubeAttemptsFailed(true);
     }
   };
 
@@ -372,6 +388,8 @@ export default function WorkoutScreen() {
       </SafeAreaView>
     );
   }
+
+  const currentYoutubeVideoId = youtubeVideoIds[youtubeAttemptIndex];
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -620,7 +638,8 @@ export default function WorkoutScreen() {
                     ))}
                   </View>
 
-                  {/* Video section — handles YouTube embed (with fallback), uploaded video image/GIF, or "not available" */}
+                  {/* Video section — tries each YouTube candidate in turn, falls back to
+                      uploaded video/GIF, or the "watch on YouTube" thumbnail if all candidates fail */}
                   {loadingVideo ? (
                     <View style={styles.videoPlaceholder}>
                       <ActivityIndicator color="#fff" />
@@ -629,10 +648,12 @@ export default function WorkoutScreen() {
                       </Text>
                     </View>
                   ) : videoSource === "youtube" &&
-                    youtubeVideoId &&
-                    !youtubeEmbedFailed ? (
+                    currentYoutubeVideoId &&
+                    !allYoutubeAttemptsFailed ? (
                     <View style={styles.webviewWrapper}>
                       <WebView
+                        // key forces WebView to remount when we move to the next candidate
+                        key={currentYoutubeVideoId}
                         source={{
                           html: `
           <html>
@@ -645,7 +666,7 @@ export default function WorkoutScreen() {
                   player = new YT.Player('player', {
                     height: '100%',
                     width: '100%',
-                    videoId: '${youtubeVideoId}',
+                    videoId: '${currentYoutubeVideoId}',
                     playerVars: { rel: 0, playsinline: 1 },
                     events: {
                       onError: function(e) {
@@ -665,25 +686,25 @@ export default function WorkoutScreen() {
                         domStorageEnabled
                         onMessage={(event) => {
                           if (event.nativeEvent.data === "EMBED_ERROR") {
-                            setYoutubeEmbedFailed(true);
+                            tryNextYoutubeVideo();
                           }
                         }}
                       />
                     </View>
                   ) : videoSource === "youtube" &&
-                    youtubeVideoId &&
-                    youtubeEmbedFailed ? (
+                    youtubeVideoIds.length > 0 &&
+                    allYoutubeAttemptsFailed ? (
                     <TouchableOpacity
                       style={styles.youtubeFallback}
                       onPress={() =>
                         Linking.openURL(
-                          `https://www.youtube.com/watch?v=${youtubeVideoId}`,
+                          `https://www.youtube.com/watch?v=${youtubeVideoIds[0]}`,
                         )
                       }
                     >
                       <Image
                         source={{
-                          uri: `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`,
+                          uri: `https://img.youtube.com/vi/${youtubeVideoIds[0]}/hqdefault.jpg`,
                         }}
                         style={styles.videoImage}
                         resizeMode="cover"
