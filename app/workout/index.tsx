@@ -628,20 +628,51 @@ export default function WorkoutScreen() {
                         Loading demonstration...
                       </Text>
                     </View>
-                  ) : videoSource === "youtube" && youtubeVideoId && !youtubeEmbedFailed ? (
+                  ) : videoSource === "youtube" &&
+                    youtubeVideoId &&
+                    !youtubeEmbedFailed ? (
                     <View style={styles.webviewWrapper}>
                       <WebView
                         source={{
-                          uri: `https://www.youtube.com/embed/${youtubeVideoId}?rel=0&playsinline=1`,
+                          html: `
+          <html>
+            <body style="margin:0;padding:0;background:#000;">
+              <div id="player"></div>
+              <script src="https://www.youtube.com/iframe_api"></script>
+              <script>
+                var player;
+                function onYouTubeIframeAPIReady() {
+                  player = new YT.Player('player', {
+                    height: '100%',
+                    width: '100%',
+                    videoId: '${youtubeVideoId}',
+                    playerVars: { rel: 0, playsinline: 1 },
+                    events: {
+                      onError: function(e) {
+                        window.ReactNativeWebView.postMessage('EMBED_ERROR');
+                      }
+                    }
+                  });
+                }
+              </script>
+            </body>
+          </html>
+        `,
                         }}
                         style={styles.webview}
                         allowsFullscreenVideo
                         javaScriptEnabled
-                        onError={() => setYoutubeEmbedFailed(true)}
-                        onHttpError={() => setYoutubeEmbedFailed(true)}
+                        domStorageEnabled
+                        onMessage={(event) => {
+                          if (event.nativeEvent.data === "EMBED_ERROR") {
+                            setYoutubeEmbedFailed(true);
+                          }
+                        }}
                       />
                     </View>
-                  ) : videoSource === "youtube" && youtubeVideoId && youtubeEmbedFailed ? (
+                  ) : videoSource === "youtube" &&
+                    youtubeVideoId &&
+                    youtubeEmbedFailed ? (
                     <TouchableOpacity
                       style={styles.youtubeFallback}
                       onPress={() =>
