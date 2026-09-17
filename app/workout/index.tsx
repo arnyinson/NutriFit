@@ -28,7 +28,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { WebView } from "react-native-webview";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -54,7 +53,7 @@ type ExerciseEntry = {
 
 type WorkoutDay = {
   day: string;
-  date: string; // YYYY-MM-DD
+  date: string;
   exercises: ExerciseEntry[];
 };
 
@@ -77,10 +76,9 @@ const formatLocalDate = (d: Date) => {
 
 const getTodayDateString = () => formatLocalDate(new Date());
 
-// Kinukuha ang petsa ng Lunes ng kasalukuyang linggo, tapos ang bawat araw pagkatapos nito
 const getWeekDates = () => {
   const today = new Date();
-  const dayOfWeek = today.getDay(); // Sunday = 0
+  const dayOfWeek = today.getDay();
   const monday = new Date(
     today.getFullYear(),
     today.getMonth(),
@@ -104,7 +102,6 @@ const formatDateLabel = (dateStr: string) => {
   });
 };
 
-// Rough estimated height (in px) ng bawat collapsed day card, para sa scroll positioning
 const DAY_SECTION_ESTIMATED_HEIGHT = 280;
 
 type VideoType = "uploaded" | "youtube" | "exercisedb" | "none" | null;
@@ -130,15 +127,10 @@ export default function WorkoutScreen() {
   const [logReps, setLogReps] = useState("");
   const [logWeight, setLogWeight] = useState("");
 
-  // Video fetching state — separate from the exercise object itself
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  // List of YouTube candidates + which index we're currently trying
   const [youtubeVideoIds, setYoutubeVideoIds] = useState<string[]>([]);
-  const [youtubeAttemptIndex, setYoutubeAttemptIndex] = useState(0);
   const [videoSource, setVideoSource] = useState<VideoType>(null);
   const [loadingVideo, setLoadingVideo] = useState(false);
-  const [allYoutubeAttemptsFailed, setAllYoutubeAttemptsFailed] =
-    useState(false);
 
   const loadWorkoutPlan = useCallback(async () => {
     try {
@@ -152,7 +144,6 @@ export default function WorkoutScreen() {
         res = await api.get("/workouts/plan/me");
       }
 
-      // I-fill ang buong linggo (Mon-Sun) para makita ang Rest Days na walang entry mula sa API
       const weekDates = getWeekDates();
       const existingDays = new Map<string, ExerciseEntry[]>(
         res.data.workoutPlan.map(
@@ -191,7 +182,6 @@ export default function WorkoutScreen() {
     loadWorkoutPlan();
   };
 
-  // Auto-scroll papuntang kasalukuyang araw sa unang pagkakataon lang na na-load ang plan
   useEffect(() => {
     if (loading || workoutPlan.length === 0 || hasAutoScrolledRef.current)
       return;
@@ -268,16 +258,12 @@ export default function WorkoutScreen() {
     }
   };
 
-  // Kapag binuksan ang Exercise Detail modal, kunin ang video mula sa backend
-  // (pwedeng: admin-uploaded video, YouTube video, o ExerciseDB GIF, depende sa availability)
   const openExerciseDetail = async (exercise: Exercise) => {
     setSelectedExercise(exercise);
     setShowDetailModal(true);
     setVideoUrl(null);
     setYoutubeVideoIds([]);
-    setYoutubeAttemptIndex(0);
     setVideoSource(null);
-    setAllYoutubeAttemptsFailed(false);
     setLoadingVideo(true);
 
     try {
@@ -285,7 +271,6 @@ export default function WorkoutScreen() {
 
       if (res.data.type === "youtube" && res.data.videoIds?.length > 0) {
         setYoutubeVideoIds(res.data.videoIds);
-        setYoutubeAttemptIndex(0);
         setVideoSource("youtube");
       } else if (res.data.type === "image" || res.data.type === "video") {
         const url = res.data.url;
@@ -303,17 +288,6 @@ export default function WorkoutScreen() {
       setVideoSource("none");
     } finally {
       setLoadingVideo(false);
-    }
-  };
-
-  // Kapag mag-fail ang kasalukuyang video (embedding disabled, atbp.), subukan ang susunod sa listahan
-  const tryNextYoutubeVideo = () => {
-    const nextIndex = youtubeAttemptIndex + 1;
-    if (nextIndex < youtubeVideoIds.length) {
-      setYoutubeAttemptIndex(nextIndex);
-    } else {
-      // Naubos na ang lahat ng candidates, ipakita na lang ang "Watch on YouTube" gamit ang una
-      setAllYoutubeAttemptsFailed(true);
     }
   };
 
@@ -339,7 +313,6 @@ export default function WorkoutScreen() {
         weight_used: logWeight || "BW",
       });
 
-      // markahan din bilang done kung hindi pa
       if (!logEntry.done) {
         await api.patch(`/workouts/plan/${logEntry.plan_id}/toggle`, {
           done: true,
@@ -389,11 +362,8 @@ export default function WorkoutScreen() {
     );
   }
 
-  const currentYoutubeVideoId = youtubeVideoIds[youtubeAttemptIndex];
-
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-      {/* Header */}
       <View
         style={[
           styles.header,
@@ -446,7 +416,6 @@ export default function WorkoutScreen() {
                 isToday && styles.daySectionToday,
               ]}
             >
-              {/* Day Header */}
               <View style={styles.dayHeader}>
                 <View style={{ flex: 1 }}>
                   <View
@@ -495,7 +464,6 @@ export default function WorkoutScreen() {
                 </View>
               ) : (
                 <>
-                  {/* Progress Bar */}
                   <View style={styles.progressRow}>
                     <View
                       style={[
@@ -515,7 +483,6 @@ export default function WorkoutScreen() {
                     </Text>
                   </View>
 
-                  {/* Exercises */}
                   {day.exercises.map((entry) => (
                     <TouchableOpacity
                       key={entry.plan_id}
@@ -586,7 +553,6 @@ export default function WorkoutScreen() {
         <View style={{ height: 80 }} />
       </ScrollView>
 
-      {/* Exercise Detail Modal */}
       <Modal
         visible={showDetailModal}
         animationType="slide"
@@ -638,8 +604,6 @@ export default function WorkoutScreen() {
                     ))}
                   </View>
 
-                  {/* Video section — tries each YouTube candidate in turn, falls back to
-                      uploaded video/GIF, or the "watch on YouTube" thumbnail if all candidates fail */}
                   {loadingVideo ? (
                     <View style={styles.videoPlaceholder}>
                       <ActivityIndicator color="#fff" />
@@ -648,52 +612,7 @@ export default function WorkoutScreen() {
                       </Text>
                     </View>
                   ) : videoSource === "youtube" &&
-  currentYoutubeVideoId &&
-  !allYoutubeAttemptsFailed ? (
-  <View style={styles.webviewWrapper}>
-    <WebView
-      key={currentYoutubeVideoId}
-      source={{
-        html: `
-  <html>
-    <body style="margin:0;padding:0;background:#000;">
-      <div id="player"></div>
-      <script src="https://www.youtube.com/iframe_api"></script>
-      <script>
-        var player;
-        function onYouTubeIframeAPIReady() {
-          player = new YT.Player('player', {
-            height: '100%',
-            width: '100%',
-            videoId: '${currentYoutubeVideoId}',
-            playerVars: { rel: 0, playsinline: 1 },
-            events: {
-              onError: function(e) {
-                window.ReactNativeWebView.postMessage('EMBED_ERROR');
-              }
-            }
-          });
-        }
-      </script>
-    </body>
-  </html>
-`,
-      }}
-      style={styles.webview}
-      allowsFullscreenVideo
-      javaScriptEnabled
-      domStorageEnabled
-      onMessage={(event) => {
-        if (event.nativeEvent.data === "EMBED_ERROR") {
-          // One attempt only — if it fails, go straight to the "Watch on YouTube" fallback
-          setAllYoutubeAttemptsFailed(true);
-        }
-      }}
-    />
-  </View>
-) : videoSource === "youtube" &&
-  youtubeVideoIds.length > 0 &&
-  allYoutubeAttemptsFailed ? (
+                    youtubeVideoIds.length > 0 ? (
                     <TouchableOpacity
                       style={styles.youtubeFallback}
                       onPress={() =>
@@ -714,7 +633,7 @@ export default function WorkoutScreen() {
                           <Play size={24} color="#fff" fill="#fff" />
                         </View>
                         <Text style={styles.youtubeFallbackText}>
-                          Watch on YouTube
+                          Tap to watch on YouTube
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -769,7 +688,6 @@ export default function WorkoutScreen() {
         </View>
       </Modal>
 
-      {/* Log Exercise Modal */}
       <Modal
         visible={showLogModal}
         animationType="slide"
@@ -844,7 +762,6 @@ export default function WorkoutScreen() {
         </View>
       </Modal>
 
-      {/* Bottom Navigation */}
       <View
         style={[
           styles.bottomNav,
@@ -1021,17 +938,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
     gap: 8,
-  },
-  webviewWrapper: {
-    borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 16,
-    backgroundColor: "#000",
-    height: 220,
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: "#000",
   },
   youtubeFallback: {
     width: "100%",
