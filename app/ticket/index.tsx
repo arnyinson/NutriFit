@@ -1,17 +1,19 @@
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import {
   CheckCircle2,
   ChevronLeft,
   History,
+  Image as ImageIcon,
   Lock,
   Send,
-  Star,
   X,
 } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -30,24 +32,27 @@ type Ticket = {
   id: string;
   type: string;
   message: string;
-  rating: number;
   status: "New" | "Pending" | "Resolved";
   admin_response: string | null;
   created_at: string;
+  image_url: string | null;
 };
 
 export default function TicketScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const [rating, setRating] = useState(0);
   const [feedbackType, setFeedbackType] = useState("Suggestion");
   const [message, setMessage] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
 
   const feedbackTypes = [
     "Bug Report",
@@ -81,11 +86,54 @@ export default function TicketScreen() {
     return "#2196F3";
   };
 
-  const handleSubmit = async () => {
-    if (rating === 0) {
-      Alert.alert("Error", "Please rate your experience.");
+  const handlePickImage = async () => {
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert(
+        "Permission needed",
+        "Please allow access to your photos to attach a screenshot.",
+      );
       return;
     }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.6,
+    });
+
+    if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+    const asset = result.assets[0];
+    setUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      const filename = asset.uri.split("/").pop() || "screenshot.jpg";
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : "image/jpeg";
+
+      formData.append("image", {
+        uri: asset.uri,
+        name: filename,
+        type,
+      } as any);
+
+      const res = await api.post("/upload/ticket-image", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setAttachedImage(res.data.image_url);
+    } catch (err) {
+      console.error("Upload ticket image error:", err);
+      Alert.alert("Error", "Unable to upload image. Please try again.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleSubmit = async () => {
     if (!message.trim()) {
       Alert.alert("Error", "Please enter your feedback.");
       return;
@@ -96,7 +144,7 @@ export default function TicketScreen() {
       await api.post("/tickets", {
         type: feedbackType,
         message,
-        rating,
+        image_url: attachedImage,
       });
       setShowSuccessModal(true);
     } catch (err: any) {
@@ -110,9 +158,9 @@ export default function TicketScreen() {
   };
 
   const resetForm = () => {
-    setRating(0);
     setFeedbackType("Suggestion");
     setMessage("");
+    setAttachedImage(null);
     setShowSuccessModal(false);
   };
 
@@ -157,42 +205,6 @@ export default function TicketScreen() {
               Your thoughts help us improve and create a better experience for
               you.
             </Text>
-          </View>
-
-          {/* Star Rating */}
-          <View style={styles.ratingSection}>
-            <Text style={[styles.sectionLabel, { color: colors.text }]}>
-              How was your experience?
-            </Text>
-            <View style={styles.starsRow}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => setRating(star)}
-                  style={styles.starBtn}
-                  hitSlop={HIT_SLOP}
-                >
-                  <Star
-                    size={32}
-                    color={star <= rating ? "#FF9800" : "#ddd"}
-                    fill={star <= rating ? "#FF9800" : "none"}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-            {rating > 0 && (
-              <Text style={styles.ratingLabel}>
-                {rating === 1
-                  ? "Poor"
-                  : rating === 2
-                    ? "Fair"
-                    : rating === 3
-                      ? "Good"
-                      : rating === 4
-                        ? "Very Good"
-                        : "Excellent!"}
-              </Text>
-            )}
           </View>
 
           {/* Feedback Type */}
@@ -255,6 +267,57 @@ export default function TicketScreen() {
             <Text style={[styles.charCount, { color: colors.textMuted }]}>
               {message.length}/500
             </Text>
+          </View>
+
+          {/* Attach Screenshot */}
+          <View style={styles.imageSection}>
+            <Text style={[styles.sectionLabel, { color: colors.text }]}>
+              Attach a screenshot (optional)
+            </Text>
+            {attachedImage ? (
+              <View style={styles.attachedImageWrapper}>
+                <Image
+                  source={{ uri: attachedImage }}
+                  style={styles.attachedImage}
+                  resizeMode="cover"
+                />
+                <TouchableOpacity
+                  style={styles.removeImageBtn}
+                  onPress={() => setAttachedImage(null)}
+                  hitSlop={HIT_SLOP}
+                >
+                  <X size={16} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[
+                  styles.attachBtn,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                  },
+                ]}
+                onPress={handlePickImage}
+                disabled={uploadingImage}
+              >
+                {uploadingImage ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <>
+                    <ImageIcon size={20} color={colors.textMuted} />
+                    <Text
+                      style={[
+                        styles.attachBtnText,
+                        { color: colors.textMuted },
+                      ]}
+                    >
+                      Tap to attach a screenshot
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Submit Button */}
@@ -442,16 +505,26 @@ export default function TicketScreen() {
                         >
                           {ticket.message}
                         </Text>
-                        <View style={styles.ticketStars}>
-                          {[1, 2, 3, 4, 5].map((s) => (
-                            <Star
-                              key={s}
-                              size={14}
-                              color={s <= ticket.rating ? "#FF9800" : "#ddd"}
-                              fill={s <= ticket.rating ? "#FF9800" : "none"}
+                        {ticket.image_url && (
+                          <TouchableOpacity
+                            onPress={() => setViewingImage(ticket.image_url)}
+                            style={styles.ticketImageThumbWrapper}
+                          >
+                            <Image
+                              source={{ uri: ticket.image_url }}
+                              style={styles.ticketImageThumb}
+                              resizeMode="cover"
                             />
-                          ))}
-                        </View>
+                            <Text
+                              style={[
+                                styles.ticketImageThumbLabel,
+                                { color: colors.primary },
+                              ]}
+                            >
+                              View attached screenshot
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                         {ticket.admin_response && (
                           <View
                             style={[
@@ -491,6 +564,31 @@ export default function TicketScreen() {
               <Text style={styles.modalCloseBtnText}>Close</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      {/* Full Image Viewer Modal */}
+      <Modal
+        visible={!!viewingImage}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+      >
+        <View style={styles.imageViewerOverlay}>
+          <TouchableOpacity
+            style={styles.imageViewerCloseBtn}
+            onPress={() => setViewingImage(null)}
+            hitSlop={HIT_SLOP}
+          >
+            <X size={26} color="#fff" />
+          </TouchableOpacity>
+          {viewingImage && (
+            <Image
+              source={{ uri: viewingImage }}
+              style={styles.imageViewerFull}
+              resizeMode="contain"
+            />
+          )}
         </View>
       </Modal>
 
@@ -544,20 +642,11 @@ const styles = StyleSheet.create({
   topSection: { alignItems: "center", marginBottom: 24 },
   topTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 6 },
   topSubtitle: { fontSize: 13, textAlign: "center", lineHeight: 20 },
-  ratingSection: { alignItems: "center", marginBottom: 20 },
   sectionLabel: {
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 12,
     alignSelf: "flex-start",
-  },
-  starsRow: { flexDirection: "row", gap: 8 },
-  starBtn: { padding: 4 },
-  ratingLabel: {
-    fontSize: 14,
-    color: "#FF9800",
-    fontWeight: "600",
-    marginTop: 8,
   },
   typeSection: { marginBottom: 20 },
   typeChipRow: { flexDirection: "row", gap: 8 },
@@ -580,6 +669,35 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   charCount: { fontSize: 11, textAlign: "right", marginTop: 4 },
+  imageSection: { marginBottom: 20 },
+  attachBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderRadius: 12,
+    paddingVertical: 20,
+  },
+  attachBtnText: { fontSize: 13, fontWeight: "500" },
+  attachedImageWrapper: {
+    borderRadius: 12,
+    overflow: "hidden",
+    position: "relative",
+  },
+  attachedImage: { width: "100%", height: 180 },
+  removeImageBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 14,
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   submitBtn: {
     backgroundColor: "#4CAF50",
     padding: 16,
@@ -643,7 +761,14 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 11, fontWeight: "700" },
   ticketDate: { fontSize: 11 },
   ticketMessage: { fontSize: 13, marginBottom: 8 },
-  ticketStars: { flexDirection: "row", gap: 2 },
+  ticketImageThumbWrapper: { marginBottom: 8 },
+  ticketImageThumb: {
+    width: "100%",
+    height: 100,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  ticketImageThumbLabel: { fontSize: 11, fontWeight: "600" },
   adminResponseBox: { borderRadius: 10, padding: 10, marginTop: 10 },
   adminResponseLabel: {
     fontSize: 10,
@@ -660,6 +785,19 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   modalCloseBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imageViewerCloseBtn: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 1,
+  },
+  imageViewerFull: { width: "100%", height: "80%" },
   successModal: {
     margin: 40,
     borderRadius: 24,

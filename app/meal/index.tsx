@@ -293,9 +293,10 @@ export default function MealScreen() {
   const searchMealsForSlot = async (mealType: string, search: string) => {
     setSearchingPlan(true);
     try {
-      const res = await api.get("/meals", {
-        params: { meal_type: mealType, search: search || undefined },
-      });
+      const params: Record<string, string> = search
+        ? { search }
+        : { meal_type: mealType };
+      const res = await api.get("/meals", { params });
       setEditPlanResults(res.data.meals);
     } catch (err) {
       console.error("Search meals error:", err);
@@ -357,12 +358,10 @@ export default function MealScreen() {
     if (showEditMealModal && editTab === "replace" && editingEntry) {
       (async () => {
         try {
-          const res = await api.get("/meals", {
-            params: {
-              meal_type: editingEntry.meal_type,
-              search: editMealSearch || undefined,
-            },
-          });
+          const params: Record<string, string> = editMealSearch
+            ? { search: editMealSearch }
+            : { meal_type: editingEntry.meal_type };
+          const res = await api.get("/meals", { params });
           setEditMealResults(res.data.meals);
         } catch (err) {
           console.error("Search error:", err);
