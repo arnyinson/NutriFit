@@ -28,6 +28,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -109,6 +110,7 @@ type VideoType = "uploaded" | "youtube" | "exercisedb" | "none" | null;
 export default function WorkoutScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const scrollViewRef = useRef<ScrollView>(null);
   const hasAutoScrolledRef = useRef(false);
@@ -550,7 +552,7 @@ export default function WorkoutScreen() {
             </View>
           );
         })}
-        <View style={{ height: 80 }} />
+        <View style={{ height: 80 + insets.bottom }} />
       </ScrollView>
 
       <Modal
@@ -765,7 +767,12 @@ export default function WorkoutScreen() {
       <View
         style={[
           styles.bottomNav,
-          { backgroundColor: colors.navBg, borderTopColor: colors.border },
+          {
+            backgroundColor: colors.navBg,
+            borderTopColor: colors.border,
+            paddingBottom: insets.bottom + 6,
+            height: 56 + insets.bottom,
+          },
         ]}
       >
         {[

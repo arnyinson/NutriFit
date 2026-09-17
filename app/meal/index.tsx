@@ -34,6 +34,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -105,6 +106,7 @@ const DAY_SECTION_ESTIMATED_HEIGHT = 340;
 export default function MealScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const scrollViewRef = useRef<ScrollView>(null);
   const dayPositionsRef = useRef<Record<string, number>>({});
@@ -714,7 +716,7 @@ export default function MealScreen() {
             );
           })
         )}
-        <View style={{ height: 80 }} />
+        <View style={{ height: 80 + insets.bottom }} />
       </ScrollView>
 
       {/* MEAL DETAIL MODAL */}
@@ -1250,7 +1252,12 @@ export default function MealScreen() {
       <View
         style={[
           styles.bottomNav,
-          { backgroundColor: colors.navBg, borderTopColor: colors.border },
+          {
+            backgroundColor: colors.navBg,
+            borderTopColor: colors.border,
+            paddingBottom: insets.bottom + 6,
+            height: 56 + insets.bottom,
+          },
         ]}
       >
         {[

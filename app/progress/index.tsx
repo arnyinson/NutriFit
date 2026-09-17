@@ -29,6 +29,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -46,6 +47,7 @@ type Summary = {
 export default function ProgressScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("Stats");
   const [activePeriod, setActivePeriod] = useState("Weekly");
   const [loading, setLoading] = useState(true);
@@ -679,7 +681,7 @@ export default function ProgressScreen() {
           </>
         )}
 
-        <View style={{ height: 80 }} />
+        <View style={{ height: 80 + insets.bottom }} />
       </ScrollView>
 
       {/* Update Progress Modal */}
@@ -695,7 +697,13 @@ export default function ProgressScreen() {
         >
           <View style={styles.modalOverlay}>
             <View
-              style={[styles.modalContent, { backgroundColor: colors.card }]}
+              style={[
+                styles.modalContent,
+                {
+                  backgroundColor: colors.card,
+                  paddingBottom: 24 + insets.bottom,
+                },
+              ]}
             >
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
@@ -764,7 +772,12 @@ export default function ProgressScreen() {
       <View
         style={[
           styles.bottomNav,
-          { backgroundColor: colors.navBg, borderTopColor: colors.border },
+          {
+            backgroundColor: colors.navBg,
+            borderTopColor: colors.border,
+            paddingBottom: insets.bottom + 6,
+            height: 56 + insets.bottom,
+          },
         ]}
       >
         {[

@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { registerAndSavePushToken } from "../../constants/pushNotifications";
 import { useRouter } from "expo-router";
 import {
   BarChart3,
@@ -28,7 +27,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import api from "../../constants/api";
+import { registerAndSavePushToken } from "../../constants/pushNotifications";
 import { useTheme } from "../../constants/theme";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
@@ -89,6 +90,7 @@ const toNumber = (value: unknown) => parseFloat(String(value ?? 0)) || 0;
 export default function DashboardScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("Home");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -203,10 +205,10 @@ export default function DashboardScreen() {
     }
   }, []);
 
- useEffect(() => {
-  loadDashboardData();
-  registerAndSavePushToken();
-}, [loadDashboardData]);
+  useEffect(() => {
+    loadDashboardData();
+    registerAndSavePushToken();
+  }, [loadDashboardData]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -627,14 +629,19 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        <View style={{ height: 80 }} />
+        <View style={{ height: 80 + insets.bottom }} />
       </ScrollView>
 
       {/* Bottom Navigation */}
       <View
         style={[
           styles.bottomNav,
-          { backgroundColor: colors.navBg, borderTopColor: colors.border },
+          {
+            backgroundColor: colors.navBg,
+            borderTopColor: colors.border,
+            paddingBottom: insets.bottom + 6,
+            height: 56 + insets.bottom,
+          },
         ]}
       >
         {[
