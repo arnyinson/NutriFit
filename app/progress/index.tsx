@@ -44,9 +44,15 @@ type Summary = {
   mealConsistency: number;
 };
 
+const PERIODS = [
+  { key: "Daily", apiValue: "daily" },
+  { key: "Weekly", apiValue: "weekly" },
+  { key: "Monthly", apiValue: "monthly" },
+] as const;
+
 export default function ProgressScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState("Stats");
   const [activePeriod, setActivePeriod] = useState("Weekly");
@@ -58,12 +64,16 @@ export default function ProgressScreen() {
   const [weightInput, setWeightInput] = useState("");
   const [syncing, setSyncing] = useState(false);
 
-  const loadSummary = useCallback(async () => {
+  const loadSummary = useCallback(async (period: string) => {
     try {
-      const res = await api.get("/progress/weekly-summary");
+      const apiPeriod =
+        PERIODS.find((p) => p.key === period)?.apiValue || "weekly";
+      const res = await api.get("/progress/weekly-summary", {
+        params: { period: apiPeriod },
+      });
       setSummary(res.data.summary);
     } catch (err) {
-      console.error("Load weekly summary error:", err);
+      console.error("Load summary error:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -71,12 +81,13 @@ export default function ProgressScreen() {
   }, []);
 
   useEffect(() => {
-    loadSummary();
-  }, [loadSummary]);
+    setLoading(true);
+    loadSummary(activePeriod);
+  }, [activePeriod, loadSummary]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadSummary();
+    loadSummary(activePeriod);
   };
 
   const openUpdateModal = async () => {
@@ -103,7 +114,7 @@ export default function ProgressScreen() {
     try {
       await api.post("/progress/sync-today", { weight: weightNum });
       setShowUpdateModal(false);
-      await loadSummary();
+      await loadSummary(activePeriod);
       Alert.alert("Success", "Your progress has been updated!");
     } catch (err: any) {
       const message =
@@ -143,7 +154,40 @@ export default function ProgressScreen() {
   const dayOfWeek = today.getDay();
   const monday = new Date(today);
   monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-  const dateRangeLabel = `${monday.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${today.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  const monthStart = new Date(today);
+  monthStart.setDate(today.getDate() - 29);
+
+  const dateRangeLabel =
+    activePeriod === "Daily"
+      ? today.toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+        })
+      : activePeriod === "Monthly"
+        ? `${monthStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${today.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+        : `${monday.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${today.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+
+  const summaryLabel =
+    activePeriod === "Daily"
+      ? "Today's Summary"
+      : activePeriod === "Monthly"
+        ? "Month Summary"
+        : "Week Summary";
+
+  const periodBadgeLabel =
+    activePeriod === "Daily"
+      ? "Today"
+      : activePeriod === "Monthly"
+        ? "This Month"
+        : "This Week";
+
+  const insightsTitle =
+    activePeriod === "Daily"
+      ? "Insights Today"
+      : activePeriod === "Monthly"
+        ? "Insights This Month"
+        : "Insights This Week";
 
   const recommendations: string[] = [];
   if (
@@ -157,7 +201,7 @@ export default function ProgressScreen() {
     recommendations.push("You are consistently under your calorie target");
   }
   if (summary.workoutCompletion >= 80) {
-    recommendations.push("Great workout consistency this week");
+    recommendations.push("Great workout consistency this period");
   } else if (summary.workoutCompletion > 0) {
     recommendations.push("Try to complete more of your scheduled workouts");
   }
@@ -192,23 +236,23 @@ export default function ProgressScreen() {
           <View style={{ width: 24 }} />
         </View>
         <View style={[styles.periodRow, { backgroundColor: colors.surface }]}>
-          {["Weekly", "Monthly"].map((p) => (
+          {PERIODS.map((p) => (
             <TouchableOpacity
-              key={p}
+              key={p.key}
               style={[
                 styles.periodBtn,
-                activePeriod === p && styles.periodBtnActive,
+                activePeriod === p.key && styles.periodBtnActive,
               ]}
-              onPress={() => setActivePeriod(p)}
+              onPress={() => setActivePeriod(p.key)}
             >
               <Text
                 style={[
                   styles.periodText,
                   { color: colors.textMuted },
-                  activePeriod === p && styles.periodTextActive,
+                  activePeriod === p.key && styles.periodTextActive,
                 ]}
               >
-                {p}
+                {p.key}
               </Text>
             </TouchableOpacity>
           ))}
@@ -225,11 +269,11 @@ export default function ProgressScreen() {
           />
         }
       >
-        {/* Week Label + Update Progress Button */}
+        {/* Period Label + Update Progress Button */}
         <View style={styles.weekHeader}>
           <View>
             <Text style={[styles.weekLabel, { color: colors.text }]}>
-              Week Summary
+              {summaryLabel}
             </Text>
             <Text style={[styles.weekDate, { color: colors.textMuted }]}>
               {dateRangeLabel}
@@ -237,7 +281,7 @@ export default function ProgressScreen() {
           </View>
           <View style={styles.phaseBadge}>
             <Target size={13} color="#4CAF50" />
-            <Text style={styles.phaseText}>This Week</Text>
+            <Text style={styles.phaseText}>{periodBadgeLabel}</Text>
           </View>
         </View>
 
@@ -269,7 +313,7 @@ export default function ProgressScreen() {
                 textAlign: "center",
               }}
             >
-              No progress data logged yet this week. Tap &quot;Update
+              No progress data logged yet for this period. Tap &quot;Update
               Progress&quot; above to log your weight and sync today&apos;s
               stats.
             </Text>
@@ -398,7 +442,7 @@ export default function ProgressScreen() {
               </View>
             </View>
 
-            {/* Daily Calorie Chart */}
+            {/* Calorie Chart */}
             <View
               style={[
                 styles.card,
@@ -406,7 +450,9 @@ export default function ProgressScreen() {
               ]}
             >
               <Text style={[styles.cardTitle, { color: colors.text }]}>
-                Daily Calorie Intake
+                {activePeriod === "Daily"
+                  ? "Today's Calorie Intake"
+                  : "Daily Calorie Intake"}
               </Text>
               <View style={styles.barChart}>
                 {summary.dailyCalories.map((day, i) => {
@@ -657,11 +703,20 @@ export default function ProgressScreen() {
             </View>
 
             {/* Recommendation */}
-            <View style={[styles.card, styles.recommendCard]}>
+            <View
+              style={[
+                styles.card,
+                styles.recommendCard,
+                {
+                  backgroundColor: isDark ? "#16281C" : "#F1F8E9",
+                  borderColor: "#4CAF50",
+                },
+              ]}
+            >
               <View style={styles.recommendHeader}>
                 <View style={styles.recommendDot} />
                 <Text style={[styles.recommendTitle, { color: colors.text }]}>
-                  Insights This Week
+                  {insightsTitle}
                 </Text>
               </View>
               {recommendations.map((rec, i) => (
@@ -967,7 +1022,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   consistencyFill: { height: 6, borderRadius: 3 },
-  recommendCard: { borderColor: "#4CAF50", backgroundColor: "#F1F8E9" },
+  recommendCard: {},
   recommendHeader: {
     flexDirection: "row",
     alignItems: "center",

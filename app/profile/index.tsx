@@ -10,6 +10,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  HeartPulse,
   Moon,
   Ruler,
   Sun,
@@ -87,6 +88,10 @@ const CHART_HEIGHT = 130;
 const CHART_TOP_PADDING = 20;
 const CHART_BOTTOM_PADDING = 10;
 
+// Kailangan bago muling ipakita ang parehong warning para sa parehong user
+// (iwasan ang paulit-ulit na pag-popup sa bawat pagbukas ng Profile)
+const BMI_WARNING_KEY = "lastBmiWarningCategory";
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { isDark, toggleTheme, colors } = useTheme();
@@ -107,6 +112,12 @@ export default function ProfileScreen() {
   >([]);
   const [loadingWeight, setLoadingWeight] = useState(true);
   const [chartWidth, setChartWidth] = useState(0);
+
+  const [showBmiWarning, setShowBmiWarning] = useState(false);
+  const [bmiWarningInfo, setBmiWarningInfo] = useState<{
+    label: string;
+    message: string;
+  } | null>(null);
 
   const allergenList = [
     "Eggs",
@@ -156,6 +167,48 @@ export default function ProfileScreen() {
   useEffect(() => {
     loadWeightHistory(activeWeightTab);
   }, [activeWeightTab, loadWeightHistory]);
+
+  // Kapag na-load na ang profile, i-check kung Underweight o Obese ang BMI,
+  // at ipakita ang warning kung hindi pa ito ipinapakita para sa kasalukuyang
+  // BMI category ng user (iwasan ang paulit-ulit na pag-popup)
+  useEffect(() => {
+    const checkBmiWarning = async () => {
+      if (!profile) return;
+      const bmi = parseFloat(profile.bmi);
+      if (isNaN(bmi)) return;
+
+      let warning: { label: string; message: string } | null = null;
+
+      if (bmi < 18.5) {
+        warning = {
+          label: "Underweight",
+          message:
+            "Your BMI indicates you may be underweight. This could be a sign of malnutrition. We recommend consulting a qualified healthcare professional or registered dietitian for proper guidance.",
+        };
+      } else if (bmi >= 30) {
+        warning = {
+          label: "Obese",
+          message:
+            "Your BMI indicates a possible risk of obesity. We recommend consulting a qualified healthcare professional or registered dietitian for proper guidance on a safe and sustainable plan.",
+        };
+      }
+
+      if (!warning) return;
+
+      try {
+        const lastShownCategory = await AsyncStorage.getItem(BMI_WARNING_KEY);
+        if (lastShownCategory === warning.label) return; // ipinakita na ito dati, huwag na ulitin
+
+        setBmiWarningInfo(warning);
+        setShowBmiWarning(true);
+        await AsyncStorage.setItem(BMI_WARNING_KEY, warning.label);
+      } catch (err) {
+        console.error("BMI warning check error:", err);
+      }
+    };
+
+    checkBmiWarning();
+  }, [profile]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -736,6 +789,36 @@ export default function ProfileScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
+      {/* BMI Health Warning Modal */}
+      <Modal
+        visible={showBmiWarning}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+      >
+        <View style={styles.warningOverlay}>
+          <View style={[styles.warningModal, { backgroundColor: colors.card }]}>
+            <View style={styles.warningIconCircle}>
+              <HeartPulse size={28} color="#F44336" />
+            </View>
+            <Text style={[styles.warningTitle, { color: colors.text }]}>
+              {bmiWarningInfo?.label} BMI Detected
+            </Text>
+            <Text
+              style={[styles.warningMessage, { color: colors.textSecondary }]}
+            >
+              {bmiWarningInfo?.message}
+            </Text>
+            <TouchableOpacity
+              style={styles.warningBtn}
+              onPress={() => setShowBmiWarning(false)}
+            >
+              <Text style={styles.warningBtnText}>I Understand</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Edit Profile Modal */}
       <Modal
         visible={showEditModal}
@@ -1148,6 +1231,49 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   logoutText: { color: "#F44336", fontWeight: "bold", fontSize: 15 },
+  warningOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  warningModal: {
+    width: "100%",
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+  },
+  warningIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#FFEBEE",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  warningTitle: {
+    fontSize: 17,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  warningMessage: {
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  warningBtn: {
+    backgroundColor: "#F44336",
+    paddingHorizontal: 32,
+    paddingVertical: 13,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+  },
+  warningBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

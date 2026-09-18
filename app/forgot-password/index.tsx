@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { ChevronLeft, Lock, Mail } from "lucide-react-native";
+import { ChevronLeft, Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -26,6 +26,8 @@ export default function ForgotPasswordScreen() {
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
 
@@ -233,10 +235,20 @@ export default function ForgotPasswordScreen() {
                   placeholderTextColor={colors.textMuted}
                   value={newPassword}
                   onChangeText={setNewPassword}
-                  secureTextEntry
+                  secureTextEntry={!showNewPassword}
                   autoCapitalize="none"
                   editable={!loading}
                 />
+                <TouchableOpacity
+                  onPress={() => setShowNewPassword((v) => !v)}
+                  hitSlop={HIT_SLOP}
+                >
+                  {showNewPassword ? (
+                    <EyeOff size={18} color={colors.textMuted} />
+                  ) : (
+                    <Eye size={18} color={colors.textMuted} />
+                  )}
+                </TouchableOpacity>
               </View>
 
               <View
@@ -255,10 +267,20 @@ export default function ForgotPasswordScreen() {
                   placeholderTextColor={colors.textMuted}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
-                  secureTextEntry
+                  secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
                   editable={!loading}
                 />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword((v) => !v)}
+                  hitSlop={HIT_SLOP}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff size={18} color={colors.textMuted} />
+                  ) : (
+                    <Eye size={18} color={colors.textMuted} />
+                  )}
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
