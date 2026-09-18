@@ -24,7 +24,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -1015,136 +1017,83 @@ export default function MealScreen() {
 
       {/* EDIT MEAL MODAL (Replace / Log Outside) */}
       <Modal visible={showEditMealModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                Edit Meal
-              </Text>
-              <TouchableOpacity
-                onPress={() => setShowEditMealModal(false)}
-                hitSlop={HIT_SLOP}
-              >
-                <X size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalOverlay}>
             <View
-              style={[styles.editTabRow, { backgroundColor: colors.input }]}
+              style={[styles.modalContent, { backgroundColor: colors.card }]}
             >
-              {(
-                [
-                  { key: "replace", label: "Replace", Icon: Repeat },
-                  { key: "log", label: "Log Outside", Icon: NotebookPen },
-                ] as const
-              ).map((tab) => {
-                const isActive = editTab === tab.key;
-                return (
-                  <TouchableOpacity
-                    key={tab.key}
-                    style={[
-                      styles.editTabBtn,
-                      isActive && styles.editTabActive,
-                    ]}
-                    onPress={() => setEditTab(tab.key)}
-                  >
-                    <tab.Icon
-                      size={14}
-                      color={isActive ? "#fff" : colors.textMuted}
-                    />
-                    <Text
-                      style={[
-                        styles.editTabText,
-                        { color: colors.textMuted },
-                        isActive && styles.editTabTextActive,
-                      ]}
-                    >
-                      {tab.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {editTab === "replace" && (
-              <>
-                <View
-                  style={[styles.searchBar, { backgroundColor: colors.input }]}
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  Edit Meal
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowEditMealModal(false)}
+                  hitSlop={HIT_SLOP}
                 >
-                  <Search size={16} color={colors.textMuted} />
-                  <TextInput
-                    style={[styles.searchInput, { color: colors.text }]}
-                    placeholder="Search replacement meal..."
-                    placeholderTextColor={colors.textMuted}
-                    value={editMealSearch}
-                    onChangeText={setEditMealSearch}
-                    autoFocus
-                  />
-                </View>
-                <FlatList
-                  data={editMealResults}
-                  keyExtractor={(item) => item.id}
-                  renderItem={({ item }) => (
+                  <X size={20} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <View
+                style={[styles.editTabRow, { backgroundColor: colors.input }]}
+              >
+                {(
+                  [
+                    { key: "replace", label: "Replace", Icon: Repeat },
+                    { key: "log", label: "Log Outside", Icon: NotebookPen },
+                  ] as const
+                ).map((tab) => {
+                  const isActive = editTab === tab.key;
+                  return (
                     <TouchableOpacity
+                      key={tab.key}
                       style={[
-                        styles.dbMealCard,
-                        {
-                          backgroundColor: colors.surface,
-                          borderColor: colors.border,
-                        },
+                        styles.editTabBtn,
+                        isActive && styles.editTabActive,
                       ]}
-                      onPress={() => replaceWholeMeal(item)}
+                      onPress={() => setEditTab(tab.key)}
                     >
-                      <View style={styles.dbMealInfo}>
-                        <Text
-                          style={[styles.dbMealName, { color: colors.text }]}
-                        >
-                          {item.name}
-                        </Text>
-                        <View style={styles.macroRow}>
-                          <Text style={styles.macroText}>
-                            P: {item.protein}g
-                          </Text>
-                          <Text style={styles.macroText}>C: {item.carbs}g</Text>
-                          <Text style={styles.macroText}>F: {item.fats}g</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.dbMealCal}>{item.calories} kcal</Text>
+                      <tab.Icon
+                        size={14}
+                        color={isActive ? "#fff" : colors.textMuted}
+                      />
+                      <Text
+                        style={[
+                          styles.editTabText,
+                          { color: colors.textMuted },
+                          isActive && styles.editTabTextActive,
+                        ]}
+                      >
+                        {tab.label}
+                      </Text>
                     </TouchableOpacity>
-                  )}
-                  style={{ maxHeight: 350 }}
-                />
-              </>
-            )}
+                  );
+                })}
+              </View>
 
-            {editTab === "log" && (
-              <ScrollView>
-                <Text
-                  style={[
-                    styles.editSectionLabel,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  Kumain ka sa labas? I-log ang iyong food intake:
-                </Text>
-                <Text style={[styles.logSubLabel, { color: colors.text }]}>
-                  Search Meal
-                </Text>
-                <View
-                  style={[styles.searchBar, { backgroundColor: colors.input }]}
-                >
-                  <Search size={16} color={colors.textMuted} />
-                  <TextInput
-                    style={[styles.searchInput, { color: colors.text }]}
-                    placeholder="Search meal to log..."
-                    placeholderTextColor={colors.textMuted}
-                    value={editMealSearch}
-                    onChangeText={setEditMealSearch}
-                  />
-                </View>
-                {editMealSearch !== "" && (
+              {editTab === "replace" && (
+                <>
+                  <View
+                    style={[
+                      styles.searchBar,
+                      { backgroundColor: colors.input },
+                    ]}
+                  >
+                    <Search size={16} color={colors.textMuted} />
+                    <TextInput
+                      style={[styles.searchInput, { color: colors.text }]}
+                      placeholder="Search replacement meal..."
+                      placeholderTextColor={colors.textMuted}
+                      value={editMealSearch}
+                      onChangeText={setEditMealSearch}
+                      autoFocus
+                    />
+                  </View>
                   <FlatList
-                    data={logSearchResults}
+                    data={editMealResults}
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => (
                       <TouchableOpacity
@@ -1155,7 +1104,7 @@ export default function MealScreen() {
                             borderColor: colors.border,
                           },
                         ]}
-                        onPress={() => logFoodFromDb(item)}
+                        onPress={() => replaceWholeMeal(item)}
                       >
                         <View style={styles.dbMealInfo}>
                           <Text
@@ -1180,72 +1129,147 @@ export default function MealScreen() {
                         </Text>
                       </TouchableOpacity>
                     )}
-                    style={{ maxHeight: 180 }}
-                    scrollEnabled={false}
+                    style={{ maxHeight: 350 }}
                   />
-                )}
-                <Text
-                  style={[
-                    styles.logSubLabel,
-                    { color: colors.text, marginTop: 16 },
-                  ]}
-                >
-                  Manual Input
-                </Text>
-                <TextInput
-                  style={[
-                    styles.manualInput,
-                    {
-                      backgroundColor: colors.input,
-                      borderColor: colors.inputBorder,
-                      color: colors.text,
-                    },
-                  ]}
-                  placeholder="Food name (e.g. Jollibee Chickenjoy)"
-                  placeholderTextColor={colors.textMuted}
-                  value={manualFoodName}
-                  onChangeText={setManualFoodName}
-                />
-                <TextInput
-                  style={[
-                    styles.manualInput,
-                    {
-                      backgroundColor: colors.input,
-                      borderColor: colors.inputBorder,
-                      color: colors.text,
-                    },
-                  ]}
-                  placeholder="Weight in grams (optional, e.g. 150)"
-                  placeholderTextColor={colors.textMuted}
-                  value={manualWeight}
-                  onChangeText={setManualWeight}
-                  keyboardType="numeric"
-                />
-                <TextInput
-                  style={[
-                    styles.manualInput,
-                    {
-                      backgroundColor: colors.input,
-                      borderColor: colors.inputBorder,
-                      color: colors.text,
-                    },
-                  ]}
-                  placeholder="Calories (kcal) e.g. 400"
-                  placeholderTextColor={colors.textMuted}
-                  value={manualKcal}
-                  onChangeText={setManualKcal}
-                  keyboardType="numeric"
-                />
-                <TouchableOpacity
-                  style={styles.modalCloseBtn}
-                  onPress={logManualFood}
-                >
-                  <Text style={styles.modalCloseBtnText}>Log Food</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            )}
+                </>
+              )}
+
+              {editTab === "log" && (
+                <ScrollView>
+                  <Text
+                    style={[
+                      styles.editSectionLabel,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    Kumain ka sa labas? I-log ang iyong food intake:
+                  </Text>
+                  <Text style={[styles.logSubLabel, { color: colors.text }]}>
+                    Search Meal
+                  </Text>
+                  <View
+                    style={[
+                      styles.searchBar,
+                      { backgroundColor: colors.input },
+                    ]}
+                  >
+                    <Search size={16} color={colors.textMuted} />
+                    <TextInput
+                      style={[styles.searchInput, { color: colors.text }]}
+                      placeholder="Search meal to log..."
+                      placeholderTextColor={colors.textMuted}
+                      value={editMealSearch}
+                      onChangeText={setEditMealSearch}
+                    />
+                  </View>
+                  {editMealSearch !== "" && (
+                    <FlatList
+                      data={logSearchResults}
+                      keyExtractor={(item) => item.id}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={[
+                            styles.dbMealCard,
+                            {
+                              backgroundColor: colors.surface,
+                              borderColor: colors.border,
+                            },
+                          ]}
+                          onPress={() => logFoodFromDb(item)}
+                        >
+                          <View style={styles.dbMealInfo}>
+                            <Text
+                              style={[
+                                styles.dbMealName,
+                                { color: colors.text },
+                              ]}
+                            >
+                              {item.name}
+                            </Text>
+                            <View style={styles.macroRow}>
+                              <Text style={styles.macroText}>
+                                P: {item.protein}g
+                              </Text>
+                              <Text style={styles.macroText}>
+                                C: {item.carbs}g
+                              </Text>
+                              <Text style={styles.macroText}>
+                                F: {item.fats}g
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={styles.dbMealCal}>
+                            {item.calories} kcal
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      style={{ maxHeight: 180 }}
+                      scrollEnabled={false}
+                    />
+                  )}
+                  <Text
+                    style={[
+                      styles.logSubLabel,
+                      { color: colors.text, marginTop: 16 },
+                    ]}
+                  >
+                    Manual Input
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.manualInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="Food name (e.g. Jollibee Chickenjoy)"
+                    placeholderTextColor={colors.textMuted}
+                    value={manualFoodName}
+                    onChangeText={setManualFoodName}
+                  />
+                  <TextInput
+                    style={[
+                      styles.manualInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="Weight in grams (optional, e.g. 150)"
+                    placeholderTextColor={colors.textMuted}
+                    value={manualWeight}
+                    onChangeText={setManualWeight}
+                    keyboardType="numeric"
+                  />
+                  <TextInput
+                    style={[
+                      styles.manualInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="Calories (kcal) e.g. 400"
+                    placeholderTextColor={colors.textMuted}
+                    value={manualKcal}
+                    onChangeText={setManualKcal}
+                    keyboardType="numeric"
+                  />
+                  <TouchableOpacity
+                    style={styles.modalCloseBtn}
+                    onPress={logManualFood}
+                  >
+                    <Text style={styles.modalCloseBtnText}>Log Food</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              )}
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Bottom Navigation */}
