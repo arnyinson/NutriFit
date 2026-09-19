@@ -1,7 +1,8 @@
 import * as Notifications from "expo-notifications";
 import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { ThemeProvider } from "../constants/theme";
+import { ThemeProvider, useTheme } from "../constants/theme";
 
 // How notifications should appear while the app is open (foreground)
 Notifications.setNotificationHandler({
@@ -14,6 +15,12 @@ Notifications.setNotificationHandler({
   }),
 });
 
+
+function AppStatusBar() {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? "light" : "dark"} />;
+}
+
 export default function RootLayout() {
   useEffect(() => {
     // Listener for when the user taps a notification (foreground or background)
@@ -23,7 +30,6 @@ export default function RootLayout() {
           "Notification tapped:",
           response.notification.request.content.data,
         );
-        // Could navigate to the Ticket screen here if type === 'ticket_response'
       });
 
     return () => {
@@ -33,6 +39,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
+      <AppStatusBar />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login/index" />
