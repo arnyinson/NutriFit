@@ -104,6 +104,10 @@ const getTodayDateString = () => {
   return `${year}-${month}-${day}`;
 };
 
+// Susunod pa lang ang araw na ito (hindi pa dumarating) — YYYY-MM-DD string
+// comparison ay gumagana nang tama para sa chronological order
+const isFutureDay = (dateStr: string) => dateStr > getTodayDateString();
+
 // Rough estimated height (in px) of each collapsed day section card, para sa scroll positioning
 const DAY_SECTION_ESTIMATED_HEIGHT = 340;
 
@@ -569,6 +573,7 @@ export default function MealScreen() {
         ) : (
           mealPlan.map((day, dayIndex) => {
             const isToday = day.date === getTodayDateString();
+            const isFuture = isFutureDay(day.date);
             return (
               <View
                 key={day.date}
@@ -609,8 +614,12 @@ export default function MealScreen() {
                   </View>
                   <View style={styles.dayActions}>
                     <TouchableOpacity
-                      style={styles.takeAllBtn}
-                      onPress={() => takeAllMeals(dayIndex)}
+                      style={[
+                        styles.takeAllBtn,
+                        isFuture && styles.disabledBtn,
+                      ]}
+                      onPress={() => !isFuture && takeAllMeals(dayIndex)}
+                      disabled={isFuture}
                     >
                       <Text style={styles.takeAllText}>Take all</Text>
                     </TouchableOpacity>
@@ -685,8 +694,10 @@ export default function MealScreen() {
                         style={[
                           styles.actionBtn,
                           entry.taken ? styles.skipBtn : styles.takeBtn,
+                          isFuture && styles.disabledBtn,
                         ]}
-                        onPress={() => toggleMeal(dayIndex, entry)}
+                        onPress={() => !isFuture && toggleMeal(dayIndex, entry)}
+                        disabled={isFuture}
                       >
                         <Text style={styles.actionBtnText}>
                           {entry.taken ? "Skip" : "Take"}
@@ -694,10 +705,16 @@ export default function MealScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.pencilBtn}
-                        onPress={() => openEditMeal(dayIndex, entry)}
+                        onPress={() =>
+                          !isFuture && openEditMeal(dayIndex, entry)
+                        }
+                        disabled={isFuture}
                         hitSlop={HIT_SLOP}
                       >
-                        <Pencil size={16} color={colors.textMuted} />
+                        <Pencil
+                          size={16}
+                          color={isFuture ? colors.border : colors.textMuted}
+                        />
                       </TouchableOpacity>
                     </View>
                   </TouchableOpacity>
@@ -1390,6 +1407,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
   },
+  disabledBtn: { backgroundColor: "#B0BEC5", opacity: 0.6 },
   takeAllText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   editBtn: {
     backgroundColor: "#FF9800",

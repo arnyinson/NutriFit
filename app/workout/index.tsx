@@ -79,6 +79,10 @@ const formatLocalDate = (d: Date) => {
 
 const getTodayDateString = () => formatLocalDate(new Date());
 
+// Susunod pa lang ang araw na ito (hindi pa dumarating) — YYYY-MM-DD string
+// comparison ay gumagana nang tama para sa chronological order
+const isFutureDay = (dateStr: string) => dateStr > getTodayDateString();
+
 const getWeekDates = () => {
   const today = new Date();
   const dayOfWeek = today.getDay();
@@ -405,6 +409,7 @@ export default function WorkoutScreen() {
         {workoutPlan.map((day, dayIndex) => {
           const isRest = day.exercises.length === 0;
           const isToday = day.date === getTodayDateString();
+          const isFuture = isFutureDay(day.date);
           const focus = isRest
             ? "Rest Day"
             : [
@@ -445,8 +450,9 @@ export default function WorkoutScreen() {
                 {!isRest && (
                   <View style={styles.dayActions}>
                     <TouchableOpacity
-                      style={styles.logAllBtn}
-                      onPress={() => logAllExercises(dayIndex)}
+                      style={[styles.logAllBtn, isFuture && styles.disabledBtn]}
+                      onPress={() => !isFuture && logAllExercises(dayIndex)}
+                      disabled={isFuture}
                     >
                       <Text style={styles.logAllText}>Log all</Text>
                     </TouchableOpacity>
@@ -507,7 +513,10 @@ export default function WorkoutScreen() {
                           { borderColor: colors.border },
                           entry.done && styles.exerciseCheckDone,
                         ]}
-                        onPress={() => toggleExercise(dayIndex, entry)}
+                        onPress={() =>
+                          !isFuture && toggleExercise(dayIndex, entry)
+                        }
+                        disabled={isFuture}
                         hitSlop={HIT_SLOP}
                       >
                         {entry.done && (
@@ -541,8 +550,9 @@ export default function WorkoutScreen() {
                         </View>
                       </View>
                       <TouchableOpacity
-                        style={styles.logBtn}
-                        onPress={() => openLogModal(entry)}
+                        style={[styles.logBtn, isFuture && styles.disabledBtn]}
+                        onPress={() => !isFuture && openLogModal(entry)}
+                        disabled={isFuture}
                         hitSlop={HIT_SLOP}
                       >
                         <Text style={styles.logBtnText}>Log</Text>
@@ -858,6 +868,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
   },
+  disabledBtn: { backgroundColor: "#B0BEC5", opacity: 0.6 },
   logAllText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   restCard: { alignItems: "center", paddingVertical: 20, gap: 8 },
   restTitle: { fontSize: 16, fontWeight: "700" },
