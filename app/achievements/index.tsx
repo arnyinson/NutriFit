@@ -113,12 +113,8 @@ export default function AchievementsScreen() {
       setAchievements(res.data.achievements);
       setTotalXP(res.data.totalXP);
       setStats(res.data.stats);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Load achievements error:", err);
-      Alert.alert(
-        "Debug Error",
-        `Status: ${err.response?.status}\nMessage: ${err.message}\nData: ${JSON.stringify(err.response?.data)}`,
-      );
     } finally {
       setLoading(false);
       setRefreshing(false);
