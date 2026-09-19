@@ -52,6 +52,10 @@ const PERIODS = [
   { key: "Monthly", apiValue: "monthly" },
 ] as const;
 
+// Weight change na mas maliit sa halagang ito (sa kg) ay itinuturing na
+// "stable" / walang malaking pagbabago, sa halip na pilit na "pataas" o "pababa"
+const WEIGHT_STABLE_THRESHOLD = 0.3;
+
 export default function ProgressScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
@@ -61,6 +65,7 @@ export default function ProgressScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [dietaryGoal, setDietaryGoal] = useState<string>("Maintenance");
 
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [weightInput, setWeightInput] = useState("");
@@ -86,6 +91,21 @@ export default function ProgressScreen() {
     setLoading(true);
     loadSummary(activePeriod);
   }, [activePeriod, loadSummary]);
+
+  // Kunin ang dietary goal ng user (kailangan para malaman kung "maganda" o
+  // "masama" ang direksyon ng weight change — iba-iba depende sa goal)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get("/users/me");
+        if (res.data.user?.dietary_goal) {
+          setDietaryGoal(res.data.user.dietary_goal);
+        }
+      } catch (err) {
+        console.error("Load dietary goal error:", err);
+      }
+    })();
+  }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -126,6 +146,33 @@ export default function ProgressScreen() {
     } finally {
       setSyncing(false);
     }
+  };
+
+  // Kinukuha ang tamang arrow symbol at kulay para sa weight change, base sa
+  // dietary goal ng user:
+  // - Maintenance: stable = berde, kahit anong direksyon ng malaking pagbabago = pula
+  // - Cutting: bumaba = berde (maganda), tumaas = pula
+  // - Bulking: tumaas = berde (maganda), bumaba = pula
+  const getWeightChangeDisplay = (change: number, goal: string) => {
+    const isStable = Math.abs(change) < WEIGHT_STABLE_THRESHOLD;
+
+    if (goal === "Cutting") {
+      if (isStable) return { symbol: "~", color: "#9E9E9E" };
+      return change < 0
+        ? { symbol: "▼", color: "#4CAF50" }
+        : { symbol: "▲", color: "#F44336" };
+    }
+    if (goal === "Bulking") {
+      if (isStable) return { symbol: "~", color: "#9E9E9E" };
+      return change > 0
+        ? { symbol: "▲", color: "#4CAF50" }
+        : { symbol: "▼", color: "#F44336" };
+    }
+    // Maintenance (default)
+    if (isStable) return { symbol: "~", color: "#4CAF50" };
+    return change < 0
+      ? { symbol: "▼", color: "#F44336" }
+      : { symbol: "▲", color: "#F44336" };
   };
 
   if (loading || !summary) {
@@ -215,6 +262,11 @@ export default function ProgressScreen() {
       "Log your meals and workouts daily to see personalized insights here",
     );
   }
+
+  const weightChangeDisplay = getWeightChangeDisplay(
+    summary.bodyProgress.change,
+    dietaryGoal,
+  );
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -348,15 +400,10 @@ export default function ProgressScreen() {
                   <Text
                     style={[
                       styles.bodyChange,
-                      {
-                        color:
-                          summary.bodyProgress.change < 0
-                            ? "#4CAF50"
-                            : "#F44336",
-                      },
+                      { color: weightChangeDisplay.color },
                     ]}
                   >
-                    {summary.bodyProgress.change < 0 ? "▼" : "▲"}{" "}
+                    {weightChangeDisplay.symbol}{" "}
                     {Math.abs(summary.bodyProgress.change)} kg
                   </Text>
                 </View>
