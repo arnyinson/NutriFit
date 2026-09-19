@@ -15,7 +15,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,6 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Logo from "../../components/Logo";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";

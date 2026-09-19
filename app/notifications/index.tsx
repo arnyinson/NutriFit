@@ -13,13 +13,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -62,7 +62,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [activeFilter, setActiveFilter] = useState <
+  const [activeFilter, setActiveFilter] = useState<
     "all" | "meal" | "workout" | "progress" | "achievement"
   >("all");
   const [loading, setLoading] = useState(true);

@@ -20,14 +20,16 @@ import {
   ActivityIndicator,
   Image,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import api from "../../constants/api";
 import { registerAndSavePushToken } from "../../constants/pushNotifications";
 import { useTheme } from "../../constants/theme";

@@ -7,13 +7,13 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Logo from "../../components/Logo";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";

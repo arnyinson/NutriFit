@@ -31,7 +31,6 @@ import {
   Alert,
   Modal,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   Share,
   StyleSheet,
@@ -39,6 +38,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import ViewShot from "react-native-view-shot";
 import Logo from "../../components/Logo";
 import api from "../../constants/api";
