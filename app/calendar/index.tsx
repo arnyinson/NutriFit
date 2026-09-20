@@ -404,7 +404,10 @@ export default function CalendarScreen() {
                   <Text style={[styles.totalText, { color: colors.text }]}>
                     Total kcal |{" "}
                     {selectedDayData.meals
-                      .reduce((s, m) => s + (m.meal?.calories || 0), 0)
+                      .reduce(
+                        (s, m) => s + parseFloat(String(m.meal?.calories || 0)),
+                        0,
+                      )
                       .toLocaleString()}{" "}
                     kcal
                   </Text>
