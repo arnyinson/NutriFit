@@ -31,14 +31,13 @@ import {
   Alert,
   Modal,
   RefreshControl,
+  SafeAreaView,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import ViewShot from "react-native-view-shot";
 import Logo from "../../components/Logo";
 import api from "../../constants/api";
@@ -64,6 +63,13 @@ const ICON_MAP: Record<string, LucideIcon> = {
   scale: Scale,
   sparkle: Sparkle,
   trophy: Trophy,
+};
+
+// Bawat category ay may sariling kulay para sa share card, para agad na makilala
+const CATEGORY_COLORS: Record<string, string> = {
+  Nutrition: "#4CAF50",
+  Workout: "#FF9800",
+  Goals: "#9C27B0",
 };
 
 type Achievement = {
@@ -105,7 +111,15 @@ export default function AchievementsScreen() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [capturing, setCapturing] = useState(false);
 
+  // Hiwalay na state/ref para sa pag-share ng isang SPECIFIC achievement bilang larawan
+  const [shareTargetAchievement, setShareTargetAchievement] =
+    useState<Achievement | null>(null);
+  const [showAchievementShareModal, setShowAchievementShareModal] =
+    useState(false);
+  const [capturingAchievement, setCapturingAchievement] = useState(false);
+
   const shareCardRef = useRef<ViewShot>(null);
+  const achievementShareCardRef = useRef<ViewShot>(null);
 
   const loadAchievements = useCallback(async () => {
     try {
@@ -139,13 +153,38 @@ export default function AchievementsScreen() {
     (a) => a.category === activeCategory,
   );
 
-  const handleShare = async (achievement: Achievement) => {
+  // Binubuksan ang bagong "Share Achievement" modal (larawan-based, katulad ng
+  // "Share My Progress"), sa halip na direktang tumawag ng text-based Share.share()
+  const openAchievementShare = (achievement: Achievement) => {
+    setShareTargetAchievement(achievement);
+    setShowAchievementShareModal(true);
+  };
+
+  const captureAndShareAchievement = async () => {
+    if (!achievementShareCardRef.current?.capture) return;
+    setCapturingAchievement(true);
     try {
-      await Share.share({
-        message: `I just unlocked "${achievement.title}" on NutriFit!\n\n${achievement.description}\n\n+${achievement.xp} XP earned!\n\n#NutriFit #FitnessGoals`,
-      });
-    } catch {
-      Alert.alert("Error", "Could not share achievement.");
+      const uri = await achievementShareCardRef.current.capture();
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "image/png",
+          dialogTitle: "Share My Achievement",
+        });
+      } else {
+        Alert.alert(
+          "Sharing unavailable",
+          "Sharing is not available on this device.",
+        );
+      }
+    } catch (err) {
+      console.error("Capture and share achievement error:", err);
+      Alert.alert(
+        "Error",
+        "Unable to create your achievement card. Please try again.",
+      );
+    } finally {
+      setCapturingAchievement(false);
     }
   };
 
@@ -193,6 +232,13 @@ export default function AchievementsScreen() {
       </SafeAreaView>
     );
   }
+
+  const shareCardColor = shareTargetAchievement
+    ? CATEGORY_COLORS[shareTargetAchievement.category] || "#4CAF50"
+    : "#4CAF50";
+  const ShareCardIcon = shareTargetAchievement
+    ? ICON_MAP[shareTargetAchievement.iconKey] || Trophy
+    : Trophy;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -425,7 +471,7 @@ export default function AchievementsScreen() {
                 {achievement.unlocked ? (
                   <TouchableOpacity
                     style={styles.shareBtn}
-                    onPress={() => handleShare(achievement)}
+                    onPress={() => openAchievementShare(achievement)}
                     hitSlop={HIT_SLOP}
                   >
                     <Text style={styles.shareBtnText}>Share</Text>
@@ -514,7 +560,7 @@ export default function AchievementsScreen() {
                     style={styles.modalShareBtn}
                     onPress={() => {
                       setShowModal(false);
-                      handleShare(selectedAchievement);
+                      openAchievementShare(selectedAchievement);
                     }}
                   >
                     <Text style={styles.modalShareText}>Share Achievement</Text>
@@ -642,6 +688,106 @@ export default function AchievementsScreen() {
                 { backgroundColor: colors.input, marginTop: 8 },
               ]}
               onPress={() => setShowShareModal(false)}
+            >
+              <Text style={[styles.modalCloseBtnText, { color: colors.text }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Share ACHIEVEMENT Modal — image-based, same pattern as Share Progress,
+          but for a single unlocked achievement, colored per its category */}
+      <Modal
+        visible={showAchievementShareModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Share Achievement
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowAchievementShareModal(false)}
+                hitSlop={HIT_SLOP}
+              >
+                <X size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {shareTargetAchievement && (
+              <ViewShot
+                ref={achievementShareCardRef}
+                options={{ format: "png", quality: 1 }}
+                style={styles.shareCardWrapper}
+              >
+                <View
+                  style={[
+                    styles.achievementShareCard,
+                    { backgroundColor: shareCardColor },
+                  ]}
+                >
+                  <View style={styles.shareCardDecorCircle1} />
+                  <View style={styles.shareCardDecorCircle2} />
+
+                  <View style={styles.shareCardHeader}>
+                    <Logo size={32} />
+                    <Text style={styles.shareCardBrand}>NutriFit</Text>
+                  </View>
+
+                  <View style={styles.achievementShareIconCircle}>
+                    <ShareCardIcon size={40} color="#fff" />
+                  </View>
+
+                  <Text style={styles.achievementShareCategory}>
+                    {shareTargetAchievement.category.toUpperCase()} ACHIEVEMENT
+                  </Text>
+                  <Text style={styles.achievementShareTitle}>
+                    {shareTargetAchievement.title}
+                  </Text>
+                  <Text style={styles.achievementShareDesc}>
+                    {shareTargetAchievement.description}
+                  </Text>
+
+                  <View style={styles.achievementShareXpBadge}>
+                    <Text style={styles.achievementShareXpText}>
+                      +{shareTargetAchievement.xp} XP Earned
+                    </Text>
+                  </View>
+
+                  <Text style={styles.shareCardFooterText}>
+                    Unlocked on NutriFit 🏆
+                  </Text>
+                </View>
+              </ViewShot>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.captureShareBtn,
+                capturingAchievement && { opacity: 0.7 },
+              ]}
+              onPress={captureAndShareAchievement}
+              disabled={capturingAchievement}
+            >
+              <Download size={18} color="#fff" />
+              <Text style={styles.captureShareBtnText}>
+                {capturingAchievement
+                  ? "Preparing..."
+                  : "Save & Share as Image"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.modalCloseBtn,
+                { backgroundColor: colors.input, marginTop: 8 },
+              ]}
+              onPress={() => setShowAchievementShareModal(false)}
             >
               <Text style={[styles.modalCloseBtnText, { color: colors.text }]}>
                 Cancel
@@ -817,7 +963,7 @@ const styles = StyleSheet.create({
   modalCloseBtn: { padding: 14, borderRadius: 12, alignItems: "center" },
   modalCloseBtnText: { fontWeight: "bold", fontSize: 15 },
 
-  // ============ Visual Share Card ============
+  // ============ Visual Share Card (Progress) ============
   shareCardWrapper: {
     borderRadius: 20,
     overflow: "hidden",
@@ -915,4 +1061,52 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   captureShareBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+
+  // ============ Visual Share Card (Individual Achievement) ============
+  achievementShareCard: {
+    padding: 28,
+    minHeight: 360,
+    overflow: "hidden",
+    alignItems: "center",
+  },
+  achievementShareIconCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+    marginBottom: 18,
+  },
+  achievementShareCategory: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  achievementShareTitle: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  achievementShareDesc: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 19,
+    marginBottom: 20,
+    paddingHorizontal: 8,
+  },
+  achievementShareXpBadge: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 20,
+  },
+  achievementShareXpText: { color: "#fff", fontWeight: "800", fontSize: 14 },
 });
