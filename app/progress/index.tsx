@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import {
   ArrowRight,
@@ -134,7 +135,9 @@ export default function ProgressScreen() {
 
     setSyncing(true);
     try {
-      await api.post("/progress/sync-today", { weight: weightNum });
+      const savedMode = await AsyncStorage.getItem("mealPlanMode");
+      const mode = savedMode === "continuous" ? "continuous" : "weekly";
+      await api.post("/progress/sync-today", { weight: weightNum, mode });
       setShowUpdateModal(false);
       await loadSummary(activePeriod);
       Alert.alert("Success", "Your progress has been updated!");
