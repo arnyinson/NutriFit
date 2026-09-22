@@ -208,42 +208,51 @@ export default function NotificationsScreen() {
         )}
       </View>
 
-      {/* Filter Tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[styles.filterRow, { borderBottomColor: colors.border }]}
-        contentContainerStyle={styles.filterContent}
+      {/* Filter Tabs — nakabalot sa isang FIXED-HEIGHT na wrapper View, para
+          hindi na ito "mag-stretch" kapag maikli lang ang natitirang
+          notifications sa ibaba (ito ang naging sanhi ng malaking bug dati) */}
+      <View
+        style={[styles.filterRowWrapper, { borderBottomColor: colors.border }]}
       >
-        {filterConfig.map((filter) => {
-          const isActive = activeFilter === filter.key;
-          return (
-            <TouchableOpacity
-              key={filter.key}
-              style={[
-                styles.filterBtn,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                isActive && styles.filterBtnActive,
-              ]}
-              onPress={() => setActiveFilter(filter.key)}
-            >
-              <filter.Icon
-                size={13}
-                color={isActive ? "#fff" : colors.textMuted}
-              />
-              <Text
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterRow}
+          contentContainerStyle={styles.filterContent}
+        >
+          {filterConfig.map((filter) => {
+            const isActive = activeFilter === filter.key;
+            return (
+              <TouchableOpacity
+                key={filter.key}
                 style={[
-                  styles.filterText,
-                  { color: colors.textMuted },
-                  isActive && styles.filterTextActive,
+                  styles.filterBtn,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                  isActive && styles.filterBtnActive,
                 ]}
+                onPress={() => setActiveFilter(filter.key)}
               >
-                {filter.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+                <filter.Icon
+                  size={13}
+                  color={isActive ? "#fff" : colors.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.filterText,
+                    { color: colors.textMuted },
+                    isActive && styles.filterTextActive,
+                  ]}
+                >
+                  {filter.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -356,8 +365,18 @@ const styles = StyleSheet.create({
   },
   unreadBadgeText: { color: "#fff", fontSize: 11, fontWeight: "bold" },
   markAllBtn: { fontSize: 12, fontWeight: "600" },
-  filterRow: { borderBottomWidth: 1 },
-  filterContent: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  // Fixed na taas — ito ang naglo-lock para hindi na "mag-stretch" ang buong
+  // filter row kahit ano pa ang laki ng natitirang content sa ibaba
+  filterRowWrapper: {
+    height: 60,
+    borderBottomWidth: 1,
+  },
+  filterRow: { flex: 1 },
+  filterContent: {
+    paddingHorizontal: 16,
+    alignItems: "center",
+    gap: 8,
+  },
   filterBtn: {
     flexDirection: "row",
     alignItems: "center",
