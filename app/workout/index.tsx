@@ -8,6 +8,7 @@ import {
   ListPlus,
   Moon,
   Dumbbell as MuscleIcon,
+  NotebookPen,
   Play,
   Search,
   User,
@@ -116,8 +117,18 @@ const formatDateLabel = (dateStr: string) => {
 };
 
 // Tanggapin lang ang digits (walang negative sign, walang letters) — ginagamit
-// sa Sets/Reps/Weight inputs sa parehong Log Exercise at Log Own Workout modals
+// sa Weight inputs (walang max, posibleng lumagpas sa 99kg)
 const sanitizeNumericInput = (text: string) => text.replace(/[^0-9]/g, "");
+
+// Katulad ng sanitizeNumericInput, pero may MAX na 99 — ginagamit lang sa
+// Sets at Reps (hindi makatuwirang lumagpas sa 99 ang bilang ng sets/reps)
+const sanitizeSetsRepsInput = (text: string) => {
+  const cleaned = text.replace(/[^0-9]/g, "");
+  if (cleaned === "") return cleaned;
+  const num = parseInt(cleaned, 10);
+  if (num > 99) return "99";
+  return cleaned;
+};
 
 const DAY_SECTION_ESTIMATED_HEIGHT = 280;
 
@@ -149,12 +160,15 @@ export default function WorkoutScreen() {
   const [logWeight, setLogWeight] = useState("");
 
   // Log Own Workout modal (bagong feature — hindi naka-tali sa naka-schedule
-  // na plan, katulad ng "Log Outside Food" sa Meal screen: maghahanap muna
-  // ng exercise sa database, tapos ilalagay ang sets/reps/weight. Naka-tali
-  // na ngayon sa SPECIFIC na araw — customDayIndex — para lumabas ang bagong
-  // entry sa listahan ng exercises ng araw na iyon)
+  // na plan, katulad ng "Log Outside Food" sa Meal screen: may dalawang tabs
+  // ngayon — "Search" (hanapin sa database) at "Manual" (i-type ang pangalan
+  // kahit wala sa database). Naka-tali sa SPECIFIC na araw — customDayIndex —
+  // para lumabas ang bagong entry sa listahan ng exercises ng araw na iyon)
   const [showCustomLogModal, setShowCustomLogModal] = useState(false);
   const [customDayIndex, setCustomDayIndex] = useState<number | null>(null);
+  const [customLogTab, setCustomLogTab] = useState<"search" | "manual">(
+    "search",
+  );
   const [customSearch, setCustomSearch] = useState("");
   const [customSearchResults, setCustomSearchResults] = useState<Exercise[]>(
     [],
@@ -162,6 +176,7 @@ export default function WorkoutScreen() {
   const [searchingCustom, setSearchingCustom] = useState(false);
   const [customSelectedExercise, setCustomSelectedExercise] =
     useState<Exercise | null>(null);
+  const [manualExerciseName, setManualExerciseName] = useState("");
   const [customSets, setCustomSets] = useState("");
   const [customReps, setCustomReps] = useState("");
   const [customWeight, setCustomWeight] = useState("");
@@ -387,14 +402,16 @@ export default function WorkoutScreen() {
   };
 
   // ============ LOG OWN WORKOUT (bagong feature, katulad ng "Log Outside
-  // Food" sa Meal screen) — hinahanap muna ang exercise sa database, tapos
-  // ilalagay ang sets/reps/weight, DIREKTA nang idadagdag sa listahan ng
-  // exercises ng partikular na araw (hindi lang basta "log" na walang ipapakita) ============
+  // Food" sa Meal screen) — DALAWANG TABS: "Search" (hanapin sa database) at
+  // "Manual" (i-type ang pangalan kahit wala sa database). DIREKTA nang
+  // idadagdag sa listahan ng exercises ng partikular na araw ============
   const openCustomLogModal = (dayIndex: number) => {
     setCustomDayIndex(dayIndex);
+    setCustomLogTab("search");
     setCustomSearch("");
     setCustomSearchResults([]);
     setCustomSelectedExercise(null);
+    setManualExerciseName("");
     setCustomSets("");
     setCustomReps("");
     setCustomWeight("");
@@ -403,7 +420,7 @@ export default function WorkoutScreen() {
 
   useEffect(() => {
     if (!showCustomLogModal || customSelectedExercise) return;
-    if (customSearch.trim() === "") {
+    if (customLogTab !== "search" || customSearch.trim() === "") {
       setCustomSearchResults([]);
       return;
     }
@@ -421,7 +438,7 @@ export default function WorkoutScreen() {
       }
     }, 300);
     return () => clearTimeout(timeout);
-  }, [customSearch, showCustomLogModal, customSelectedExercise]);
+  }, [customSearch, customLogTab, showCustomLogModal, customSelectedExercise]);
 
   const pickCustomExercise = (exercise: Exercise) => {
     setCustomSelectedExercise(exercise);
@@ -430,10 +447,19 @@ export default function WorkoutScreen() {
     setCustomWeight("");
   };
 
+  // Ang pangalan ng exercise na ilalagay — mula sa pinili sa search (may
+  // totoong exercise_id), O mula sa manual na na-type na pangalan
+  const getCustomExerciseName = () =>
+    customSelectedExercise?.name || manualExerciseName.trim();
+
   // I-tap ang "Save Log" ay nagpapakita muna ng branded confirmation modal,
   // bago talaga tumawag sa API — parehong pattern ng ginawa natin sa Meal screen
   const requestSaveCustomLog = () => {
-    if (!customSelectedExercise) return;
+    const name = getCustomExerciseName();
+    if (!name) {
+      Alert.alert("Error", "Please enter or select an exercise.");
+      return;
+    }
     if (!customSets) {
       Alert.alert("Error", "Please enter sets.");
       return;
@@ -446,14 +472,18 @@ export default function WorkoutScreen() {
   };
 
   const saveCustomLog = async () => {
-    if (!customSelectedExercise || customDayIndex === null) return;
+    if (customDayIndex === null) return;
     const dayName = workoutPlan[customDayIndex]?.day;
+    const name = getCustomExerciseName();
 
     setSavingCustomLog(true);
     try {
       await api.post("/workouts/plan/custom", {
         day: dayName,
-        exercise_id: customSelectedExercise.id,
+        exercise_id: customSelectedExercise?.id || undefined,
+        custom_exercise_name: customSelectedExercise
+          ? undefined
+          : manualExerciseName.trim(),
         sets: customSets,
         reps: customReps,
         weight_used: customWeight || null,
@@ -465,7 +495,7 @@ export default function WorkoutScreen() {
       await loadWorkoutPlan();
       Alert.alert(
         "Added!",
-        `${customSelectedExercise.name} — ${customSets} sets x ${customReps} reps${customWeight ? ` @ ${customWeight}` : ""} added to ${dayName}.`,
+        `${name} — ${customSets} sets x ${customReps} reps${customWeight ? ` @ ${customWeight}` : ""} added to ${dayName}.`,
       );
     } catch (err) {
       console.error("Save custom log error:", err);
@@ -900,9 +930,10 @@ export default function WorkoutScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={logSets}
                     onChangeText={(text) =>
-                      setLogSets(sanitizeNumericInput(text))
+                      setLogSets(sanitizeSetsRepsInput(text))
                     }
                     keyboardType="numeric"
+                    maxLength={2}
                   />
                   <Text
                     style={[styles.logLabel, { color: colors.textSecondary }]}
@@ -922,9 +953,10 @@ export default function WorkoutScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={logReps}
                     onChangeText={(text) =>
-                      setLogReps(sanitizeNumericInput(text))
+                      setLogReps(sanitizeSetsRepsInput(text))
                     }
                     keyboardType="numeric"
+                    maxLength={2}
                   />
                   <Text
                     style={[styles.logLabel, { color: colors.textSecondary }]}
@@ -958,8 +990,8 @@ export default function WorkoutScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* LOG OWN WORKOUT MODAL (bagong feature — hanapin muna, tapos i-log,
-          naka-tali sa specific na araw) */}
+      {/* LOG OWN WORKOUT MODAL (bagong feature — Search / Manual tabs, naka-tali
+          sa specific na araw) */}
       <Modal
         visible={showCustomLogModal}
         animationType="slide"
@@ -999,16 +1031,50 @@ export default function WorkoutScreen() {
                 </TouchableOpacity>
               </View>
 
-              {!customSelectedExercise ? (
+              {!customSelectedExercise && (
+                <View
+                  style={[
+                    styles.customTabRow,
+                    { backgroundColor: colors.input },
+                  ]}
+                >
+                  {(
+                    [
+                      { key: "search", label: "Search", Icon: Search },
+                      { key: "manual", label: "Manual", Icon: NotebookPen },
+                    ] as const
+                  ).map((tab) => {
+                    const isActive = customLogTab === tab.key;
+                    return (
+                      <TouchableOpacity
+                        key={tab.key}
+                        style={[
+                          styles.customTabBtn,
+                          isActive && styles.customTabActive,
+                        ]}
+                        onPress={() => setCustomLogTab(tab.key)}
+                      >
+                        <tab.Icon
+                          size={14}
+                          color={isActive ? "#fff" : colors.textMuted}
+                        />
+                        <Text
+                          style={[
+                            styles.customTabText,
+                            { color: colors.textMuted },
+                            isActive && styles.customTabTextActive,
+                          ]}
+                        >
+                          {tab.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
+              {!customSelectedExercise && customLogTab === "search" && (
                 <>
-                  <Text
-                    style={[
-                      styles.logLabel,
-                      { color: colors.textSecondary, marginBottom: 10 },
-                    ]}
-                  >
-                    Search for the exercise you did:
-                  </Text>
                   <View
                     style={[
                       styles.searchBar,
@@ -1065,11 +1131,122 @@ export default function WorkoutScreen() {
                           </View>
                         </TouchableOpacity>
                       )}
-                      style={{ maxHeight: 320 }}
+                      style={{ maxHeight: 280 }}
                     />
                   )}
                 </>
-              ) : (
+              )}
+
+              {!customSelectedExercise && customLogTab === "manual" && (
+                <>
+                  <Text
+                    style={[
+                      styles.logLabel,
+                      { color: colors.textSecondary, marginBottom: 6 },
+                    ]}
+                  >
+                    Exercise Name
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.logInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="e.g. Basketball, Swimming, Zumba"
+                    placeholderTextColor={colors.textMuted}
+                    value={manualExerciseName}
+                    onChangeText={setManualExerciseName}
+                  />
+                  <Text
+                    style={[styles.logLabel, { color: colors.textSecondary }]}
+                  >
+                    Sets Completed
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.logInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="e.g. 3"
+                    placeholderTextColor={colors.textMuted}
+                    value={customSets}
+                    onChangeText={(text) =>
+                      setCustomSets(sanitizeSetsRepsInput(text))
+                    }
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
+                  <Text
+                    style={[styles.logLabel, { color: colors.textSecondary }]}
+                  >
+                    Reps Completed
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.logInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="e.g. 12"
+                    placeholderTextColor={colors.textMuted}
+                    value={customReps}
+                    onChangeText={(text) =>
+                      setCustomReps(sanitizeSetsRepsInput(text))
+                    }
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
+                  <Text
+                    style={[styles.logLabel, { color: colors.textSecondary }]}
+                  >
+                    Weight Used in kg (optional)
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.logInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="e.g. 10"
+                    placeholderTextColor={colors.textMuted}
+                    value={customWeight}
+                    onChangeText={(text) =>
+                      setCustomWeight(sanitizeNumericInput(text))
+                    }
+                    keyboardType="numeric"
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.saveLogBtn,
+                      savingCustomLog && { opacity: 0.7 },
+                    ]}
+                    onPress={requestSaveCustomLog}
+                    disabled={savingCustomLog}
+                  >
+                    {savingCustomLog ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.saveLogText}>Save Log</Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {customSelectedExercise && (
                 <>
                   <Text
                     style={[styles.logExerciseName, { color: colors.text }]}
@@ -1094,9 +1271,10 @@ export default function WorkoutScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={customSets}
                     onChangeText={(text) =>
-                      setCustomSets(sanitizeNumericInput(text))
+                      setCustomSets(sanitizeSetsRepsInput(text))
                     }
                     keyboardType="numeric"
+                    maxLength={2}
                   />
                   <Text
                     style={[styles.logLabel, { color: colors.textSecondary }]}
@@ -1116,9 +1294,10 @@ export default function WorkoutScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={customReps}
                     onChangeText={(text) =>
-                      setCustomReps(sanitizeNumericInput(text))
+                      setCustomReps(sanitizeSetsRepsInput(text))
                     }
                     keyboardType="numeric"
+                    maxLength={2}
                   />
                   <Text
                     style={[styles.logLabel, { color: colors.textSecondary }]}
@@ -1166,11 +1345,7 @@ export default function WorkoutScreen() {
       <ConfirmModal
         visible={showCustomLogConfirm}
         title="Add This Workout?"
-        message={
-          customSelectedExercise
-            ? `Add "${customSelectedExercise.name}" (${customSets} sets x ${customReps} reps${customWeight ? ` @ ${customWeight}kg` : ""}) to ${customDayIndex !== null ? workoutPlan[customDayIndex]?.day : "this day"}?`
-            : ""
-        }
+        message={`Add "${getCustomExerciseName()}" (${customSets} sets x ${customReps} reps${customWeight ? ` @ ${customWeight}kg` : ""}) to ${customDayIndex !== null ? workoutPlan[customDayIndex]?.day : "this day"}?`}
         confirmLabel="Add Workout"
         onConfirm={() => {
           setShowCustomLogConfirm(false);
@@ -1453,6 +1628,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveLogText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  customTabRow: {
+    flexDirection: "row",
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+    gap: 4,
+  },
+  customTabBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  customTabActive: { backgroundColor: "#4CAF50" },
+  customTabText: { fontSize: 12, fontWeight: "600" },
+  customTabTextActive: { color: "#fff" },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",

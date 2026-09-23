@@ -1,3 +1,4 @@
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import {
   Calendar,
@@ -60,6 +61,8 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [birthday, setBirthday] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [birthdayDate, setBirthdayDate] = useState<Date | null>(null);
   const [sex, setSex] = useState("Male");
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
@@ -92,17 +95,16 @@ export default function RegisterScreen() {
   };
 
   // Auto-format habang nagta-type: nagdadagdag ng "/" automatic
-  const handleBirthdayChange = (text: string) => {
-    const digitsOnly = text.replace(/\D/g, "");
-    let formatted = digitsOnly;
-
-    if (digitsOnly.length >= 5) {
-      formatted = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2, 4)}/${digitsOnly.slice(4, 8)}`;
-    } else if (digitsOnly.length >= 3) {
-      formatted = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}`;
+  // Native date picker na lang, sa halip na manual na pag-type
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setBirthdayDate(selectedDate);
+      const mm = String(selectedDate.getMonth() + 1).padStart(2, "0");
+      const dd = String(selectedDate.getDate()).padStart(2, "0");
+      const yyyy = selectedDate.getFullYear();
+      setBirthday(`${mm}/${dd}/${yyyy}`);
     }
-
-    setBirthday(formatted);
   };
 
   // Convert MM/DD/YYYY -> YYYY-MM-DD para sa backend
@@ -321,24 +323,37 @@ export default function RegisterScreen() {
         </View>
 
         {/* Birthday */}
-        <View
+        <TouchableOpacity
           style={[
             styles.inputWrapper,
             { backgroundColor: colors.input, borderColor: colors.inputBorder },
           ]}
+          onPress={() => setShowDatePicker(true)}
+          disabled={loading}
         >
           <Calendar size={16} color={colors.textMuted} />
-          <TextInput
-            style={[styles.input, { color: colors.text }]}
-            placeholder="Birthday (MM/DD/YYYY)"
-            placeholderTextColor={colors.textMuted}
-            value={birthday}
-            onChangeText={handleBirthdayChange}
-            keyboardType="numeric"
-            editable={!loading}
-            maxLength={10}
+          <Text
+            style={[
+              styles.input,
+              {
+                color: birthday ? colors.text : colors.textMuted,
+                paddingVertical: 12,
+              },
+            ]}
+          >
+            {birthday || "Birthday (MM/DD/YYYY)"}
+          </Text>
+        </TouchableOpacity>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={birthdayDate || new Date(2000, 0, 1)}
+            mode="date"
+            display="spinner"
+            maximumDate={new Date()}
+            onChange={handleDateChange}
           />
-        </View>
+        )}
 
         {/* Sex Toggle */}
         <View style={styles.sexRow}>

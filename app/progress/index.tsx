@@ -34,6 +34,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import ConfirmModal from "../../components/ConfirmModal";
+import SuccessModal from "../../components/SuccessModal";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -137,7 +138,7 @@ export default function ProgressScreen() {
       await api.post("/progress/sync-today", { weight: weightNum, mode });
       setShowUpdateModal(false);
       await loadSummary(activePeriod);
-      Alert.alert("Success", "Your progress has been updated!");
+      setShowSuccessModal(true);
     } catch (err: any) {
       const message =
         err.response?.data?.error ||
@@ -149,6 +150,7 @@ export default function ProgressScreen() {
   };
 
   const [showSyncConfirm, setShowSyncConfirm] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const handleSyncProgress = () => {
     const weightNum = parseFloat(weightInput);
@@ -892,6 +894,13 @@ export default function ProgressScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <SuccessModal
+        visible={showSuccessModal}
+        title="Success"
+        message="Your progress has been updated!"
+        onClose={() => setShowSuccessModal(false)}
+      />
+
       <ConfirmModal
         visible={showSyncConfirm}
         title="Confirm Update"

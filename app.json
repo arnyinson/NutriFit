@@ -13,7 +13,7 @@
     },
     "android": {
       "googleServicesFile": "./google-services.json",
-        "adaptiveIcon": {
+      "adaptiveIcon": {
         "backgroundColor": "#4CAF50",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
@@ -47,7 +47,8 @@
           "icon": "./assets/images/notification-icon.png",
           "color": "#4CAF50"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
