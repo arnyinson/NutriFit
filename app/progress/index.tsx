@@ -928,7 +928,7 @@ export default function ProgressScreen() {
           { name: "Home", Icon: Home, route: "/dashboard" },
           { name: "Stats", Icon: BarChart3, route: "/progress" },
           { name: "Meal", Icon: Utensils, route: "/meal" },
-          { name: "Exercise", Icon: Dumbbell, route: "/workout" },
+          { name: "Workout", Icon: Dumbbell, route: "/workout" },
           { name: "Profile", Icon: User, route: "/profile" },
         ].map((tab) => {
           const isActive = activeTab === tab.name;

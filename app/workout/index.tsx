@@ -38,6 +38,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import ConfirmModal from "../../components/ConfirmModal";
+import SuccessModal from "../../components/SuccessModal";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -86,8 +87,6 @@ const formatLocalDate = (d: Date) => {
 
 const getTodayDateString = () => formatLocalDate(new Date());
 
-// Susunod pa lang ang araw na ito (hindi pa dumarating) — YYYY-MM-DD string
-// comparison ay gumagana nang tama para sa chronological order
 const isFutureDay = (dateStr: string) => dateStr > getTodayDateString();
 
 const getWeekDates = () => {
@@ -116,12 +115,8 @@ const formatDateLabel = (dateStr: string) => {
   });
 };
 
-// Tanggapin lang ang digits (walang negative sign, walang letters) — ginagamit
-// sa Weight inputs (walang max, posibleng lumagpas sa 99kg)
 const sanitizeNumericInput = (text: string) => text.replace(/[^0-9]/g, "");
 
-// Katulad ng sanitizeNumericInput, pero may MAX na 99 — ginagamit lang sa
-// Sets at Reps (hindi makatuwirang lumagpas sa 99 ang bilang ng sets/reps)
 const sanitizeSetsRepsInput = (text: string) => {
   const cleaned = text.replace(/[^0-9]/g, "");
   if (cleaned === "") return cleaned;
@@ -143,7 +138,7 @@ export default function WorkoutScreen() {
   const hasAutoScrolledRef = useRef(false);
 
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutDay[]>([]);
-  const [activeTab, setActiveTab] = useState("Exercise");
+  const [activeTab, setActiveTab] = useState("Workout");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -152,18 +147,12 @@ export default function WorkoutScreen() {
   );
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Log Exercise modal (para sa naka-schedule na exercise mula sa AI plan)
   const [showLogModal, setShowLogModal] = useState(false);
   const [logEntry, setLogEntry] = useState<ExerciseEntry | null>(null);
   const [logSets, setLogSets] = useState("");
   const [logReps, setLogReps] = useState("");
   const [logWeight, setLogWeight] = useState("");
 
-  // Log Own Workout modal (bagong feature — hindi naka-tali sa naka-schedule
-  // na plan, katulad ng "Log Outside Food" sa Meal screen: may dalawang tabs
-  // ngayon — "Search" (hanapin sa database) at "Manual" (i-type ang pangalan
-  // kahit wala sa database). Naka-tali sa SPECIFIC na araw — customDayIndex —
-  // para lumabas ang bagong entry sa listahan ng exercises ng araw na iyon)
   const [showCustomLogModal, setShowCustomLogModal] = useState(false);
   const [customDayIndex, setCustomDayIndex] = useState<number | null>(null);
   const [customLogTab, setCustomLogTab] = useState<"search" | "manual">(
@@ -182,6 +171,10 @@ export default function WorkoutScreen() {
   const [customWeight, setCustomWeight] = useState("");
   const [savingCustomLog, setSavingCustomLog] = useState(false);
   const [showCustomLogConfirm, setShowCustomLogConfirm] = useState(false);
+
+  const [successModalTitle, setSuccessModalTitle] = useState("Logged!");
+  const [successModalMessage, setSuccessModalMessage] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [youtubeVideoIds, setYoutubeVideoIds] = useState<string[]>([]);
@@ -349,7 +342,7 @@ export default function WorkoutScreen() {
 
   const openLogModal = (entry: ExerciseEntry) => {
     setLogEntry(entry);
-    setLogSets(String(entry.sets)); // pre-fill gamit ang naka-schedule na sets
+    setLogSets(String(entry.sets));
     setLogReps("");
     setLogWeight("");
     setShowLogModal(true);
@@ -389,22 +382,17 @@ export default function WorkoutScreen() {
       }
 
       setShowLogModal(false);
-      // Tinanggal ang "@BW" text — ipapakita na lang ang weight kung meron
-      // talaga, kung wala, hindi na kailangang banggitin
-      Alert.alert(
-        "Logged!",
+      setSuccessModalTitle("Logged!");
+      setSuccessModalMessage(
         `${logEntry.exercise.name} — ${logSets} sets x ${logReps} reps${logWeight ? ` @ ${logWeight}` : ""}`,
       );
+      setShowSuccessModal(true);
     } catch (err) {
       console.error("Save log error:", err);
       Alert.alert("Error", "Unable to save workout log. Please try again.");
     }
   };
 
-  // ============ LOG OWN WORKOUT (bagong feature, katulad ng "Log Outside
-  // Food" sa Meal screen) — DALAWANG TABS: "Search" (hanapin sa database) at
-  // "Manual" (i-type ang pangalan kahit wala sa database). DIREKTA nang
-  // idadagdag sa listahan ng exercises ng partikular na araw ============
   const openCustomLogModal = (dayIndex: number) => {
     setCustomDayIndex(dayIndex);
     setCustomLogTab("search");
@@ -447,13 +435,9 @@ export default function WorkoutScreen() {
     setCustomWeight("");
   };
 
-  // Ang pangalan ng exercise na ilalagay — mula sa pinili sa search (may
-  // totoong exercise_id), O mula sa manual na na-type na pangalan
   const getCustomExerciseName = () =>
     customSelectedExercise?.name || manualExerciseName.trim();
 
-  // I-tap ang "Save Log" ay nagpapakita muna ng branded confirmation modal,
-  // bago talaga tumawag sa API — parehong pattern ng ginawa natin sa Meal screen
   const requestSaveCustomLog = () => {
     const name = getCustomExerciseName();
     if (!name) {
@@ -490,13 +474,12 @@ export default function WorkoutScreen() {
       });
 
       setShowCustomLogModal(false);
-      // I-reload ang buong plan para lumabas agad ang bagong entry sa
-      // listahan ng exercises ng araw na iyon
       await loadWorkoutPlan();
-      Alert.alert(
-        "Added!",
+      setSuccessModalTitle("Added!");
+      setSuccessModalMessage(
         `${name} — ${customSets} sets x ${customReps} reps${customWeight ? ` @ ${customWeight}` : ""} added to ${dayName}.`,
       );
+      setShowSuccessModal(true);
     } catch (err) {
       console.error("Save custom log error:", err);
       Alert.alert("Error", "Unable to save workout. Please try again.");
@@ -584,16 +567,22 @@ export default function WorkoutScreen() {
                 isToday && styles.daySectionToday,
               ]}
             >
-              <View style={styles.dayHeader}>
-                <View style={{ flex: 1 }}>
+              <View style={[styles.dayHeader, { alignItems: "flex-start" }]}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
                   <View
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
+                      flexWrap: "wrap",
                       gap: 8,
                     }}
                   >
-                    <Text style={[styles.dayTitle, { color: colors.text }]}>
+                    <Text
+                      style={[
+                        styles.dayTitle,
+                        { color: colors.text, flexShrink: 1 },
+                      ]}
+                    >
                       {day.day} — {focus}
                     </Text>
                     {isToday && (
@@ -606,7 +595,7 @@ export default function WorkoutScreen() {
                     {formatDateLabel(day.date)}
                   </Text>
                 </View>
-                <View style={styles.dayActions}>
+                <View style={[styles.dayActions, { flexShrink: 0 }]}>
                   {!isRest && (
                     <TouchableOpacity
                       style={[styles.logAllBtn, isFuture && styles.disabledBtn]}
@@ -879,7 +868,7 @@ export default function WorkoutScreen() {
         </View>
       </Modal>
 
-      {/* LOG EXERCISE MODAL (para sa naka-schedule na exercise) */}
+      {/* LOG EXERCISE MODAL */}
       <Modal
         visible={showLogModal}
         animationType="slide"
@@ -990,8 +979,7 @@ export default function WorkoutScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* LOG OWN WORKOUT MODAL (bagong feature — Search / Manual tabs, naka-tali
-          sa specific na araw) */}
+      {/* LOG OWN WORKOUT MODAL */}
       <Modal
         visible={showCustomLogModal}
         animationType="slide"
@@ -1342,6 +1330,13 @@ export default function WorkoutScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      <SuccessModal
+        visible={showSuccessModal}
+        title={successModalTitle}
+        message={successModalMessage}
+        onClose={() => setShowSuccessModal(false)}
+      />
+
       <ConfirmModal
         visible={showCustomLogConfirm}
         title="Add This Workout?"
@@ -1370,7 +1365,7 @@ export default function WorkoutScreen() {
           { name: "Home", Icon: Home, route: "/dashboard" },
           { name: "Stats", Icon: BarChart3, route: "/progress" },
           { name: "Meal", Icon: Utensils, route: "/meal" },
-          { name: "Exercise", Icon: Dumbbell, route: "/workout" },
+          { name: "Workout", Icon: Dumbbell, route: "/workout" },
           { name: "Profile", Icon: User, route: "/profile" },
         ].map((tab) => {
           const isActive = activeTab === tab.name;
