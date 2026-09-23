@@ -36,6 +36,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import ConfirmModal from "../../components/ConfirmModal";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -149,8 +150,11 @@ export default function WorkoutScreen() {
 
   // Log Own Workout modal (bagong feature — hindi naka-tali sa naka-schedule
   // na plan, katulad ng "Log Outside Food" sa Meal screen: maghahanap muna
-  // ng exercise sa database, tapos ilalagay ang sets/reps/weight)
+  // ng exercise sa database, tapos ilalagay ang sets/reps/weight. Naka-tali
+  // na ngayon sa SPECIFIC na araw — customDayIndex — para lumabas ang bagong
+  // entry sa listahan ng exercises ng araw na iyon)
   const [showCustomLogModal, setShowCustomLogModal] = useState(false);
+  const [customDayIndex, setCustomDayIndex] = useState<number | null>(null);
   const [customSearch, setCustomSearch] = useState("");
   const [customSearchResults, setCustomSearchResults] = useState<Exercise[]>(
     [],
@@ -162,6 +166,7 @@ export default function WorkoutScreen() {
   const [customReps, setCustomReps] = useState("");
   const [customWeight, setCustomWeight] = useState("");
   const [savingCustomLog, setSavingCustomLog] = useState(false);
+  const [showCustomLogConfirm, setShowCustomLogConfirm] = useState(false);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [youtubeVideoIds, setYoutubeVideoIds] = useState<string[]>([]);
@@ -383,8 +388,10 @@ export default function WorkoutScreen() {
 
   // ============ LOG OWN WORKOUT (bagong feature, katulad ng "Log Outside
   // Food" sa Meal screen) — hinahanap muna ang exercise sa database, tapos
-  // ilalagay ang sets/reps/weight nang hiwalay sa naka-schedule na plan ============
-  const openCustomLogModal = () => {
+  // ilalagay ang sets/reps/weight, DIREKTA nang idadagdag sa listahan ng
+  // exercises ng partikular na araw (hindi lang basta "log" na walang ipapakita) ============
+  const openCustomLogModal = (dayIndex: number) => {
+    setCustomDayIndex(dayIndex);
     setCustomSearch("");
     setCustomSearchResults([]);
     setCustomSelectedExercise(null);
@@ -423,7 +430,9 @@ export default function WorkoutScreen() {
     setCustomWeight("");
   };
 
-  const saveCustomLog = async () => {
+  // I-tap ang "Save Log" ay nagpapakita muna ng branded confirmation modal,
+  // bago talaga tumawag sa API — parehong pattern ng ginawa natin sa Meal screen
+  const requestSaveCustomLog = () => {
     if (!customSelectedExercise) return;
     if (!customSets) {
       Alert.alert("Error", "Please enter sets.");
@@ -433,24 +442,34 @@ export default function WorkoutScreen() {
       Alert.alert("Error", "Please enter reps.");
       return;
     }
+    setShowCustomLogConfirm(true);
+  };
+
+  const saveCustomLog = async () => {
+    if (!customSelectedExercise || customDayIndex === null) return;
+    const dayName = workoutPlan[customDayIndex]?.day;
 
     setSavingCustomLog(true);
     try {
-      await api.post("/workouts/log", {
+      await api.post("/workouts/plan/custom", {
+        day: dayName,
         exercise_id: customSelectedExercise.id,
-        sets_completed: customSets,
-        reps_completed: customReps,
+        sets: customSets,
+        reps: customReps,
         weight_used: customWeight || null,
       });
 
       setShowCustomLogModal(false);
+      // I-reload ang buong plan para lumabas agad ang bagong entry sa
+      // listahan ng exercises ng araw na iyon
+      await loadWorkoutPlan();
       Alert.alert(
-        "Logged!",
-        `${customSelectedExercise.name} — ${customSets} sets x ${customReps} reps${customWeight ? ` @ ${customWeight}` : ""}`,
+        "Added!",
+        `${customSelectedExercise.name} — ${customSets} sets x ${customReps} reps${customWeight ? ` @ ${customWeight}` : ""} added to ${dayName}.`,
       );
     } catch (err) {
       console.error("Save custom log error:", err);
-      Alert.alert("Error", "Unable to save workout log. Please try again.");
+      Alert.alert("Error", "Unable to save workout. Please try again.");
     } finally {
       setSavingCustomLog(false);
     }
@@ -497,17 +516,12 @@ export default function WorkoutScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Weekly Workout Plan
         </Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={openCustomLogModal} hitSlop={HIT_SLOP}>
-            <ListPlus size={22} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push("/dashboard" as any)}
-            hitSlop={HIT_SLOP}
-          >
-            <X size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={() => router.push("/dashboard" as any)}
+          hitSlop={HIT_SLOP}
+        >
+          <X size={20} color={colors.textMuted} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -562,8 +576,8 @@ export default function WorkoutScreen() {
                     {formatDateLabel(day.date)}
                   </Text>
                 </View>
-                {!isRest && (
-                  <View style={styles.dayActions}>
+                <View style={styles.dayActions}>
+                  {!isRest && (
                     <TouchableOpacity
                       style={[styles.logAllBtn, isFuture && styles.disabledBtn]}
                       onPress={() => !isFuture && logAllExercises(dayIndex)}
@@ -571,8 +585,23 @@ export default function WorkoutScreen() {
                     >
                       <Text style={styles.logAllText}>Log all</Text>
                     </TouchableOpacity>
-                  </View>
-                )}
+                  )}
+                  <TouchableOpacity
+                    style={[
+                      styles.logOwnBtn,
+                      { borderColor: colors.border },
+                      isFuture && styles.disabledBtnOutline,
+                    ]}
+                    onPress={() => !isFuture && openCustomLogModal(dayIndex)}
+                    disabled={isFuture}
+                    hitSlop={HIT_SLOP}
+                  >
+                    <ListPlus
+                      size={14}
+                      color={isFuture ? colors.textMuted : colors.primary}
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {isRest ? (
@@ -584,7 +613,9 @@ export default function WorkoutScreen() {
                   <Text
                     style={[styles.restSubtitle, { color: colors.textMuted }]}
                   >
-                    Recovery is part of progress!
+                    Recovery is part of progress! Tap the{" "}
+                    <ListPlus size={12} color={colors.primary} /> button above
+                    if you did a workout anyway.
                   </Text>
                 </View>
               ) : (
@@ -927,7 +958,8 @@ export default function WorkoutScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* LOG OWN WORKOUT MODAL (bagong feature — hanapin muna, tapos i-log) */}
+      {/* LOG OWN WORKOUT MODAL (bagong feature — hanapin muna, tapos i-log,
+          naka-tali sa specific na araw) */}
       <Modal
         visible={showCustomLogModal}
         animationType="slide"
@@ -945,6 +977,9 @@ export default function WorkoutScreen() {
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
                   Log Own Workout
+                  {customDayIndex !== null
+                    ? ` — ${workoutPlan[customDayIndex]?.day}`
+                    : ""}
                 </Text>
                 <TouchableOpacity
                   onPress={() => {
@@ -1112,7 +1147,7 @@ export default function WorkoutScreen() {
                       styles.saveLogBtn,
                       savingCustomLog && { opacity: 0.7 },
                     ]}
-                    onPress={saveCustomLog}
+                    onPress={requestSaveCustomLog}
                     disabled={savingCustomLog}
                   >
                     {savingCustomLog ? (
@@ -1127,6 +1162,22 @@ export default function WorkoutScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <ConfirmModal
+        visible={showCustomLogConfirm}
+        title="Add This Workout?"
+        message={
+          customSelectedExercise
+            ? `Add "${customSelectedExercise.name}" (${customSets} sets x ${customReps} reps${customWeight ? ` @ ${customWeight}kg` : ""}) to ${customDayIndex !== null ? workoutPlan[customDayIndex]?.day : "this day"}?`
+            : ""
+        }
+        confirmLabel="Add Workout"
+        onConfirm={() => {
+          setShowCustomLogConfirm(false);
+          saveCustomLog();
+        }}
+        onCancel={() => setShowCustomLogConfirm(false)}
+      />
 
       {/* Bottom Navigation */}
       <View
@@ -1215,18 +1266,27 @@ const styles = StyleSheet.create({
   },
   dayTitle: { fontSize: 15, fontWeight: "700" },
   dayDate: { fontSize: 11, marginTop: 2 },
-  dayActions: { flexDirection: "row", gap: 8 },
+  dayActions: { flexDirection: "row", gap: 8, alignItems: "center" },
   logAllBtn: {
     backgroundColor: "#4CAF50",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
   },
+  logOwnBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   disabledBtn: { backgroundColor: "#B0BEC5", opacity: 0.6 },
+  disabledBtnOutline: { opacity: 0.4 },
   logAllText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   restCard: { alignItems: "center", paddingVertical: 20, gap: 8 },
   restTitle: { fontSize: 16, fontWeight: "700" },
-  restSubtitle: { fontSize: 12 },
+  restSubtitle: { fontSize: 12, textAlign: "center", paddingHorizontal: 12 },
   progressRow: {
     flexDirection: "row",
     alignItems: "center",

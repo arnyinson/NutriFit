@@ -33,6 +33,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import ConfirmModal from "../../components/ConfirmModal";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -147,23 +148,15 @@ export default function ProgressScreen() {
     }
   };
 
+  const [showSyncConfirm, setShowSyncConfirm] = useState(false);
+
   const handleSyncProgress = () => {
     const weightNum = parseFloat(weightInput);
     if (!weightInput || isNaN(weightNum) || weightNum <= 0) {
       Alert.alert("Error", "Please enter a valid weight.");
       return;
     }
-
-    // Confirmation prompt bago talaga i-save — para masiguro ng user na tama
-    // ang ilalagay na weight bago ito ma-sync sa progress history
-    Alert.alert(
-      "Confirm Update",
-      `Sync your progress with weight ${weightNum} kg?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Confirm", onPress: performSync },
-      ],
-    );
+    setShowSyncConfirm(true);
   };
 
   // Kinukuha ang tamang arrow symbol at kulay para sa weight change, base sa
@@ -899,7 +892,17 @@ export default function ProgressScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
+      <ConfirmModal
+        visible={showSyncConfirm}
+        title="Confirm Update"
+        message={`Sync your progress with weight ${weightInput} kg?`}
+        confirmLabel="Sync Now"
+        onConfirm={() => {
+          setShowSyncConfirm(false);
+          performSync();
+        }}
+        onCancel={() => setShowSyncConfirm(false)}
+      />
       {/* Bottom Navigation */}
       <View
         style={[

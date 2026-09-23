@@ -39,6 +39,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import ConfirmModal from "../../components/ConfirmModal";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
 
@@ -147,6 +148,16 @@ export default function MealScreen() {
   const [manualFoodName, setManualFoodName] = useState("");
   const [manualKcal, setManualKcal] = useState("");
   const [manualWeight, setManualWeight] = useState("");
+
+  // Confirmation modal bago mag-mark ng meal(s) bilang "Taken" — sadyang
+  // hindi na kailangan ng confirmation ang "Skip" (pag-untake), mas mabilis
+  // at hindi kailangan i-confirm ang pag-uundo
+  const [showTakeConfirm, setShowTakeConfirm] = useState(false);
+  const [pendingTake, setPendingTake] = useState<{
+    type: "single" | "all";
+    dayIndex: number;
+    entry?: MealEntry;
+  } | null>(null);
 
   // Una munang basahin ang naka-save na mode preference bago mag-fetch ng data
   useEffect(() => {
@@ -619,7 +630,11 @@ export default function MealScreen() {
                         styles.takeAllBtn,
                         isFuture && styles.disabledBtn,
                       ]}
-                      onPress={() => !isFuture && takeAllMeals(dayIndex)}
+                      onPress={() => {
+                        if (isFuture) return;
+                        setPendingTake({ type: "all", dayIndex });
+                        setShowTakeConfirm(true);
+                      }}
                       disabled={isFuture}
                     >
                       <Text style={styles.takeAllText}>Take all</Text>
@@ -697,7 +712,18 @@ export default function MealScreen() {
                           entry.taken ? styles.skipBtn : styles.takeBtn,
                           isFuture && styles.disabledBtn,
                         ]}
-                        onPress={() => !isFuture && toggleMeal(dayIndex, entry)}
+                        onPress={() => {
+                          if (isFuture) return;
+                          // "Skip" (pag-untake) ay hindi na kailangan ng
+                          // confirmation, direkta lang — ang "Take" lang ang
+                          // may confirmation modal
+                          if (entry.taken) {
+                            toggleMeal(dayIndex, entry);
+                          } else {
+                            setPendingTake({ type: "single", dayIndex, entry });
+                            setShowTakeConfirm(true);
+                          }
+                        }}
                         disabled={isFuture}
                       >
                         <Text style={styles.actionBtnText}>
@@ -1295,6 +1321,32 @@ export default function MealScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <ConfirmModal
+        visible={showTakeConfirm}
+        title={
+          pendingTake?.type === "all" ? "Take All Meals?" : "Mark as Taken?"
+        }
+        message={
+          pendingTake?.type === "all"
+            ? "This will mark all meals for this day as taken."
+            : `Mark "${pendingTake?.entry?.meal?.name}" as taken?`
+        }
+        confirmLabel="Confirm"
+        onConfirm={() => {
+          setShowTakeConfirm(false);
+          if (pendingTake?.type === "all") {
+            takeAllMeals(pendingTake.dayIndex);
+          } else if (pendingTake?.type === "single" && pendingTake.entry) {
+            toggleMeal(pendingTake.dayIndex, pendingTake.entry);
+          }
+          setPendingTake(null);
+        }}
+        onCancel={() => {
+          setShowTakeConfirm(false);
+          setPendingTake(null);
+        }}
+      />
 
       {/* Bottom Navigation */}
       <View
