@@ -1133,7 +1133,7 @@ export default function WorkoutScreen() {
                       { color: colors.textSecondary, marginBottom: 6 },
                     ]}
                   >
-                    Exercise Name
+                    Workout Name
                   </Text>
                   <TextInput
                     style={[
@@ -1144,7 +1144,7 @@ export default function WorkoutScreen() {
                         color: colors.text,
                       },
                     ]}
-                    placeholder="e.g. Basketball, Swimming, Zumba"
+                    placeholder="e.g. Mountain Climbers, Box Jumps, Battle Ropes"
                     placeholderTextColor={colors.textMuted}
                     value={manualExerciseName}
                     onChangeText={setManualExerciseName}
