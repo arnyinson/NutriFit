@@ -718,24 +718,32 @@ export default function ProfileScreen() {
             showsHorizontalScrollIndicator={false}
             style={styles.weightTabs}
           >
-            {["1W", "1M", "3M", "6M"].map((tab) => (
+            {[
+              { key: "1W", enabled: true },
+              { key: "1M", enabled: true },
+              { key: "3M", enabled: false }, // pansamantalang naka-disable, kulang pa ang datos
+              { key: "6M", enabled: false }, // pansamantalang naka-disable, kulang pa ang datos
+            ].map((tab) => (
               <TouchableOpacity
-                key={tab}
+                key={tab.key}
                 style={[
                   styles.weightTab,
                   { backgroundColor: colors.input },
-                  activeWeightTab === tab && styles.weightTabActive,
+                  activeWeightTab === tab.key && styles.weightTabActive,
+                  !tab.enabled && styles.weightTabDisabled,
                 ]}
-                onPress={() => setActiveWeightTab(tab)}
+                onPress={() => tab.enabled && setActiveWeightTab(tab.key)}
+                disabled={!tab.enabled}
               >
                 <Text
                   style={[
                     styles.weightTabText,
                     { color: colors.textMuted },
-                    activeWeightTab === tab && styles.weightTabTextActive,
+                    activeWeightTab === tab.key && styles.weightTabTextActive,
+                    !tab.enabled && styles.weightTabTextDisabled,
                   ]}
                 >
-                  {tab}
+                  {tab.key}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -1200,6 +1208,8 @@ const styles = StyleSheet.create({
   graphValue: { fontSize: 9, color: "#4CAF50", marginBottom: 2 },
   graphLabel: { fontSize: 9 },
   weightTabs: { marginBottom: 12 },
+  weightTabDisabled: { opacity: 0.35 },
+  weightTabTextDisabled: { textDecorationLine: "line-through" },
   weightTab: {
     paddingHorizontal: 14,
     paddingVertical: 6,

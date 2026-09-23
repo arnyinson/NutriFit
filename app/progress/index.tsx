@@ -126,12 +126,8 @@ export default function ProgressScreen() {
     setShowUpdateModal(true);
   };
 
-  const handleSyncProgress = async () => {
+  const performSync = async () => {
     const weightNum = parseFloat(weightInput);
-    if (!weightInput || isNaN(weightNum) || weightNum <= 0) {
-      Alert.alert("Error", "Please enter a valid weight.");
-      return;
-    }
 
     setSyncing(true);
     try {
@@ -149,6 +145,25 @@ export default function ProgressScreen() {
     } finally {
       setSyncing(false);
     }
+  };
+
+  const handleSyncProgress = () => {
+    const weightNum = parseFloat(weightInput);
+    if (!weightInput || isNaN(weightNum) || weightNum <= 0) {
+      Alert.alert("Error", "Please enter a valid weight.");
+      return;
+    }
+
+    // Confirmation prompt bago talaga i-save — para masiguro ng user na tama
+    // ang ilalagay na weight bago ito ma-sync sa progress history
+    Alert.alert(
+      "Confirm Update",
+      `Sync your progress with weight ${weightNum} kg?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Confirm", onPress: performSync },
+      ],
+    );
   };
 
   // Kinukuha ang tamang arrow symbol at kulay para sa weight change, base sa
@@ -849,7 +864,17 @@ export default function ProgressScreen() {
                   placeholder="e.g. 69.5"
                   placeholderTextColor={colors.textMuted}
                   value={weightInput}
-                  onChangeText={setWeightInput}
+                  onChangeText={(text) => {
+                    // Tanggapin lang ang digits at ISANG decimal point —
+                    // awtomatikong tinatanggal ang negative sign, letters,
+                    // at kahit anong ibang character
+                    let cleaned = text.replace(/[^0-9.]/g, "");
+                    const parts = cleaned.split(".");
+                    if (parts.length > 2) {
+                      cleaned = parts[0] + "." + parts.slice(1).join("");
+                    }
+                    setWeightInput(cleaned);
+                  }}
                   keyboardType="numeric"
                   editable={!syncing}
                   autoFocus

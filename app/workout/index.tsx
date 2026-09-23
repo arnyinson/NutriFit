@@ -5,9 +5,11 @@ import {
   ChevronLeft,
   Dumbbell,
   Home,
+  ListPlus,
   Moon,
   Dumbbell as MuscleIcon,
   Play,
+  Search,
   User,
   Utensils,
   X,
@@ -16,9 +18,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -109,6 +114,10 @@ const formatDateLabel = (dateStr: string) => {
   });
 };
 
+// Tanggapin lang ang digits (walang negative sign, walang letters) — ginagamit
+// sa Sets/Reps/Weight inputs sa parehong Log Exercise at Log Own Workout modals
+const sanitizeNumericInput = (text: string) => text.replace(/[^0-9]/g, "");
+
 const DAY_SECTION_ESTIMATED_HEIGHT = 280;
 
 type VideoType = "uploaded" | "youtube" | "exercisedb" | "none" | null;
@@ -130,10 +139,29 @@ export default function WorkoutScreen() {
     null,
   );
   const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Log Exercise modal (para sa naka-schedule na exercise mula sa AI plan)
   const [showLogModal, setShowLogModal] = useState(false);
   const [logEntry, setLogEntry] = useState<ExerciseEntry | null>(null);
+  const [logSets, setLogSets] = useState("");
   const [logReps, setLogReps] = useState("");
   const [logWeight, setLogWeight] = useState("");
+
+  // Log Own Workout modal (bagong feature — hindi naka-tali sa naka-schedule
+  // na plan, katulad ng "Log Outside Food" sa Meal screen: maghahanap muna
+  // ng exercise sa database, tapos ilalagay ang sets/reps/weight)
+  const [showCustomLogModal, setShowCustomLogModal] = useState(false);
+  const [customSearch, setCustomSearch] = useState("");
+  const [customSearchResults, setCustomSearchResults] = useState<Exercise[]>(
+    [],
+  );
+  const [searchingCustom, setSearchingCustom] = useState(false);
+  const [customSelectedExercise, setCustomSelectedExercise] =
+    useState<Exercise | null>(null);
+  const [customSets, setCustomSets] = useState("");
+  const [customReps, setCustomReps] = useState("");
+  const [customWeight, setCustomWeight] = useState("");
+  const [savingCustomLog, setSavingCustomLog] = useState(false);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [youtubeVideoIds, setYoutubeVideoIds] = useState<string[]>([]);
@@ -301,12 +329,17 @@ export default function WorkoutScreen() {
 
   const openLogModal = (entry: ExerciseEntry) => {
     setLogEntry(entry);
+    setLogSets(String(entry.sets)); // pre-fill gamit ang naka-schedule na sets
     setLogReps("");
     setLogWeight("");
     setShowLogModal(true);
   };
 
   const saveLog = async () => {
+    if (!logSets) {
+      Alert.alert("Error", "Please enter sets.");
+      return;
+    }
     if (!logReps) {
       Alert.alert("Error", "Please enter reps.");
       return;
@@ -316,9 +349,9 @@ export default function WorkoutScreen() {
     try {
       await api.post("/workouts/log", {
         exercise_id: logEntry.exercise.id,
-        sets_completed: logEntry.sets,
+        sets_completed: logSets,
         reps_completed: logReps,
-        weight_used: logWeight || "BW",
+        weight_used: logWeight || null,
       });
 
       if (!logEntry.done) {
@@ -336,13 +369,90 @@ export default function WorkoutScreen() {
       }
 
       setShowLogModal(false);
+      // Tinanggal ang "@BW" text — ipapakita na lang ang weight kung meron
+      // talaga, kung wala, hindi na kailangang banggitin
       Alert.alert(
         "Logged!",
-        `${logEntry.exercise.name} — ${logReps} reps @ ${logWeight || "BW"}`,
+        `${logEntry.exercise.name} — ${logSets} sets x ${logReps} reps${logWeight ? ` @ ${logWeight}` : ""}`,
       );
     } catch (err) {
       console.error("Save log error:", err);
       Alert.alert("Error", "Unable to save workout log. Please try again.");
+    }
+  };
+
+  // ============ LOG OWN WORKOUT (bagong feature, katulad ng "Log Outside
+  // Food" sa Meal screen) — hinahanap muna ang exercise sa database, tapos
+  // ilalagay ang sets/reps/weight nang hiwalay sa naka-schedule na plan ============
+  const openCustomLogModal = () => {
+    setCustomSearch("");
+    setCustomSearchResults([]);
+    setCustomSelectedExercise(null);
+    setCustomSets("");
+    setCustomReps("");
+    setCustomWeight("");
+    setShowCustomLogModal(true);
+  };
+
+  useEffect(() => {
+    if (!showCustomLogModal || customSelectedExercise) return;
+    if (customSearch.trim() === "") {
+      setCustomSearchResults([]);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      setSearchingCustom(true);
+      try {
+        const res = await api.get("/workouts", {
+          params: { search: customSearch },
+        });
+        setCustomSearchResults(res.data.exercises || []);
+      } catch (err) {
+        console.error("Search exercises error:", err);
+      } finally {
+        setSearchingCustom(false);
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [customSearch, showCustomLogModal, customSelectedExercise]);
+
+  const pickCustomExercise = (exercise: Exercise) => {
+    setCustomSelectedExercise(exercise);
+    setCustomSets("");
+    setCustomReps("");
+    setCustomWeight("");
+  };
+
+  const saveCustomLog = async () => {
+    if (!customSelectedExercise) return;
+    if (!customSets) {
+      Alert.alert("Error", "Please enter sets.");
+      return;
+    }
+    if (!customReps) {
+      Alert.alert("Error", "Please enter reps.");
+      return;
+    }
+
+    setSavingCustomLog(true);
+    try {
+      await api.post("/workouts/log", {
+        exercise_id: customSelectedExercise.id,
+        sets_completed: customSets,
+        reps_completed: customReps,
+        weight_used: customWeight || null,
+      });
+
+      setShowCustomLogModal(false);
+      Alert.alert(
+        "Logged!",
+        `${customSelectedExercise.name} — ${customSets} sets x ${customReps} reps${customWeight ? ` @ ${customWeight}` : ""}`,
+      );
+    } catch (err) {
+      console.error("Save custom log error:", err);
+      Alert.alert("Error", "Unable to save workout log. Please try again.");
+    } finally {
+      setSavingCustomLog(false);
     }
   };
 
@@ -387,12 +497,17 @@ export default function WorkoutScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Weekly Workout Plan
         </Text>
-        <TouchableOpacity
-          onPress={() => router.push("/dashboard" as any)}
-          hitSlop={HIT_SLOP}
-        >
-          <X size={20} color={colors.textMuted} />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={openCustomLogModal} hitSlop={HIT_SLOP}>
+            <ListPlus size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push("/dashboard" as any)}
+            hitSlop={HIT_SLOP}
+          >
+            <X size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -567,6 +682,7 @@ export default function WorkoutScreen() {
         <View style={{ height: 80 + insets.bottom }} />
       </ScrollView>
 
+      {/* EXERCISE DETAIL MODAL */}
       <Modal
         visible={showDetailModal}
         animationType="slide"
@@ -702,80 +818,317 @@ export default function WorkoutScreen() {
         </View>
       </Modal>
 
+      {/* LOG EXERCISE MODAL (para sa naka-schedule na exercise) */}
       <Modal
         visible={showLogModal}
         animationType="slide"
         transparent
         statusBarTranslucent
       >
-        <View style={styles.modalOverlay}>
-          <View
-            style={[styles.logModalContent, { backgroundColor: colors.card }]}
-          >
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                Log Exercise
-              </Text>
-              <TouchableOpacity
-                onPress={() => setShowLogModal(false)}
-                hitSlop={HIT_SLOP}
-              >
-                <X size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            {logEntry && (
-              <>
-                <Text style={[styles.logExerciseName, { color: colors.text }]}>
-                  {logEntry.exercise.name}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalOverlay}>
+            <View
+              style={[styles.logModalContent, { backgroundColor: colors.card }]}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  Log Exercise
                 </Text>
-                <Text
-                  style={[styles.logLabel, { color: colors.textSecondary }]}
+                <TouchableOpacity
+                  onPress={() => setShowLogModal(false)}
+                  hitSlop={HIT_SLOP}
                 >
-                  Reps Completed
-                </Text>
-                <TextInput
-                  style={[
-                    styles.logInput,
-                    {
-                      backgroundColor: colors.input,
-                      borderColor: colors.inputBorder,
-                      color: colors.text,
-                    },
-                  ]}
-                  placeholder={`e.g. ${logEntry.reps}`}
-                  placeholderTextColor={colors.textMuted}
-                  value={logReps}
-                  onChangeText={setLogReps}
-                  keyboardType="numeric"
-                />
-                <Text
-                  style={[styles.logLabel, { color: colors.textSecondary }]}
-                >
-                  Weight Used (optional)
-                </Text>
-                <TextInput
-                  style={[
-                    styles.logInput,
-                    {
-                      backgroundColor: colors.input,
-                      borderColor: colors.inputBorder,
-                      color: colors.text,
-                    },
-                  ]}
-                  placeholder="e.g. 10kg or BW (bodyweight)"
-                  placeholderTextColor={colors.textMuted}
-                  value={logWeight}
-                  onChangeText={setLogWeight}
-                />
-                <TouchableOpacity style={styles.saveLogBtn} onPress={saveLog}>
-                  <Text style={styles.saveLogText}>Save Log</Text>
+                  <X size={20} color={colors.textMuted} />
                 </TouchableOpacity>
-              </>
-            )}
+              </View>
+              {logEntry && (
+                <>
+                  <Text
+                    style={[styles.logExerciseName, { color: colors.text }]}
+                  >
+                    {logEntry.exercise.name}
+                  </Text>
+                  <Text
+                    style={[styles.logLabel, { color: colors.textSecondary }]}
+                  >
+                    Sets Completed
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.logInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder={`e.g. ${logEntry.sets}`}
+                    placeholderTextColor={colors.textMuted}
+                    value={logSets}
+                    onChangeText={(text) =>
+                      setLogSets(sanitizeNumericInput(text))
+                    }
+                    keyboardType="numeric"
+                  />
+                  <Text
+                    style={[styles.logLabel, { color: colors.textSecondary }]}
+                  >
+                    Reps Completed
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.logInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder={`e.g. ${logEntry.reps}`}
+                    placeholderTextColor={colors.textMuted}
+                    value={logReps}
+                    onChangeText={(text) =>
+                      setLogReps(sanitizeNumericInput(text))
+                    }
+                    keyboardType="numeric"
+                  />
+                  <Text
+                    style={[styles.logLabel, { color: colors.textSecondary }]}
+                  >
+                    Weight Used in kg (optional)
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.logInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="e.g. 10"
+                    placeholderTextColor={colors.textMuted}
+                    value={logWeight}
+                    onChangeText={(text) =>
+                      setLogWeight(sanitizeNumericInput(text))
+                    }
+                    keyboardType="numeric"
+                  />
+                  <TouchableOpacity style={styles.saveLogBtn} onPress={saveLog}>
+                    <Text style={styles.saveLogText}>Save Log</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
+      {/* LOG OWN WORKOUT MODAL (bagong feature — hanapin muna, tapos i-log) */}
+      <Modal
+        visible={showCustomLogModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalOverlay}>
+            <View
+              style={[styles.logModalContent, { backgroundColor: colors.card }]}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  Log Own Workout
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (customSelectedExercise) {
+                      setCustomSelectedExercise(null);
+                    } else {
+                      setShowCustomLogModal(false);
+                    }
+                  }}
+                  hitSlop={HIT_SLOP}
+                >
+                  {customSelectedExercise ? (
+                    <ChevronLeft size={20} color={colors.textMuted} />
+                  ) : (
+                    <X size={20} color={colors.textMuted} />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {!customSelectedExercise ? (
+                <>
+                  <Text
+                    style={[
+                      styles.logLabel,
+                      { color: colors.textSecondary, marginBottom: 10 },
+                    ]}
+                  >
+                    Search for the exercise you did:
+                  </Text>
+                  <View
+                    style={[
+                      styles.searchBar,
+                      { backgroundColor: colors.input },
+                    ]}
+                  >
+                    <Search size={16} color={colors.textMuted} />
+                    <TextInput
+                      style={[styles.searchInput, { color: colors.text }]}
+                      placeholder="e.g. Push-up, Squat, Bench Press"
+                      placeholderTextColor={colors.textMuted}
+                      value={customSearch}
+                      onChangeText={setCustomSearch}
+                      autoFocus
+                    />
+                  </View>
+                  {searchingCustom ? (
+                    <ActivityIndicator
+                      color={colors.primary}
+                      style={{ marginTop: 16 }}
+                    />
+                  ) : (
+                    <FlatList
+                      data={customSearchResults}
+                      keyExtractor={(item) => item.id}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={[
+                            styles.dbExerciseCard,
+                            {
+                              backgroundColor: colors.surface,
+                              borderColor: colors.border,
+                            },
+                          ]}
+                          onPress={() => pickCustomExercise(item)}
+                        >
+                          <View style={styles.dbExerciseInfo}>
+                            <Text
+                              style={[
+                                styles.dbExerciseName,
+                                { color: colors.text },
+                              ]}
+                            >
+                              {item.name}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.dbExerciseMeta,
+                                { color: colors.textMuted },
+                              ]}
+                            >
+                              {item.muscle_group} • {item.equipment}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      )}
+                      style={{ maxHeight: 320 }}
+                    />
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text
+                    style={[styles.logExerciseName, { color: colors.text }]}
+                  >
+                    {customSelectedExercise.name}
+                  </Text>
+                  <Text
+                    style={[styles.logLabel, { color: colors.textSecondary }]}
+                  >
+                    Sets Completed
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.logInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="e.g. 3"
+                    placeholderTextColor={colors.textMuted}
+                    value={customSets}
+                    onChangeText={(text) =>
+                      setCustomSets(sanitizeNumericInput(text))
+                    }
+                    keyboardType="numeric"
+                  />
+                  <Text
+                    style={[styles.logLabel, { color: colors.textSecondary }]}
+                  >
+                    Reps Completed
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.logInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="e.g. 12"
+                    placeholderTextColor={colors.textMuted}
+                    value={customReps}
+                    onChangeText={(text) =>
+                      setCustomReps(sanitizeNumericInput(text))
+                    }
+                    keyboardType="numeric"
+                  />
+                  <Text
+                    style={[styles.logLabel, { color: colors.textSecondary }]}
+                  >
+                    Weight Used in kg (optional)
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.logInput,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    placeholder="e.g. 10"
+                    placeholderTextColor={colors.textMuted}
+                    value={customWeight}
+                    onChangeText={(text) =>
+                      setCustomWeight(sanitizeNumericInput(text))
+                    }
+                    keyboardType="numeric"
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.saveLogBtn,
+                      savingCustomLog && { opacity: 0.7 },
+                    ]}
+                    onPress={saveCustomLog}
+                    disabled={savingCustomLog}
+                  >
+                    {savingCustomLog ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.saveLogText}>Save Log</Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Bottom Navigation */}
       <View
         style={[
           styles.bottomNav,
@@ -838,6 +1191,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: { fontSize: 18, fontWeight: "bold" },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 14 },
   daySection: {
     marginHorizontal: 16,
     marginTop: 14,
@@ -939,6 +1293,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
+    maxHeight: "85%",
   },
   modalHeader: {
     flexDirection: "row",
@@ -1038,6 +1393,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveLogText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+  },
+  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14 },
+  dbExerciseCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  dbExerciseInfo: { flex: 1 },
+  dbExerciseName: { fontSize: 14, fontWeight: "600" },
+  dbExerciseMeta: { fontSize: 12, marginTop: 2 },
   bottomNav: {
     flexDirection: "row",
     paddingVertical: 10,

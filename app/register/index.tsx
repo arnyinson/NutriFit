@@ -35,6 +35,23 @@ const ACTIVITY_LEVELS = [
   "Extra Active (very hard exercise / physical job)",
 ];
 
+// Tanggapin lang ang mga totoong/karaniwang email providers — hindi temp mail
+const ALLOWED_EMAIL_DOMAINS = ["gmail.com", "hotmail.com", "yahoo.com"];
+
+const isValidEmailDomain = (email: string) => {
+  const domain = email.split("@")[1]?.toLowerCase();
+  return ALLOWED_EMAIL_DOMAINS.includes(domain);
+};
+
+// Minimum 8 characters, kailangan ng uppercase, number, at special character
+const isValidPassword = (password: string) => {
+  const hasMinLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>_\-+=]/.test(password);
+  return hasMinLength && hasUppercase && hasNumber && hasSpecialChar;
+};
+
 export default function RegisterScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -112,6 +129,23 @@ export default function RegisterScreen() {
       Alert.alert("Error", "Please fill in all required fields.");
       return;
     }
+
+    if (!isValidEmailDomain(email)) {
+      Alert.alert(
+        "Invalid Email",
+        "Please use a valid Gmail, Hotmail, or Yahoo email address. Temporary or disposable emails are not accepted.",
+      );
+      return;
+    }
+
+    if (!isValidPassword(password)) {
+      Alert.alert(
+        "Weak Password",
+        "Password must be at least 8 characters and include at least one uppercase letter, one number, and one special character (e.g. !@#$%^&*).",
+      );
+      return;
+    }
+
     if (password !== confirmPassword) {
       Alert.alert("Error", "Passwords do not match.");
       return;
@@ -202,6 +236,9 @@ export default function RegisterScreen() {
             editable={!loading}
           />
         </View>
+        <Text style={[styles.hintText, { color: colors.textMuted }]}>
+          Only Gmail, Hotmail, or Yahoo email addresses are accepted.
+        </Text>
 
         {/* Username */}
         <View
@@ -250,6 +287,10 @@ export default function RegisterScreen() {
             )}
           </TouchableOpacity>
         </View>
+        <Text style={[styles.hintText, { color: colors.textMuted }]}>
+          At least 8 characters, with 1 uppercase letter, 1 number, and 1
+          special character (e.g. !@#$%^&*).
+        </Text>
 
         {/* Confirm Password */}
         <View
@@ -665,6 +706,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   input: { flex: 1, paddingVertical: 12, fontSize: 14 },
+  hintText: {
+    alignSelf: "flex-start",
+    fontSize: 11,
+    marginTop: -8,
+    marginBottom: 12,
+    marginLeft: 4,
+  },
   sexRow: { flexDirection: "row", width: "100%", marginBottom: 12, gap: 8 },
   sexBtn: {
     flex: 1,

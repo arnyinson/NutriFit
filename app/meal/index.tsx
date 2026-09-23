@@ -95,6 +95,7 @@ const formatDateLabel = (dateStr: string) => {
     year: "numeric",
   });
 };
+const sanitizeNumericInput = (text: string) => text.replace(/[^0-9]/g, "");
 
 const getTodayDateString = () => {
   const d = new Date();
@@ -1260,7 +1261,9 @@ export default function MealScreen() {
                     placeholder="Weight in grams (optional, e.g. 150)"
                     placeholderTextColor={colors.textMuted}
                     value={manualWeight}
-                    onChangeText={setManualWeight}
+                    onChangeText={(text) =>
+                      setManualWeight(sanitizeNumericInput(text))
+                    }
                     keyboardType="numeric"
                   />
                   <TextInput
@@ -1275,7 +1278,9 @@ export default function MealScreen() {
                     placeholder="Calories (kcal) e.g. 400"
                     placeholderTextColor={colors.textMuted}
                     value={manualKcal}
-                    onChangeText={setManualKcal}
+                    onChangeText={(text) =>
+                      setManualKcal(sanitizeNumericInput(text))
+                    }
                     keyboardType="numeric"
                   />
                   <TouchableOpacity
