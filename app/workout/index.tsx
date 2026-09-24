@@ -125,6 +125,15 @@ const sanitizeSetsRepsInput = (text: string) => {
   return cleaned;
 };
 
+// May max na 999kg — sapat na para sa kahit anong makatuwirang lifting weight
+const sanitizeWeightInput = (text: string) => {
+  const cleaned = text.replace(/[^0-9]/g, "");
+  if (cleaned === "") return cleaned;
+  const num = parseInt(cleaned, 10);
+  if (num > 999) return "999";
+  return cleaned;
+};
+
 const DAY_SECTION_ESTIMATED_HEIGHT = 280;
 
 type VideoType = "uploaded" | "youtube" | "exercisedb" | "none" | null;
@@ -994,9 +1003,10 @@ export default function WorkoutScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={logWeight}
                     onChangeText={(text) =>
-                      setLogWeight(sanitizeNumericInput(text))
+                      setLogWeight(sanitizeWeightInput(text))
                     }
                     keyboardType="numeric"
+                    maxLength={3}
                   />
                   <TouchableOpacity style={styles.saveLogBtn} onPress={saveLog}>
                     <Text style={styles.saveLogText}>Save Log</Text>
@@ -1242,9 +1252,10 @@ export default function WorkoutScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={customWeight}
                     onChangeText={(text) =>
-                      setCustomWeight(sanitizeNumericInput(text))
+                      setCustomWeight(sanitizeWeightInput(text))
                     }
                     keyboardType="numeric"
+                    maxLength={3}
                   />
                   <TouchableOpacity
                     style={[
@@ -1334,9 +1345,10 @@ export default function WorkoutScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={customWeight}
                     onChangeText={(text) =>
-                      setCustomWeight(sanitizeNumericInput(text))
+                      setCustomWeight(sanitizeWeightInput(text))
                     }
                     keyboardType="numeric"
+                    maxLength={3}
                   />
                   <TouchableOpacity
                     style={[

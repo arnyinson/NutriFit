@@ -96,7 +96,27 @@ const formatDateLabel = (dateStr: string) => {
     year: "numeric",
   });
 };
+
 const sanitizeNumericInput = (text: string) => text.replace(/[^0-9]/g, "");
+
+// May max na 9999 kcal — sapat na, hindi realistic ang mas mataas pa dito
+// para sa isang beses na kainan
+const sanitizeCalorieInput = (text: string) => {
+  const cleaned = text.replace(/[^0-9]/g, "");
+  if (cleaned === "") return cleaned;
+  const num = parseInt(cleaned, 10);
+  if (num > 9999) return "9999";
+  return cleaned;
+};
+
+// May max na 9999 grams (~10kg) — sapat na para sa isang food item
+const sanitizeGramsInput = (text: string) => {
+  const cleaned = text.replace(/[^0-9]/g, "");
+  if (cleaned === "") return cleaned;
+  const num = parseInt(cleaned, 10);
+  if (num > 9999) return "9999";
+  return cleaned;
+};
 
 const getTodayDateString = () => {
   const d = new Date();
@@ -1288,9 +1308,10 @@ export default function MealScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={manualWeight}
                     onChangeText={(text) =>
-                      setManualWeight(sanitizeNumericInput(text))
+                      setManualWeight(sanitizeGramsInput(text))
                     }
                     keyboardType="numeric"
+                    maxLength={4}
                   />
                   <TextInput
                     style={[
@@ -1305,9 +1326,10 @@ export default function MealScreen() {
                     placeholderTextColor={colors.textMuted}
                     value={manualKcal}
                     onChangeText={(text) =>
-                      setManualKcal(sanitizeNumericInput(text))
+                      setManualKcal(sanitizeCalorieInput(text))
                     }
                     keyboardType="numeric"
+                    maxLength={4}
                   />
                   <TouchableOpacity
                     style={styles.modalCloseBtn}
