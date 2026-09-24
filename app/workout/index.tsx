@@ -176,6 +176,16 @@ export default function WorkoutScreen() {
   const [successModalMessage, setSuccessModalMessage] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Confirmation bago mag-mark ng exercise (o lahat ng exercises) bilang
+  // "Done" — sadyang IISANG DIREKSYON lang ito (false -> true), hindi na
+  // pwedeng i-uncheck pagkatapos, kaya kailangan ng confirmation muna
+  const [showCheckConfirm, setShowCheckConfirm] = useState(false);
+  const [pendingCheck, setPendingCheck] = useState<{
+    type: "single" | "all";
+    dayIndex: number;
+    entry?: ExerciseEntry;
+  } | null>(null);
+
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [youtubeVideoIds, setYoutubeVideoIds] = useState<string[]>([]);
   const [videoSource, setVideoSource] = useState<VideoType>(null);
@@ -249,15 +259,16 @@ export default function WorkoutScreen() {
     hasAutoScrolledRef.current = true;
   }, [loading, workoutPlan]);
 
-  const toggleExercise = async (dayIndex: number, entry: ExerciseEntry) => {
-    const newDone = !entry.done;
+  // Palaging TRUE lang ang itinatakda dito — one-way lang ito (hindi na
+  // pwedeng i-uncheck), kaya walang kailangang "newDone" logic pa
+  const markExerciseDone = async (dayIndex: number, entry: ExerciseEntry) => {
     setWorkoutPlan((prev) =>
       prev.map((day, di) =>
         di === dayIndex
           ? {
               ...day,
               exercises: day.exercises.map((e) =>
-                e.plan_id === entry.plan_id ? { ...e, done: newDone } : e,
+                e.plan_id === entry.plan_id ? { ...e, done: true } : e,
               ),
             }
           : day,
@@ -265,22 +276,25 @@ export default function WorkoutScreen() {
     );
     try {
       await api.patch(`/workouts/plan/${entry.plan_id}/toggle`, {
-        done: newDone,
+        done: true,
       });
     } catch (err) {
-      console.error("Toggle exercise error:", err);
+      console.error("Mark exercise done error:", err);
+      // Kung na-fail ang request, ibalik sa unchecked state para tumugma
+      // sa totoong nasa server
       setWorkoutPlan((prev) =>
         prev.map((day, di) =>
           di === dayIndex
             ? {
                 ...day,
                 exercises: day.exercises.map((e) =>
-                  e.plan_id === entry.plan_id ? { ...e, done: entry.done } : e,
+                  e.plan_id === entry.plan_id ? { ...e, done: false } : e,
                 ),
               }
             : day,
         ),
       );
+      Alert.alert("Error", "Unable to save. Please try again.");
     }
   };
 
@@ -304,6 +318,13 @@ export default function WorkoutScreen() {
       );
     } catch (err) {
       console.error("Log all error:", err);
+      // Kung na-fail, ibalik sa dating state
+      setWorkoutPlan((prev) =>
+        prev.map((d, di) =>
+          di === dayIndex ? { ...d, exercises: previous } : d,
+        ),
+      );
+      Alert.alert("Error", "Unable to save. Please try again.");
     }
   };
 
@@ -599,7 +620,11 @@ export default function WorkoutScreen() {
                   {!isRest && (
                     <TouchableOpacity
                       style={[styles.logAllBtn, isFuture && styles.disabledBtn]}
-                      onPress={() => !isFuture && logAllExercises(dayIndex)}
+                      onPress={() => {
+                        if (isFuture) return;
+                        setPendingCheck({ type: "all", dayIndex });
+                        setShowCheckConfirm(true);
+                      }}
                       disabled={isFuture}
                     >
                       <Text style={styles.logAllText}>Log all</Text>
@@ -678,10 +703,14 @@ export default function WorkoutScreen() {
                           { borderColor: colors.border },
                           entry.done && styles.exerciseCheckDone,
                         ]}
-                        onPress={() =>
-                          !isFuture && toggleExercise(dayIndex, entry)
-                        }
-                        disabled={isFuture}
+                        onPress={() => {
+                          // Kapag naka-check na, hindi na dapat magawa ang
+                          // kahit ano pa (permanenteng naka-lock)
+                          if (isFuture || entry.done) return;
+                          setPendingCheck({ type: "single", dayIndex, entry });
+                          setShowCheckConfirm(true);
+                        }}
+                        disabled={isFuture || entry.done}
                         hitSlop={HIT_SLOP}
                       >
                         {entry.done && (
@@ -1329,6 +1358,32 @@ export default function WorkoutScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <ConfirmModal
+        visible={showCheckConfirm}
+        title={
+          pendingCheck?.type === "all" ? "Log All Exercises?" : "Mark as Done?"
+        }
+        message={
+          pendingCheck?.type === "all"
+            ? "This will mark all exercises for this day as done. This cannot be undone."
+            : `Mark "${pendingCheck?.entry?.exercise.name}" as done? This cannot be undone.`
+        }
+        confirmLabel="Confirm"
+        onConfirm={() => {
+          setShowCheckConfirm(false);
+          if (pendingCheck?.type === "all") {
+            logAllExercises(pendingCheck.dayIndex);
+          } else if (pendingCheck?.type === "single" && pendingCheck.entry) {
+            markExerciseDone(pendingCheck.dayIndex, pendingCheck.entry);
+          }
+          setPendingCheck(null);
+        }}
+        onCancel={() => {
+          setShowCheckConfirm(false);
+          setPendingCheck(null);
+        }}
+      />
 
       <SuccessModal
         visible={showSuccessModal}
