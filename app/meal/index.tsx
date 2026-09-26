@@ -97,10 +97,6 @@ const formatDateLabel = (dateStr: string) => {
   });
 };
 
-const sanitizeNumericInput = (text: string) => text.replace(/[^0-9]/g, "");
-
-// May max na 9999 kcal — sapat na, hindi realistic ang mas mataas pa dito
-// para sa isang beses na kainan
 const sanitizeCalorieInput = (text: string) => {
   const cleaned = text.replace(/[^0-9]/g, "");
   if (cleaned === "") return cleaned;
@@ -109,7 +105,6 @@ const sanitizeCalorieInput = (text: string) => {
   return cleaned;
 };
 
-// May max na 9999 grams (~10kg) — sapat na para sa isang food item
 const sanitizeGramsInput = (text: string) => {
   const cleaned = text.replace(/[^0-9]/g, "");
   if (cleaned === "") return cleaned;
@@ -169,12 +164,14 @@ export default function MealScreen() {
   const [manualKcal, setManualKcal] = useState("");
   const [manualWeight, setManualWeight] = useState("");
 
-  // Confirmation modal bago mag-mark ng meal(s) bilang "Taken" — sadyang
-  // hindi na kailangan ng confirmation ang "Skip" (pag-untake), mas mabilis
-  // at hindi kailangan i-confirm ang pag-uundo
+  // Confirmation modal bago mag-mark ng meal(s) — "Take" ay PERMANENTE
+  // (hindi na mababago pagkatapos), pero ang "Skip" ay REVERSIBLE — baka
+  // magbago ang isip ng user at kainin pa rin nila mamaya, kaya nananatiling
+  // may "Take" button pa rin kahit na-skip na
   const [showTakeConfirm, setShowTakeConfirm] = useState(false);
   const [pendingTake, setPendingTake] = useState<{
     type: "single" | "all";
+    action: "take" | "skip";
     dayIndex: number;
     entry?: MealEntry;
   } | null>(null);
@@ -257,24 +254,25 @@ export default function MealScreen() {
     hasAutoScrolledRef.current = true;
   }, [loading, mealPlan]);
 
+  // "Take" — PERMANENTE, hindi na maaaring bawiin pagkatapos. Palaging
+  // taken:true, skipped:false ang itinatakda dito
   const toggleMeal = async (dayIndex: number, entry: MealEntry) => {
-    const newTaken = !entry.taken;
     setMealPlan((prev) =>
       prev.map((day, di) =>
         di === dayIndex
           ? {
               ...day,
               meals: day.meals.map((m) =>
-                m.plan_id === entry.plan_id ? { ...m, taken: newTaken } : m,
+                m.plan_id === entry.plan_id
+                  ? { ...m, taken: true, skipped: false }
+                  : m,
               ),
             }
           : day,
       ),
     );
     try {
-      await api.patch(`/meals/plan/${entry.plan_id}/toggle`, {
-        taken: newTaken,
-      });
+      await api.patch(`/meals/plan/${entry.plan_id}/toggle`, { taken: true });
     } catch (err) {
       console.error("Toggle meal error:", err);
       setMealPlan((prev) =>
@@ -284,7 +282,45 @@ export default function MealScreen() {
                 ...day,
                 meals: day.meals.map((m) =>
                   m.plan_id === entry.plan_id
-                    ? { ...m, taken: entry.taken }
+                    ? { ...m, taken: false, skipped: false }
+                    : m,
+                ),
+              }
+            : day,
+        ),
+      );
+    }
+  };
+
+  // "Skip" — REVERSIBLE. Hindi ito naka-lock; kahit na-skip na, palaging
+  // ipapakita pa rin ang "Take" button (baka kainin pa rin nila mamaya)
+  const skipMeal = async (dayIndex: number, entry: MealEntry) => {
+    setMealPlan((prev) =>
+      prev.map((day, di) =>
+        di === dayIndex
+          ? {
+              ...day,
+              meals: day.meals.map((m) =>
+                m.plan_id === entry.plan_id
+                  ? { ...m, taken: false, skipped: true }
+                  : m,
+              ),
+            }
+          : day,
+      ),
+    );
+    try {
+      await api.patch(`/meals/plan/${entry.plan_id}/toggle`, { taken: false });
+    } catch (err) {
+      console.error("Skip meal error:", err);
+      setMealPlan((prev) =>
+        prev.map((day, di) =>
+          di === dayIndex
+            ? {
+                ...day,
+                meals: day.meals.map((m) =>
+                  m.plan_id === entry.plan_id
+                    ? { ...m, taken: false, skipped: false }
                     : m,
                 ),
               }
@@ -300,7 +336,14 @@ export default function MealScreen() {
     setMealPlan((prev) =>
       prev.map((d, di) =>
         di === dayIndex
-          ? { ...d, meals: d.meals.map((m) => ({ ...m, taken: true })) }
+          ? {
+              ...d,
+              meals: d.meals.map((m) => ({
+                ...m,
+                taken: true,
+                skipped: false,
+              })),
+            }
           : d,
       ),
     );
@@ -314,6 +357,10 @@ export default function MealScreen() {
       );
     } catch (err) {
       console.error("Take all error:", err);
+      setMealPlan((prev) =>
+        prev.map((d, di) => (di === dayIndex ? { ...d, meals: previous } : d)),
+      );
+      Alert.alert("Error", "Unable to save. Please try again.");
     }
   };
 
@@ -367,7 +414,7 @@ export default function MealScreen() {
                 ...day,
                 meals: day.meals.map((m) =>
                   m.plan_id === editPlanSlot.plan_id
-                    ? { ...m, meal: newMeal, taken: false }
+                    ? { ...m, meal: newMeal, taken: false, skipped: false }
                     : m,
                 ),
               }
@@ -426,7 +473,7 @@ export default function MealScreen() {
                 ...day,
                 meals: day.meals.map((m) =>
                   m.plan_id === editingEntry.plan_id
-                    ? { ...m, meal: newMeal, taken: false }
+                    ? { ...m, meal: newMeal, taken: false, skipped: false }
                     : m,
                 ),
               }
@@ -652,7 +699,11 @@ export default function MealScreen() {
                       ]}
                       onPress={() => {
                         if (isFuture) return;
-                        setPendingTake({ type: "all", dayIndex });
+                        setPendingTake({
+                          type: "all",
+                          action: "take",
+                          dayIndex,
+                        });
                         setShowTakeConfirm(true);
                       }}
                       disabled={isFuture}
@@ -726,30 +777,68 @@ export default function MealScreen() {
                       >
                         ~{entry.meal?.calories} kcal
                       </Text>
-                      <TouchableOpacity
-                        style={[
-                          styles.actionBtn,
-                          entry.taken ? styles.skipBtn : styles.takeBtn,
-                          isFuture && styles.disabledBtn,
-                        ]}
-                        onPress={() => {
-                          if (isFuture) return;
-                          // "Skip" (pag-untake) ay hindi na kailangan ng
-                          // confirmation, direkta lang — ang "Take" lang ang
-                          // may confirmation modal
-                          if (entry.taken) {
-                            toggleMeal(dayIndex, entry);
-                          } else {
-                            setPendingTake({ type: "single", dayIndex, entry });
-                            setShowTakeConfirm(true);
-                          }
-                        }}
-                        disabled={isFuture}
-                      >
-                        <Text style={styles.actionBtnText}>
-                          {entry.taken ? "Skip" : "Take"}
-                        </Text>
-                      </TouchableOpacity>
+
+                      {entry.taken ? (
+                        // "Taken" ay PERMANENTE — badge lang, walang buttons
+                        <View style={styles.statusBadgeTaken}>
+                          <Text style={styles.statusBadgeText}>Taken</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.actionBtnRow}>
+                          {entry.skipped && (
+                            <View style={styles.statusBadgeSkipped}>
+                              <Text style={styles.statusBadgeText}>
+                                Skipped
+                              </Text>
+                            </View>
+                          )}
+                          <TouchableOpacity
+                            style={[
+                              styles.actionBtn,
+                              styles.takeBtn,
+                              isFuture && styles.disabledBtn,
+                            ]}
+                            onPress={() => {
+                              if (isFuture) return;
+                              setPendingTake({
+                                type: "single",
+                                action: "take",
+                                dayIndex,
+                                entry,
+                              });
+                              setShowTakeConfirm(true);
+                            }}
+                            disabled={isFuture}
+                          >
+                            <Text style={styles.actionBtnText}>Take</Text>
+                          </TouchableOpacity>
+                          {/* "Skip" ay REVERSIBLE — hindi na kailangan i-disable
+                              kahit na-skip na, para maibalik pa rin ang isip */}
+                          {!entry.skipped && (
+                            <TouchableOpacity
+                              style={[
+                                styles.actionBtn,
+                                styles.skipBtn,
+                                isFuture && styles.disabledBtn,
+                              ]}
+                              onPress={() => {
+                                if (isFuture) return;
+                                setPendingTake({
+                                  type: "single",
+                                  action: "skip",
+                                  dayIndex,
+                                  entry,
+                                });
+                                setShowTakeConfirm(true);
+                              }}
+                              disabled={isFuture}
+                            >
+                              <Text style={styles.actionBtnText}>Skip</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
+
                       <TouchableOpacity
                         style={styles.pencilBtn}
                         onPress={() =>
@@ -827,7 +916,14 @@ export default function MealScreen() {
                           { backgroundColor: colors.input },
                         ]}
                       >
-                        <Text style={styles.nutritionValue}>{n.value}</Text>
+                        <Text
+                          style={styles.nutritionValue}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.6}
+                        >
+                          {n.value}
+                        </Text>
                         <Text
                           style={[
                             styles.nutritionLabel,
@@ -1347,12 +1443,18 @@ export default function MealScreen() {
       <ConfirmModal
         visible={showTakeConfirm}
         title={
-          pendingTake?.type === "all" ? "Take All Meals?" : "Mark as Taken?"
+          pendingTake?.type === "all"
+            ? "Take All Meals?"
+            : pendingTake?.action === "skip"
+              ? "Skip This Meal?"
+              : "Mark as Taken?"
         }
         message={
           pendingTake?.type === "all"
-            ? "This will mark all meals for this day as taken."
-            : `Mark "${pendingTake?.entry?.meal?.name}" as taken?`
+            ? "This will mark all meals for this day as taken. This cannot be undone."
+            : pendingTake?.action === "skip"
+              ? `Skip "${pendingTake?.entry?.meal?.name}"? You can still mark it as taken later.`
+              : `Mark "${pendingTake?.entry?.meal?.name}" as taken? This cannot be undone.`
         }
         confirmLabel="Confirm"
         onConfirm={() => {
@@ -1360,7 +1462,11 @@ export default function MealScreen() {
           if (pendingTake?.type === "all") {
             takeAllMeals(pendingTake.dayIndex);
           } else if (pendingTake?.type === "single" && pendingTake.entry) {
-            toggleMeal(pendingTake.dayIndex, pendingTake.entry);
+            if (pendingTake.action === "skip") {
+              skipMeal(pendingTake.dayIndex, pendingTake.entry);
+            } else {
+              toggleMeal(pendingTake.dayIndex, pendingTake.entry);
+            }
           }
           setPendingTake(null);
         }}
@@ -1518,10 +1624,24 @@ const styles = StyleSheet.create({
   macroText: { fontSize: 10, color: "#4CAF50", fontWeight: "600" },
   mealRight: { alignItems: "flex-end", gap: 4 },
   mealCalories: { fontSize: 12 },
+  actionBtnRow: { flexDirection: "row", gap: 6 },
   actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   takeBtn: { backgroundColor: "#4CAF50" },
   skipBtn: { backgroundColor: "#FF9800" },
   actionBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  statusBadgeTaken: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusBadgeSkipped: {
+    backgroundColor: "#9E9E9E",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusBadgeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   pencilBtn: { padding: 4 },
   totalRow: {
     flexDirection: "row",

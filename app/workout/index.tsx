@@ -115,8 +115,6 @@ const formatDateLabel = (dateStr: string) => {
   });
 };
 
-const sanitizeNumericInput = (text: string) => text.replace(/[^0-9]/g, "");
-
 const sanitizeSetsRepsInput = (text: string) => {
   const cleaned = text.replace(/[^0-9]/g, "");
   if (cleaned === "") return cleaned;
@@ -289,8 +287,6 @@ export default function WorkoutScreen() {
       });
     } catch (err) {
       console.error("Mark exercise done error:", err);
-      // Kung na-fail ang request, ibalik sa unchecked state para tumugma
-      // sa totoong nasa server
       setWorkoutPlan((prev) =>
         prev.map((day, di) =>
           di === dayIndex
@@ -327,7 +323,6 @@ export default function WorkoutScreen() {
       );
     } catch (err) {
       console.error("Log all error:", err);
-      // Kung na-fail, ibalik sa dating state
       setWorkoutPlan((prev) =>
         prev.map((d, di) =>
           di === dayIndex ? { ...d, exercises: previous } : d,
@@ -713,8 +708,6 @@ export default function WorkoutScreen() {
                           entry.done && styles.exerciseCheckDone,
                         ]}
                         onPress={() => {
-                          // Kapag naka-check na, hindi na dapat magawa ang
-                          // kahit ano pa (permanenteng naka-lock)
                           if (isFuture || entry.done) return;
                           setPendingCheck({ type: "single", dayIndex, entry });
                           setShowCheckConfirm(true);
@@ -809,7 +802,14 @@ export default function WorkoutScreen() {
                           { backgroundColor: colors.input },
                         ]}
                       >
-                        <Text style={styles.infoValue}>{info.value}</Text>
+                        <Text
+                          style={styles.infoValue}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.6}
+                        >
+                          {info.value}
+                        </Text>
                         <Text
                           style={[
                             styles.infoLabel,
