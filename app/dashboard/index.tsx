@@ -30,6 +30,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import ConfirmModal from "../../components/ConfirmModal";
 import api from "../../constants/api";
 import { registerAndSavePushToken } from "../../constants/pushNotifications";
 import { useTheme } from "../../constants/theme";
@@ -104,6 +105,22 @@ export default function DashboardScreen() {
   const [todayWorkoutFocus, setTodayWorkoutFocus] = useState("Rest Day");
   const [todayExercises, setTodayExercises] = useState<ExerciseEntry[]>([]);
   const [todayFoodLogs, setTodayFoodLogs] = useState<FoodLogEntry[]>([]);
+
+  // Meal Take/Skip confirmation — "Take" ay PERMANENTE (hindi na mababago
+  // pagkatapos), pero ang "Skip" ay REVERSIBLE (baka kainin pa rin nila mamaya)
+  const [showMealConfirm, setShowMealConfirm] = useState(false);
+  const [pendingMeal, setPendingMeal] = useState<{
+    type: "single" | "all";
+    action: "take" | "skip";
+    entry?: MealEntry;
+  } | null>(null);
+
+  // Workout checkbox confirmation — one-way lang, hindi na maaaring i-uncheck
+  // pagkatapos, parehong pattern ng Workout screen
+  const [showWorkoutConfirm, setShowWorkoutConfirm] = useState(false);
+  const [pendingWorkout, setPendingWorkout] = useState<ExerciseEntry | null>(
+    null,
+  );
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -217,23 +234,39 @@ export default function DashboardScreen() {
     loadDashboardData();
   };
 
-  const toggleMeal = async (planId: string, currentlyTaken: boolean) => {
-    // Optimistic UI update
+  // "Take" — PERMANENTE, hindi na maaaring bawiin pagkatapos
+  const takeMeal = async (planId: string) => {
     setTodayMeals((prev) =>
       prev.map((m) =>
-        m.plan_id === planId ? { ...m, taken: !currentlyTaken } : m,
+        m.plan_id === planId ? { ...m, taken: true, skipped: false } : m,
       ),
     );
     try {
-      await api.patch(`/meals/plan/${planId}/toggle`, {
-        taken: !currentlyTaken,
-      });
+      await api.patch(`/meals/plan/${planId}/toggle`, { taken: true });
     } catch (err) {
-      console.error("Toggle meal error:", err);
-      // revert on failure
+      console.error("Take meal error:", err);
       setTodayMeals((prev) =>
         prev.map((m) =>
-          m.plan_id === planId ? { ...m, taken: currentlyTaken } : m,
+          m.plan_id === planId ? { ...m, taken: false, skipped: false } : m,
+        ),
+      );
+    }
+  };
+
+  // "Skip" — REVERSIBLE, palaging ipapakita pa rin ang "Take" button pagkatapos
+  const skipMeal = async (planId: string) => {
+    setTodayMeals((prev) =>
+      prev.map((m) =>
+        m.plan_id === planId ? { ...m, taken: false, skipped: true } : m,
+      ),
+    );
+    try {
+      await api.patch(`/meals/plan/${planId}/toggle`, { taken: false });
+    } catch (err) {
+      console.error("Skip meal error:", err);
+      setTodayMeals((prev) =>
+        prev.map((m) =>
+          m.plan_id === planId ? { ...m, taken: false, skipped: false } : m,
         ),
       );
     }
@@ -241,7 +274,9 @@ export default function DashboardScreen() {
 
   const takeAllMeals = async () => {
     const previous = todayMeals;
-    setTodayMeals((prev) => prev.map((m) => ({ ...m, taken: true })));
+    setTodayMeals((prev) =>
+      prev.map((m) => ({ ...m, taken: true, skipped: false })),
+    );
     try {
       await Promise.all(
         previous
@@ -252,25 +287,21 @@ export default function DashboardScreen() {
       );
     } catch (err) {
       console.error("Take all meals error:", err);
+      setTodayMeals(previous);
     }
   };
 
-  const toggleWorkout = async (planId: string, currentlyDone: boolean) => {
+  // One-way lang — palaging done:true, hindi na maaaring i-uncheck pagkatapos
+  const markWorkoutDone = async (planId: string) => {
     setTodayExercises((prev) =>
-      prev.map((e) =>
-        e.plan_id === planId ? { ...e, done: !currentlyDone } : e,
-      ),
+      prev.map((e) => (e.plan_id === planId ? { ...e, done: true } : e)),
     );
     try {
-      await api.patch(`/workouts/plan/${planId}/toggle`, {
-        done: !currentlyDone,
-      });
+      await api.patch(`/workouts/plan/${planId}/toggle`, { done: true });
     } catch (err) {
       console.error("Toggle workout error:", err);
       setTodayExercises((prev) =>
-        prev.map((e) =>
-          e.plan_id === planId ? { ...e, done: currentlyDone } : e,
-        ),
+        prev.map((e) => (e.plan_id === planId ? { ...e, done: false } : e)),
       );
     }
   };
@@ -421,7 +452,10 @@ export default function DashboardScreen() {
             <View style={styles.sectionActions}>
               <TouchableOpacity
                 style={styles.takeAllBtn}
-                onPress={takeAllMeals}
+                onPress={() => {
+                  setPendingMeal({ type: "all", action: "take" });
+                  setShowMealConfirm(true);
+                }}
                 hitSlop={HIT_SLOP}
               >
                 <Text style={styles.takeAllText}>Take all</Text>
@@ -484,18 +518,52 @@ export default function DashboardScreen() {
                   >
                     ~{toNumber(meal.meal?.calories)} kcal
                   </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.actionBtn,
-                      meal.taken ? styles.takenBtn : styles.takeBtn,
-                    ]}
-                    onPress={() => toggleMeal(meal.plan_id, meal.taken)}
-                    hitSlop={HIT_SLOP}
-                  >
-                    <Text style={styles.actionBtnText}>
-                      {meal.taken ? "Skip" : "Take"}
-                    </Text>
-                  </TouchableOpacity>
+
+                  {meal.taken ? (
+                    <View style={styles.statusBadgeTaken}>
+                      <Text style={styles.statusBadgeText}>Taken</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.actionBtnRow}>
+                      {meal.skipped && (
+                        <View style={styles.statusBadgeSkipped}>
+                          <Text style={styles.statusBadgeText}>Skipped</Text>
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.takeBtn]}
+                        onPress={() => {
+                          setPendingMeal({
+                            type: "single",
+                            action: "take",
+                            entry: meal,
+                          });
+                          setShowMealConfirm(true);
+                        }}
+                        hitSlop={HIT_SLOP}
+                      >
+                        <Text style={styles.actionBtnText}>Take</Text>
+                      </TouchableOpacity>
+                      {/* "Skip" ay REVERSIBLE — hindi na kailangan i-disable
+                          kahit na-skip na, para maibalik pa rin ang isip */}
+                      {!meal.skipped && (
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.skipBtn]}
+                          onPress={() => {
+                            setPendingMeal({
+                              type: "single",
+                              action: "skip",
+                              entry: meal,
+                            });
+                            setShowMealConfirm(true);
+                          }}
+                          hitSlop={HIT_SLOP}
+                        >
+                          <Text style={styles.actionBtnText}>Skip</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                 </View>
               );
             })
@@ -619,7 +687,13 @@ export default function DashboardScreen() {
                     { borderColor: colors.border },
                     exercise.done && styles.exerciseCheckDone,
                   ]}
-                  onPress={() => toggleWorkout(exercise.plan_id, exercise.done)}
+                  onPress={() => {
+                    // One-way lang — kapag naka-check na, wala nang magagawa
+                    if (exercise.done) return;
+                    setPendingWorkout(exercise);
+                    setShowWorkoutConfirm(true);
+                  }}
+                  disabled={exercise.done}
                   hitSlop={HIT_SLOP}
                 >
                   {exercise.done && (
@@ -633,6 +707,62 @@ export default function DashboardScreen() {
 
         <View style={{ height: 80 + insets.bottom }} />
       </ScrollView>
+
+      {/* Meal Confirmation — Take (permanente) o Skip (reversible) */}
+      <ConfirmModal
+        visible={showMealConfirm}
+        title={
+          pendingMeal?.type === "all"
+            ? "Take All Meals?"
+            : pendingMeal?.action === "skip"
+              ? "Skip This Meal?"
+              : "Mark as Taken?"
+        }
+        message={
+          pendingMeal?.type === "all"
+            ? "This will mark all meals for today as taken. This cannot be undone."
+            : pendingMeal?.action === "skip"
+              ? `Skip "${pendingMeal?.entry?.meal?.name}"? You can still mark it as taken later.`
+              : `Mark "${pendingMeal?.entry?.meal?.name}" as taken? This cannot be undone.`
+        }
+        confirmLabel="Confirm"
+        onConfirm={() => {
+          setShowMealConfirm(false);
+          if (pendingMeal?.type === "all") {
+            takeAllMeals();
+          } else if (pendingMeal?.type === "single" && pendingMeal.entry) {
+            if (pendingMeal.action === "skip") {
+              skipMeal(pendingMeal.entry.plan_id);
+            } else {
+              takeMeal(pendingMeal.entry.plan_id);
+            }
+          }
+          setPendingMeal(null);
+        }}
+        onCancel={() => {
+          setShowMealConfirm(false);
+          setPendingMeal(null);
+        }}
+      />
+
+      {/* Workout Confirmation — one-way lang */}
+      <ConfirmModal
+        visible={showWorkoutConfirm}
+        title="Mark as Done?"
+        message={`Mark "${pendingWorkout?.exercise?.name}" as done? This cannot be undone.`}
+        confirmLabel="Confirm"
+        onConfirm={() => {
+          setShowWorkoutConfirm(false);
+          if (pendingWorkout) {
+            markWorkoutDone(pendingWorkout.plan_id);
+          }
+          setPendingWorkout(null);
+        }}
+        onCancel={() => {
+          setShowWorkoutConfirm(false);
+          setPendingWorkout(null);
+        }}
+      />
 
       {/* Bottom Navigation */}
       <View
@@ -806,10 +936,24 @@ const styles = StyleSheet.create({
   mealType: { fontSize: 13, fontWeight: "700" },
   mealName: { fontSize: 11 },
   mealCalories: { fontSize: 12, marginRight: 4 },
+  actionBtnRow: { flexDirection: "row", gap: 6 },
   actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   takeBtn: { backgroundColor: "#4CAF50" },
-  takenBtn: { backgroundColor: "#FF9800" },
+  skipBtn: { backgroundColor: "#FF9800" },
   actionBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  statusBadgeTaken: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusBadgeSkipped: {
+    backgroundColor: "#9E9E9E",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusBadgeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   totalRow: {
     flexDirection: "row",
     alignItems: "center",
