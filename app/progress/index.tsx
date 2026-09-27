@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import {
   ArrowRight,
   BarChart3,
@@ -61,9 +61,9 @@ const WEIGHT_STABLE_THRESHOLD = 0.3;
 
 export default function ProgressScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState("Stats");
   const [activePeriod, setActivePeriod] = useState("Weekly");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -931,15 +931,12 @@ export default function ProgressScreen() {
           { name: "Workout", Icon: Dumbbell, route: "/workout" },
           { name: "Profile", Icon: User, route: "/profile" },
         ].map((tab) => {
-          const isActive = activeTab === tab.name;
+          const isActive = pathname === tab.route;
           return (
             <TouchableOpacity
               key={tab.name}
               style={styles.navItem}
-              onPress={() => {
-                setActiveTab(tab.name);
-                router.push(tab.route as any);
-              }}
+              onPress={() => router.push(tab.route as any)}
             >
               <tab.Icon
                 size={22}

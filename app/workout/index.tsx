@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import {
   BarChart3,
   Check,
@@ -138,6 +138,7 @@ type VideoType = "uploaded" | "youtube" | "exercisedb" | "none" | null;
 
 export default function WorkoutScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -145,7 +146,6 @@ export default function WorkoutScreen() {
   const hasAutoScrolledRef = useRef(false);
 
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutDay[]>([]);
-  const [activeTab, setActiveTab] = useState("Workout");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -554,12 +554,7 @@ export default function WorkoutScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Weekly Workout Plan
         </Text>
-        <TouchableOpacity
-          onPress={() => router.push("/dashboard" as any)}
-          hitSlop={HIT_SLOP}
-        >
-          <X size={20} color={colors.textMuted} />
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView
@@ -1435,15 +1430,12 @@ export default function WorkoutScreen() {
           { name: "Workout", Icon: Dumbbell, route: "/workout" },
           { name: "Profile", Icon: User, route: "/profile" },
         ].map((tab) => {
-          const isActive = activeTab === tab.name;
+          const isActive = pathname === tab.route;
           return (
             <TouchableOpacity
               key={tab.name}
               style={styles.navItem}
-              onPress={() => {
-                setActiveTab(tab.name);
-                router.push(tab.route as any);
-              }}
+              onPress={() => router.push(tab.route as any)}
             >
               <tab.Icon
                 size={22}

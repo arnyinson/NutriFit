@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import {
   BarChart3,
   Check,
@@ -92,9 +92,9 @@ const toNumber = (value: unknown) => parseFloat(String(value ?? 0)) || 0;
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState("Home");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -783,15 +783,12 @@ export default function DashboardScreen() {
           { name: "Workout", Icon: Dumbbell, route: "/workout" },
           { name: "Profile", Icon: User, route: "/profile" },
         ].map((tab) => {
-          const isActive = activeTab === tab.name;
+          const isActive = pathname === tab.route;
           return (
             <TouchableOpacity
               key={tab.name}
               style={styles.navItem}
-              onPress={() => {
-                setActiveTab(tab.name);
-                router.push(tab.route as any);
-              }}
+              onPress={() => router.push(tab.route as any)}
             >
               <tab.Icon
                 size={22}

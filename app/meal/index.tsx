@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import {
   AlertTriangle,
   BarChart3,
@@ -97,6 +97,8 @@ const formatDateLabel = (dateStr: string) => {
   });
 };
 
+// May max na 9999 kcal — sapat na, hindi realistic ang mas mataas pa dito
+// para sa isang beses na kainan
 const sanitizeCalorieInput = (text: string) => {
   const cleaned = text.replace(/[^0-9]/g, "");
   if (cleaned === "") return cleaned;
@@ -105,6 +107,7 @@ const sanitizeCalorieInput = (text: string) => {
   return cleaned;
 };
 
+// May max na 9999 grams (~10kg) — sapat na para sa isang food item
 const sanitizeGramsInput = (text: string) => {
   const cleaned = text.replace(/[^0-9]/g, "");
   if (cleaned === "") return cleaned;
@@ -130,6 +133,7 @@ const DAY_SECTION_ESTIMATED_HEIGHT = 340;
 
 export default function MealScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -138,7 +142,6 @@ export default function MealScreen() {
   const hasAutoScrolledRef = useRef(false);
 
   const [mealPlan, setMealPlan] = useState<DayPlan[]>([]);
-  const [activeTab, setActiveTab] = useState("Meal");
   const [planMode, setPlanMode] = useState<"weekly" | "continuous">("weekly");
   const [modeLoaded, setModeLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -916,14 +919,7 @@ export default function MealScreen() {
                           { backgroundColor: colors.input },
                         ]}
                       >
-                        <Text
-                          style={styles.nutritionValue}
-                          numberOfLines={1}
-                          adjustsFontSizeToFit
-                          minimumFontScale={0.6}
-                        >
-                          {n.value}
-                        </Text>
+                        <Text style={styles.nutritionValue}>{n.value}</Text>
                         <Text
                           style={[
                             styles.nutritionLabel,
@@ -1495,15 +1491,12 @@ export default function MealScreen() {
           { name: "Workout", Icon: Dumbbell, route: "/workout" },
           { name: "Profile", Icon: User, route: "/profile" },
         ].map((tab) => {
-          const isActive = activeTab === tab.name;
+          const isActive = pathname === tab.route;
           return (
             <TouchableOpacity
               key={tab.name}
               style={styles.navItem}
-              onPress={() => {
-                setActiveTab(tab.name);
-                router.push(tab.route as any);
-              }}
+              onPress={() => router.push(tab.route as any)}
             >
               <tab.Icon
                 size={22}
