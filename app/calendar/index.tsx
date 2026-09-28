@@ -104,10 +104,14 @@ export default function CalendarScreen() {
 
   const loadMealPlan = useCallback(async (mode: "weekly" | "continuous") => {
     try {
-      let res = await api.get("/meals/plan/me", { params: { mode } });
+      let res = await api.get("/meals/plan/me", {
+        params: { mode, history: true },
+      });
       if (!res.data.mealPlan || res.data.mealPlan.length === 0) {
         await api.post("/meals/plan/generate", { mode });
-        res = await api.get("/meals/plan/me", { params: { mode } });
+        res = await api.get("/meals/plan/me", {
+          params: { mode, history: true },
+        });
       }
       setMealPlan(res.data.mealPlan);
     } catch (err) {
