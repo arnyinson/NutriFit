@@ -501,23 +501,27 @@ export default function DashboardScreen() {
                     <MealIcon size={18} color={colors.primary} />
                   </View>
                   <View style={styles.mealInfo}>
-                    <Text style={[styles.mealType, { color: colors.text }]}>
+                    <Text
+                      style={[styles.mealType, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
                       {meal.meal_type}
                     </Text>
                     <Text
                       style={[styles.mealName, { color: colors.textMuted }]}
+                      numberOfLines={1}
                     >
                       {meal.meal?.name}
                     </Text>
+                    <Text
+                      style={[
+                        styles.mealCalories,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      ~{toNumber(meal.meal?.calories)} kcal
+                    </Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.mealCalories,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    ~{toNumber(meal.meal?.calories)} kcal
-                  </Text>
 
                   {meal.taken ? (
                     <View style={styles.statusBadgeTaken}>
@@ -589,23 +593,27 @@ export default function DashboardScreen() {
                     <Plus size={18} color={colors.primary} />
                   </View>
                   <View style={styles.mealInfo}>
-                    <Text style={[styles.mealType, { color: colors.text }]}>
+                    <Text
+                      style={[styles.mealType, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
                       Logged Food
                     </Text>
                     <Text
                       style={[styles.mealName, { color: colors.textMuted }]}
+                      numberOfLines={1}
                     >
                       {log.food_name}
                     </Text>
+                    <Text
+                      style={[
+                        styles.mealCalories,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      ~{toNumber(log.calories)} kcal
+                    </Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.mealCalories,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    ~{toNumber(log.calories)} kcal
-                  </Text>
                 </View>
               ))}
             </>
@@ -929,12 +937,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  mealInfo: { flex: 1 },
+  mealInfo: { flex: 1, minWidth: 0 },
   mealType: { fontSize: 13, fontWeight: "700" },
   mealName: { fontSize: 11 },
-  mealCalories: { fontSize: 12, marginRight: 4 },
-  actionBtnRow: { flexDirection: "row", gap: 6 },
-  actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  mealCalories: { fontSize: 11, marginTop: 2 },
+  actionBtnRow: { flexDirection: "row", gap: 6, flexShrink: 0 },
+  actionBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
   takeBtn: { backgroundColor: "#4CAF50" },
   skipBtn: { backgroundColor: "#FF9800" },
   actionBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
