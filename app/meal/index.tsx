@@ -56,6 +56,11 @@ type Meal = {
   allergens: string[];
   ingredients: string[];
   instructions: string;
+  allergen_substitutions?: {
+    original: string;
+    substitute: string;
+    allergen: string;
+  }[];
 };
 
 type MealEntry = {
@@ -970,22 +975,97 @@ export default function MealScreen() {
                       </View>
                     </>
                   )}
+                  {(selectedMeal.allergen_substitutions?.length ?? 0) > 0 && (
+                    <>
+                      <Text
+                        style={[styles.modalSection, { color: colors.text }]}
+                      >
+                        Allergen Substitutions
+                      </Text>
+                      <View style={styles.substituteCard}>
+                        <Text
+                          style={[
+                            styles.substituteNote,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
+                          Adjusted for your allergy so this meal stays safe to
+                          eat:
+                        </Text>
+                        {(selectedMeal.allergen_substitutions || []).map(
+                          (s, i) => (
+                            <View key={i} style={styles.substituteRow}>
+                              <Repeat size={14} color="#4CAF50" />
+                              <Text
+                                style={[
+                                  styles.substituteText,
+                                  { color: colors.text },
+                                ]}
+                              >
+                                <Text
+                                  style={{ textDecorationLine: "line-through" }}
+                                >
+                                  {s.original}
+                                </Text>
+                                {"  \u2192  "}
+                                <Text
+                                  style={{
+                                    color: "#4CAF50",
+                                    fontWeight: "700",
+                                  }}
+                                >
+                                  {s.substitute}
+                                </Text>
+                                {`  (${s.allergen})`}
+                              </Text>
+                            </View>
+                          ),
+                        )}
+                      </View>
+                    </>
+                  )}
                   <Text style={[styles.modalSection, { color: colors.text }]}>
                     Ingredients
                   </Text>
-                  {(selectedMeal.ingredients || []).map((ing, i) => (
-                    <View key={i} style={styles.ingredientRow}>
-                      <View style={styles.ingredientBullet} />
-                      <Text
-                        style={[
-                          styles.ingredientText,
-                          { color: colors.textSecondary },
-                        ]}
-                      >
-                        {ing}
-                      </Text>
-                    </View>
-                  ))}
+                  {(selectedMeal.ingredients || []).map((ing, i) => {
+                    // Kung ang ingredient na ito ang pinalitan, ipakita ang kapalit
+                    const sub = (
+                      selectedMeal.allergen_substitutions || []
+                    ).find(
+                      (s) =>
+                        s.original.trim().toLowerCase() ===
+                        String(ing).trim().toLowerCase(),
+                    );
+                    return (
+                      <View key={i} style={styles.ingredientRow}>
+                        <View style={styles.ingredientBullet} />
+                        <Text
+                          style={[
+                            styles.ingredientText,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
+                          {sub ? (
+                            <>
+                              <Text
+                                style={{ textDecorationLine: "line-through" }}
+                              >
+                                {ing}
+                              </Text>
+                              {"  \u2192  "}
+                              <Text
+                                style={{ color: "#4CAF50", fontWeight: "600" }}
+                              >
+                                {sub.substitute}
+                              </Text>
+                            </>
+                          ) : (
+                            ing
+                          )}
+                        </Text>
+                      </View>
+                    );
+                  })}
                   <Text style={[styles.modalSection, { color: colors.text }]}>
                     Cooking Instructions
                   </Text>
@@ -1691,6 +1771,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
   },
   ingredientText: { fontSize: 13, flex: 1 },
+  substituteCard: {
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    backgroundColor: "rgba(76,175,80,0.08)",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+  },
+  substituteNote: { fontSize: 12, marginBottom: 8 },
+  substituteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+  substituteText: { fontSize: 13, flex: 1 },
   stepText: { fontSize: 13, flex: 1, lineHeight: 20 },
   modalCloseBtn: {
     backgroundColor: "#4CAF50",
