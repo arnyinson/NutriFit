@@ -73,6 +73,7 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [hasScrolledToEnd, setHasScrolledToEnd] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const allergenList = [
@@ -531,7 +532,19 @@ export default function RegisterScreen() {
 
         {/* Terms */}
         <View style={styles.termsRow}>
-          <TouchableOpacity onPress={() => setAgreed(!agreed)}>
+          <TouchableOpacity
+            onPress={() => {
+              // Kung naka-check na, direktang mag-uncheck. Kung hindi pa,
+              // buksan muna ang Terms modal — kailangang basahin bago
+              // maka-agree
+              if (agreed) {
+                setAgreed(false);
+              } else {
+                setHasScrolledToEnd(false);
+                setShowTermsModal(true);
+              }
+            }}
+          >
             <View
               style={[
                 styles.checkbox,
@@ -546,7 +559,10 @@ export default function RegisterScreen() {
             I agree to the{" "}
             <Text
               style={[styles.termsLink, { color: colors.primary }]}
-              onPress={() => setShowTermsModal(true)}
+              onPress={() => {
+                setHasScrolledToEnd(false);
+                setShowTermsModal(true);
+              }}
             >
               Terms and Privacy Policy
             </Text>
@@ -601,6 +617,15 @@ export default function RegisterScreen() {
             <ScrollView
               showsVerticalScrollIndicator={false}
               style={styles.termsScroll}
+              onScroll={({ nativeEvent }) => {
+                const { layoutMeasurement, contentOffset, contentSize } =
+                  nativeEvent;
+                const isCloseToBottom =
+                  layoutMeasurement.height + contentOffset.y >=
+                  contentSize.height - 24;
+                if (isCloseToBottom) setHasScrolledToEnd(true);
+              }}
+              scrollEventThrottle={100}
             >
               <Text style={[styles.termsSectionTitle, { color: colors.text }]}>
                 1. Account Information
@@ -656,7 +681,20 @@ export default function RegisterScreen() {
               </Text>
 
               <Text style={[styles.termsSectionTitle, { color: colors.text }]}>
-                6. Account Responsibility
+                6. Nutritional Basis and Professional Review
+              </Text>
+              <Text style={[styles.termsBody, { color: colors.textSecondary }]}>
+                The calorie and macronutrient formulas, meal database, and
+                allergen substitution recommendations used by NutriFit were
+                reviewed and validated by a licensed nutritionist-dietitian,
+                Marc Cyrill E. De Veas, to help ensure they align with sound
+                nutritional practice. This review does not replace
+                individualized medical or dietary advice from a professional who
+                has access to your complete health history.
+              </Text>
+
+              <Text style={[styles.termsSectionTitle, { color: colors.text }]}>
+                7. Account Responsibility
               </Text>
               <Text style={[styles.termsBody, { color: colors.textSecondary }]}>
                 You are responsible for maintaining the confidentiality of your
@@ -681,15 +719,49 @@ export default function RegisterScreen() {
               <View style={{ height: 12 }} />
             </ScrollView>
 
-            <TouchableOpacity
-              style={styles.termsAgreeBtn}
-              onPress={() => {
-                setAgreed(true);
-                setShowTermsModal(false);
-              }}
-            >
-              <Text style={styles.termsAgreeBtnText}>I Agree</Text>
-            </TouchableOpacity>
+            {!hasScrolledToEnd && (
+              <Text
+                style={[styles.termsScrollHint, { color: colors.textMuted }]}
+              >
+                Scroll to the bottom to continue
+              </Text>
+            )}
+            <View style={styles.termsBtnRow}>
+              <TouchableOpacity
+                style={[
+                  styles.termsDisagreeBtn,
+                  { borderColor: colors.inputBorder },
+                ]}
+                onPress={() => {
+                  setAgreed(false);
+                  setShowTermsModal(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.termsDisagreeBtnText,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  I Disagree
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.termsAgreeBtn,
+                  { flex: 1 },
+                  !hasScrolledToEnd && { opacity: 0.4 },
+                ]}
+                onPress={() => {
+                  if (!hasScrolledToEnd) return;
+                  setAgreed(true);
+                  setShowTermsModal(false);
+                }}
+                disabled={!hasScrolledToEnd}
+              >
+                <Text style={styles.termsAgreeBtnText}>I Agree</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -838,6 +910,21 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   termsBody: { fontSize: 13, lineHeight: 20 },
+  termsScrollHint: {
+    fontSize: 11,
+    textAlign: "center",
+    marginBottom: 8,
+    fontStyle: "italic",
+  },
+  termsBtnRow: { flexDirection: "row", gap: 10 },
+  termsDisagreeBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  termsDisagreeBtnText: { fontWeight: "600", fontSize: 14 },
   termsAgreeBtn: {
     backgroundColor: "#4CAF50",
     padding: 14,

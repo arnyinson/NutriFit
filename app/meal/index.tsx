@@ -924,7 +924,14 @@ export default function MealScreen() {
                           { backgroundColor: colors.input },
                         ]}
                       >
-                        <Text style={styles.nutritionValue}>{n.value}</Text>
+                        <Text
+                          style={styles.nutritionValue}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.6}
+                        >
+                          {n.value}
+                        </Text>
                         <Text
                           style={[
                             styles.nutritionLabel,
