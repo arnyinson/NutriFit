@@ -70,6 +70,7 @@ export default function RegisterScreen() {
   const [dietaryGoal, setDietaryGoal] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [allergens, setAllergens] = useState<string[]>([]);
+  const [equipment, setEquipment] = useState<string[]>(["Bodyweight"]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -93,6 +94,26 @@ export default function RegisterScreen() {
     setAllergens((prev) =>
       prev.includes(item) ? prev.filter((a) => a !== item) : [...prev, item],
     );
+  };
+
+  const equipmentList = [
+    "Bodyweight",
+    "Dumbbell",
+    "Barbell",
+    "Resistance Bands",
+    "Kettlebell",
+    "Machine",
+  ];
+
+  const toggleEquipment = (item: string) => {
+    setEquipment((prev) => {
+      const next = prev.includes(item)
+        ? prev.filter((e) => e !== item)
+        : [...prev, item];
+      // Laging may kahit isa — kung wala nang natitira, ibalik sa
+      // "Bodyweight" bilang pinaka-ligtas na default (walang kailangang gamit)
+      return next.length > 0 ? next : ["Bodyweight"];
+    });
   };
 
   // Auto-format habang nagta-type: nagdadagdag ng "/" automatic
@@ -181,6 +202,7 @@ export default function RegisterScreen() {
         dietary_goal: dietaryGoal,
         activity_level: activityLevel,
         allergens,
+        available_equipment: equipment,
       });
 
       // Registration no longer logs the user in directly — email must be verified first
@@ -438,6 +460,38 @@ export default function RegisterScreen() {
             keyboardType="numeric"
             editable={!loading}
           />
+        </View>
+
+        {/* Equipment — ginagamit ng Workout module para malaman ang totoong
+            available equipment ng user, sa halip na hardcoded na assumption */}
+        <Text style={[styles.sectionLabel, { color: colors.text }]}>
+          Available Equipment
+        </Text>
+        <View style={styles.chipRow}>
+          {equipmentList.map((item) => (
+            <TouchableOpacity
+              key={item}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: colors.input,
+                  borderColor: colors.inputBorder,
+                },
+                equipment.includes(item) && styles.chipActive,
+              ]}
+              onPress={() => toggleEquipment(item)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: colors.textSecondary },
+                  equipment.includes(item) && styles.chipTextActive,
+                ]}
+              >
+                {item}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Allergens */}

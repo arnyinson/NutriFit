@@ -52,6 +52,7 @@ type UserProfile = {
   dietary_goal: string;
   activity_level: string;
   allergens: string[];
+  available_equipment: string[];
   bmi: string;
   tdee: string;
   avatar_url?: string | null;
@@ -287,6 +288,7 @@ export default function ProfileScreen() {
       dietary_goal: profile.dietary_goal,
       activity_level: profile.activity_level,
       allergens: [...profile.allergens],
+      available_equipment: [...(profile.available_equipment || ["Bodyweight"])],
       sex: profile.sex,
     });
     setBirthdayInput(formatDateDisplay(profile.birthday));
@@ -313,6 +315,30 @@ export default function ProfileScreen() {
     }));
   };
 
+  const equipmentList = [
+    "Bodyweight",
+    "Dumbbell",
+    "Barbell",
+    "Resistance Bands",
+    "Kettlebell",
+    "Machine",
+  ];
+
+  const toggleEquipment = (item: string) => {
+    setEditForm((prev: any) => {
+      const current: string[] = prev.available_equipment || [];
+      const next = current.includes(item)
+        ? current.filter((e: string) => e !== item)
+        : [...current, item];
+      // Laging may kahit isa — kung wala nang natitira, ibalik sa
+      // "Bodyweight" bilang pinaka-ligtas na default
+      return {
+        ...prev,
+        available_equipment: next.length > 0 ? next : ["Bodyweight"],
+      };
+    });
+  };
+
   const saveProfile = async () => {
     const isoBirthday = parseDateInput(birthdayInput);
     if (!isoBirthday) {
@@ -333,6 +359,7 @@ export default function ProfileScreen() {
         dietary_goal: editForm.dietary_goal,
         activity_level: editForm.activity_level,
         allergens: editForm.allergens,
+        available_equipment: editForm.available_equipment,
       });
       setProfile(res.data.user);
       await AsyncStorage.setItem("user", JSON.stringify(res.data.user));
@@ -1059,6 +1086,41 @@ export default function ProfileScreen() {
                             { color: colors.textSecondary },
                             editForm.allergens.includes(item) &&
                               styles.chipTextActive,
+                          ]}
+                        >
+                          {item}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
+                  >
+                    Available Equipment
+                  </Text>
+                  <View style={styles.chipRow}>
+                    {equipmentList.map((item) => (
+                      <TouchableOpacity
+                        key={item}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: colors.input,
+                            borderColor: colors.inputBorder,
+                          },
+                          (editForm.available_equipment || []).includes(item) &&
+                            styles.chipActive,
+                        ]}
+                        onPress={() => toggleEquipment(item)}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: colors.textSecondary },
+                            (editForm.available_equipment || []).includes(
+                              item,
+                            ) && styles.chipTextActive,
                           ]}
                         >
                           {item}
