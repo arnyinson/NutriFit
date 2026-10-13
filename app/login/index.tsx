@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Logo from "../../components/Logo";
 import api from "../../constants/api";
+import { registerAndSavePushToken } from "../../constants/pushNotifications";
 import { useTheme } from "../../constants/theme";
 
 export default function LoginScreen() {
@@ -45,6 +46,9 @@ export default function LoginScreen() {
       await AsyncStorage.setItem("token", token);
       await AsyncStorage.setItem("user", JSON.stringify(user));
 
+      // Register this device's push token for the logged-in user (non-blocking)
+      registerAndSavePushToken();
+
       router.replace("/dashboard");
     } catch (err: any) {
       const errorData = err.response?.data;
@@ -61,6 +65,17 @@ export default function LoginScreen() {
       const message =
         errorData?.error ||
         "Unable to connect to server. Please check your connection.";
+
+      // Banned / deactivated accounts get a specific title; message from the
+      // server already includes the ban reason when there is one.
+      if (errorData?.code === "ACCOUNT_BANNED") {
+        Alert.alert("Account Banned", message);
+        return;
+      }
+      if (errorData?.code === "ACCOUNT_DEACTIVATED") {
+        Alert.alert("Account Deactivated", message);
+        return;
+      }
       Alert.alert("Login Failed", message);
     } finally {
       setLoading(false);

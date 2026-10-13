@@ -77,6 +77,17 @@ const formatDateDisplay = (isoDate: string) => {
   return `${mm}/${dd}/${yyyy}`;
 };
 
+const calcAge = (isoDate: string) => {
+  if (!isoDate) return null;
+  const b = new Date(isoDate);
+  if (isNaN(b.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - b.getFullYear();
+  const m = now.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age--;
+  return age >= 0 ? age : null;
+};
+
 const parseDateInput = (mmddyyyy: string) => {
   const parts = mmddyyyy.split("/");
   if (parts.length !== 3) return null;
@@ -107,6 +118,9 @@ export default function ProfileScreen() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
   const [birthdayInput, setBirthdayInput] = useState("");
+  const [heightUnit, setHeightUnit] = useState<"cm" | "ft">("cm");
+  const [heightFt, setHeightFt] = useState("");
+  const [heightIn, setHeightIn] = useState("");
 
   const [activeWeightTab, setActiveWeightTab] = useState("1M");
   const [weightHistory, setWeightHistory] = useState<
@@ -292,6 +306,10 @@ export default function ProfileScreen() {
       sex: profile.sex,
     });
     setBirthdayInput(formatDateDisplay(profile.birthday));
+    setHeightUnit("cm");
+    const totalIn = Math.round(parseFloat(profile.height) / 2.54);
+    setHeightFt(String(Math.floor(totalIn / 12)));
+    setHeightIn(String(totalIn % 12));
     setShowEditModal(true);
   };
 
@@ -339,6 +357,34 @@ export default function ProfileScreen() {
     });
   };
 
+  // Height is always saved in cm; ft/in input is converted (1 in = 2.54 cm)
+  const getEditHeightCm = (): number | null => {
+    if (heightUnit === "cm") {
+      const cm = parseFloat(editForm.height);
+      return Number.isFinite(cm) ? cm : null;
+    }
+    const ft = parseInt(heightFt, 10);
+    const inch = heightIn === "" ? 0 : parseInt(heightIn, 10);
+    if (!Number.isFinite(ft) || !Number.isFinite(inch) || inch < 0 || inch > 11)
+      return null;
+    return Math.round((ft * 12 + inch) * 2.54 * 10) / 10;
+  };
+
+  const switchHeightUnit = (next: "cm" | "ft") => {
+    if (next === heightUnit) return;
+    const cm = getEditHeightCm();
+    if (cm) {
+      if (next === "ft") {
+        const totalIn = Math.round(cm / 2.54);
+        setHeightFt(String(Math.floor(totalIn / 12)));
+        setHeightIn(String(totalIn % 12));
+      } else {
+        setEditForm((p: any) => ({ ...p, height: String(cm) }));
+      }
+    }
+    setHeightUnit(next);
+  };
+
   const saveProfile = async () => {
     const isoBirthday = parseDateInput(birthdayInput);
     if (!isoBirthday) {
@@ -349,13 +395,32 @@ export default function ProfileScreen() {
       return;
     }
 
+    const heightCm = getEditHeightCm();
+    const weightKg = parseFloat(editForm.weight);
+    if (heightCm === null || heightCm < 100 || heightCm > 250) {
+      Alert.alert(
+        "Invalid Height",
+        "Please enter a realistic height (100–250 cm).",
+      );
+      return;
+    }
+    if (!Number.isFinite(weightKg) || weightKg < 20 || weightKg > 300) {
+      Alert.alert(
+        "Invalid Weight",
+        "Please enter a realistic weight (20–300 kg).",
+      );
+      return;
+    }
+
+    const weightChanged = weightKg !== parseFloat(profile?.weight ?? "");
+
     setSaving(true);
     try {
       const res = await api.put("/users/me", {
         birthday: isoBirthday,
         sex: editForm.sex,
-        height: parseFloat(editForm.height),
-        weight: parseFloat(editForm.weight),
+        height: heightCm,
+        weight: weightKg,
         dietary_goal: editForm.dietary_goal,
         activity_level: editForm.activity_level,
         allergens: editForm.allergens,
@@ -364,8 +429,17 @@ export default function ProfileScreen() {
       setProfile(res.data.user);
       await AsyncStorage.setItem("user", JSON.stringify(res.data.user));
 
-      await api.post("/progress/log", { weight: parseFloat(editForm.weight) });
-      loadWeightHistory(activeWeightTab);
+      // Only add a weight-history entry when the weight actually changed,
+      // so editing other fields does not create duplicate points on the chart
+      if (weightChanged) {
+        await api.post("/progress/log", { weight: weightKg });
+        loadWeightHistory(activeWeightTab);
+        // Restart the weekly weigh-in reminder on the Stats screen
+        await AsyncStorage.setItem(
+          `lastWeighIn:${res.data.user.id}`,
+          String(Date.now()),
+        );
+      }
 
       setShowEditModal(false);
       Alert.alert("Success", "Profile saved successfully!");
@@ -461,6 +535,14 @@ export default function ProfileScreen() {
       Icon: Calendar,
       label: "Birthday",
       value: formatDateDisplay(profile.birthday),
+    },
+    {
+      Icon: User,
+      label: "Age",
+      value:
+        calcAge(profile.birthday) !== null
+          ? `${calcAge(profile.birthday)} years old`
+          : "—",
     },
     { Icon: VenusAndMars, label: "Sex", value: profile.sex },
     { Icon: Ruler, label: "Height", value: `${profile.height} cm` },
@@ -939,25 +1021,99 @@ export default function ProfileScreen() {
                   <Text
                     style={[styles.inputLabel, { color: colors.textSecondary }]}
                   >
-                    Height (cm)
+                    Height
                   </Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.input,
-                        borderColor: colors.inputBorder,
-                        color: colors.text,
-                      },
-                    ]}
-                    value={String(editForm.height)}
-                    onChangeText={(v) =>
-                      setEditForm((p: any) => ({ ...p, height: v }))
-                    }
-                    placeholder="e.g. 170"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="numeric"
-                  />
+                  <View style={styles.sexRow}>
+                    {(["cm", "ft"] as const).map((u) => (
+                      <TouchableOpacity
+                        key={u}
+                        style={[
+                          styles.sexBtn,
+                          {
+                            borderColor: colors.inputBorder,
+                            backgroundColor: colors.input,
+                          },
+                          heightUnit === u && styles.sexBtnMale,
+                        ]}
+                        onPress={() => switchHeightUnit(u)}
+                      >
+                        <Text
+                          style={[
+                            styles.sexBtnText,
+                            { color: colors.textSecondary },
+                            heightUnit === u && styles.sexBtnTextActive,
+                          ]}
+                        >
+                          {u === "cm" ? "Centimeters" : "Feet / Inches"}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {heightUnit === "cm" ? (
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { marginTop: 8 },
+                        {
+                          backgroundColor: colors.input,
+                          borderColor: colors.inputBorder,
+                          color: colors.text,
+                        },
+                      ]}
+                      value={String(editForm.height)}
+                      onChangeText={(v) =>
+                        setEditForm((p: any) => ({
+                          ...p,
+                          height: v.replace(/[^0-9.]/g, ""),
+                        }))
+                      }
+                      placeholder="e.g. 170"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="numeric"
+                      maxLength={5}
+                    />
+                  ) : (
+                    <View style={[styles.sexRow, { marginTop: 8 }]}>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          { flex: 1 },
+                          {
+                            backgroundColor: colors.input,
+                            borderColor: colors.inputBorder,
+                            color: colors.text,
+                          },
+                        ]}
+                        value={heightFt}
+                        onChangeText={(v) =>
+                          setHeightFt(v.replace(/[^0-9]/g, ""))
+                        }
+                        placeholder="Feet"
+                        placeholderTextColor={colors.textMuted}
+                        keyboardType="number-pad"
+                        maxLength={1}
+                      />
+                      <TextInput
+                        style={[
+                          styles.input,
+                          { flex: 1 },
+                          {
+                            backgroundColor: colors.input,
+                            borderColor: colors.inputBorder,
+                            color: colors.text,
+                          },
+                        ]}
+                        value={heightIn}
+                        onChangeText={(v) =>
+                          setHeightIn(v.replace(/[^0-9]/g, ""))
+                        }
+                        placeholder="Inches"
+                        placeholderTextColor={colors.textMuted}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                      />
+                    </View>
+                  )}
 
                   <Text
                     style={[styles.inputLabel, { color: colors.textSecondary }]}
@@ -975,8 +1131,12 @@ export default function ProfileScreen() {
                     ]}
                     value={String(editForm.weight)}
                     onChangeText={(v) =>
-                      setEditForm((p: any) => ({ ...p, weight: v }))
+                      setEditForm((p: any) => ({
+                        ...p,
+                        weight: v.replace(/[^0-9.]/g, ""),
+                      }))
                     }
+                    maxLength={6}
                     placeholder="e.g. 69.39"
                     placeholderTextColor={colors.textMuted}
                     keyboardType="numeric"

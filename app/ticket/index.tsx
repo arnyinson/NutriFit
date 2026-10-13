@@ -1,5 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   CheckCircle2,
   ChevronLeft,
@@ -9,7 +9,7 @@ import {
   Send,
   X,
 } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -34,12 +34,25 @@ type Ticket = {
   message: string;
   status: "New" | "Pending" | "Resolved";
   admin_response: string | null;
+  responded_at?: string | null;
   created_at: string;
   image_url: string | null;
 };
 
+const formatDateTime = (iso: string) =>
+  new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
 export default function TicketScreen() {
   const router = useRouter();
+  // Set when the user taps a ticket notification: opens that ticket's conversation
+  const { ticketId } = useLocalSearchParams<{ ticketId?: string }>();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const handledTicketParam = useRef<string | null>(null);
   const { colors } = useTheme();
   const [feedbackType, setFeedbackType] = useState("Suggestion");
   const [message, setMessage] = useState("");
@@ -79,6 +92,15 @@ export default function TicketScreen() {
       loadMyTickets();
     }
   }, [showHistory, loadMyTickets]);
+
+  // Opened from a notification: show My Tickets with that ticket expanded
+  useEffect(() => {
+    if (ticketId && handledTicketParam.current !== ticketId) {
+      handledTicketParam.current = ticketId;
+      setExpandedId(String(ticketId));
+      setShowHistory(true);
+    }
+  }, [ticketId]);
 
   const getStatusColor = (status: string) => {
     if (status === "Pending") return "#FF9800";
@@ -444,114 +466,144 @@ export default function TicketScreen() {
                       You haven&apos;t submitted any feedback yet.
                     </Text>
                   ) : (
-                    myTickets.map((ticket) => (
-                      <View
-                        key={ticket.id}
-                        style={[
-                          styles.ticketCard,
-                          {
-                            backgroundColor: colors.surface,
-                            borderColor: colors.border,
-                          },
-                        ]}
-                      >
-                        <View style={styles.ticketTop}>
-                          <View style={styles.ticketTypeRow}>
+                    myTickets.map((ticket) => {
+                      const expanded = expandedId === ticket.id;
+                      return (
+                        <TouchableOpacity
+                          key={ticket.id}
+                          activeOpacity={0.85}
+                          onPress={() =>
+                            setExpandedId(expanded ? null : ticket.id)
+                          }
+                          style={[
+                            styles.ticketCard,
+                            {
+                              backgroundColor: colors.surface,
+                              borderColor: expanded ? "#4CAF50" : colors.border,
+                            },
+                          ]}
+                        >
+                          <View style={styles.ticketTop}>
+                            <View style={styles.ticketTypeRow}>
+                              <Text
+                                style={[
+                                  styles.ticketType,
+                                  { color: colors.text },
+                                ]}
+                              >
+                                {ticket.type}
+                              </Text>
+                              <View
+                                style={[
+                                  styles.statusBadge,
+                                  {
+                                    backgroundColor:
+                                      getStatusColor(ticket.status) + "20",
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.statusText,
+                                    { color: getStatusColor(ticket.status) },
+                                  ]}
+                                >
+                                  {ticket.status}
+                                </Text>
+                              </View>
+                            </View>
                             <Text
                               style={[
-                                styles.ticketType,
-                                { color: colors.text },
+                                styles.ticketDate,
+                                { color: colors.textMuted },
                               ]}
                             >
-                              {ticket.type}
+                              {new Date(ticket.created_at).toLocaleDateString(
+                                "en-US",
+                                { month: "long", day: "numeric" },
+                              )}
                             </Text>
+                          </View>
+                          <Text
+                            style={[
+                              styles.ticketMessage,
+                              { color: colors.textSecondary },
+                            ]}
+                            numberOfLines={expanded ? undefined : 2}
+                          >
+                            {ticket.message}
+                          </Text>
+                          {ticket.image_url && (
+                            <TouchableOpacity
+                              onPress={() => setViewingImage(ticket.image_url)}
+                              style={styles.ticketImageThumbWrapper}
+                            >
+                              <Image
+                                source={{ uri: ticket.image_url }}
+                                style={styles.ticketImageThumb}
+                                resizeMode="cover"
+                              />
+                              <Text
+                                style={[
+                                  styles.ticketImageThumbLabel,
+                                  { color: colors.primary },
+                                ]}
+                              >
+                                View attached screenshot
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                          {ticket.admin_response ? (
                             <View
                               style={[
-                                styles.statusBadge,
-                                {
-                                  backgroundColor:
-                                    getStatusColor(ticket.status) + "20",
-                                },
+                                styles.adminResponseBox,
+                                { backgroundColor: colors.input },
                               ]}
                             >
                               <Text
                                 style={[
-                                  styles.statusText,
-                                  { color: getStatusColor(ticket.status) },
+                                  styles.adminResponseLabel,
+                                  { color: colors.textMuted },
                                 ]}
                               >
-                                {ticket.status}
+                                Admin Response
+                                {ticket.responded_at
+                                  ? ` · ${formatDateTime(ticket.responded_at)}`
+                                  : ""}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.adminResponseText,
+                                  { color: colors.textSecondary },
+                                ]}
+                                numberOfLines={expanded ? undefined : 3}
+                              >
+                                {ticket.admin_response}
                               </Text>
                             </View>
-                          </View>
-                          <Text
-                            style={[
-                              styles.ticketDate,
-                              { color: colors.textMuted },
-                            ]}
-                          >
-                            {new Date(ticket.created_at).toLocaleDateString(
-                              "en-US",
-                              { month: "long", day: "numeric" },
-                            )}
-                          </Text>
-                        </View>
-                        <Text
-                          style={[
-                            styles.ticketMessage,
-                            { color: colors.textSecondary },
-                          ]}
-                          numberOfLines={2}
-                        >
-                          {ticket.message}
-                        </Text>
-                        {ticket.image_url && (
-                          <TouchableOpacity
-                            onPress={() => setViewingImage(ticket.image_url)}
-                            style={styles.ticketImageThumbWrapper}
-                          >
-                            <Image
-                              source={{ uri: ticket.image_url }}
-                              style={styles.ticketImageThumb}
-                              resizeMode="cover"
-                            />
+                          ) : expanded ? (
                             <Text
                               style={[
-                                styles.ticketImageThumbLabel,
-                                { color: colors.primary },
-                              ]}
-                            >
-                              View attached screenshot
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                        {ticket.admin_response && (
-                          <View
-                            style={[
-                              styles.adminResponseBox,
-                              { backgroundColor: colors.input },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.adminResponseLabel,
+                                styles.waitingText,
                                 { color: colors.textMuted },
                               ]}
                             >
-                              Admin Response
+                              No reply yet. Our team will respond soon.
                             </Text>
-                            <Text
-                              style={[
-                                styles.adminResponseText,
-                                { color: colors.textSecondary },
-                              ]}
-                            >
-                              {ticket.admin_response}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    ))
+                          ) : null}
+                          <Text
+                            style={[
+                              styles.expandHint,
+                              { color: colors.textMuted },
+                            ]}
+                          >
+                            {expanded
+                              ? "Tap to collapse"
+                              : "Tap to view conversation"}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })
                   )}
                 </ScrollView>
               </>
@@ -769,6 +821,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   ticketImageThumbLabel: { fontSize: 11, fontWeight: "600" },
+  waitingText: { fontSize: 12, fontStyle: "italic", marginTop: 6 },
+  expandHint: { fontSize: 10, marginTop: 8, textAlign: "right" },
   adminResponseBox: { borderRadius: 10, padding: 10, marginTop: 10 },
   adminResponseLabel: {
     fontSize: 10,

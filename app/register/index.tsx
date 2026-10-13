@@ -64,7 +64,10 @@ export default function RegisterScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [birthdayDate, setBirthdayDate] = useState<Date | null>(null);
   const [sex, setSex] = useState("Male");
+  const [heightUnit, setHeightUnit] = useState<"cm" | "ft">("cm");
   const [height, setHeight] = useState("");
+  const [heightFt, setHeightFt] = useState("");
+  const [heightIn, setHeightIn] = useState("");
   const [weight, setWeight] = useState("");
   const [activityLevel, setActivityLevel] = useState("");
   const [dietaryGoal, setDietaryGoal] = useState("");
@@ -138,14 +141,45 @@ export default function RegisterScreen() {
     return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
   };
 
+  // Height is always sent to the backend in centimeters. When the user picks
+  // feet/inches we convert here (1 in = 2.54 cm).
+  const getHeightCm = (): number | null => {
+    if (heightUnit === "cm") {
+      const cm = parseFloat(height);
+      return Number.isFinite(cm) ? cm : null;
+    }
+    const ft = parseInt(heightFt, 10);
+    const inch = heightIn === "" ? 0 : parseInt(heightIn, 10);
+    if (!Number.isFinite(ft) || !Number.isFinite(inch) || inch < 0 || inch > 11)
+      return null;
+    return Math.round((ft * 12 + inch) * 2.54 * 10) / 10;
+  };
+
+  const switchHeightUnit = (next: "cm" | "ft") => {
+    if (next === heightUnit) return;
+    // Carry the value over so the user does not have to retype it
+    const cm = getHeightCm();
+    if (cm) {
+      if (next === "ft") {
+        const totalIn = Math.round(cm / 2.54);
+        setHeightFt(String(Math.floor(totalIn / 12)));
+        setHeightIn(String(totalIn % 12));
+      } else {
+        setHeight(String(cm));
+      }
+    }
+    setHeightUnit(next);
+  };
+
   const handleRegister = async () => {
+    const heightCm = getHeightCm();
     if (
       !email ||
       !username ||
       !password ||
       !confirmPassword ||
       !birthday ||
-      !height ||
+      heightCm === null ||
       !weight ||
       !activityLevel ||
       !dietaryGoal
@@ -179,6 +213,14 @@ export default function RegisterScreen() {
       return;
     }
 
+    if (heightCm < 100 || heightCm > 250) {
+      Alert.alert(
+        "Invalid Height",
+        "Please enter a realistic height (about 100 cm / 3'3\" up to 250 cm / 8'2\").",
+      );
+      return;
+    }
+
     const formattedBirthday = formatBirthdayForAPI(birthday);
     if (!formattedBirthday) {
       Alert.alert(
@@ -197,7 +239,7 @@ export default function RegisterScreen() {
         password,
         birthday: formattedBirthday,
         sex,
-        height: parseFloat(height),
+        height: heightCm,
         weight: parseFloat(weight),
         dietary_goal: dietaryGoal,
         activity_level: activityLevel,
@@ -424,24 +466,96 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Height */}
-        <View
-          style={[
-            styles.inputWrapper,
-            { backgroundColor: colors.input, borderColor: colors.inputBorder },
-          ]}
-        >
-          <Ruler size={16} color={colors.textMuted} />
-          <TextInput
-            style={[styles.input, { color: colors.text }]}
-            placeholder="Height (cm)"
-            placeholderTextColor={colors.textMuted}
-            value={height}
-            onChangeText={setHeight}
-            keyboardType="numeric"
-            editable={!loading}
-          />
+        {/* Height — cm or ft/in; converted to cm before sending */}
+        <View style={styles.unitRow}>
+          {(["cm", "ft"] as const).map((u) => (
+            <TouchableOpacity
+              key={u}
+              style={[
+                styles.unitBtn,
+                {
+                  borderColor: colors.inputBorder,
+                  backgroundColor: colors.input,
+                },
+                heightUnit === u && styles.unitBtnActive,
+              ]}
+              onPress={() => switchHeightUnit(u)}
+              disabled={loading}
+            >
+              <Text
+                style={[
+                  styles.unitText,
+                  { color: colors.textSecondary },
+                  heightUnit === u && styles.unitTextActive,
+                ]}
+              >
+                {u === "cm" ? "Centimeters" : "Feet / Inches"}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
+        {heightUnit === "cm" ? (
+          <View
+            style={[
+              styles.inputWrapper,
+              { backgroundColor: colors.input, borderColor: colors.inputBorder },
+            ]}
+          >
+            <Ruler size={16} color={colors.textMuted} />
+            <TextInput
+              style={[styles.input, { color: colors.text }]}
+              placeholder="Height (cm)"
+              placeholderTextColor={colors.textMuted}
+              value={height}
+              onChangeText={(v) => setHeight(v.replace(/[^0-9.]/g, ""))}
+              keyboardType="numeric"
+              maxLength={5}
+              editable={!loading}
+            />
+          </View>
+        ) : (
+          <View style={styles.ftRow}>
+            <View
+              style={[
+                styles.inputWrapper,
+                styles.ftInput,
+                { backgroundColor: colors.input, borderColor: colors.inputBorder },
+              ]}
+            >
+              <Ruler size={16} color={colors.textMuted} />
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="Feet"
+                placeholderTextColor={colors.textMuted}
+                value={heightFt}
+                onChangeText={(v) => setHeightFt(v.replace(/[^0-9]/g, ""))}
+                keyboardType="number-pad"
+                maxLength={1}
+                editable={!loading}
+              />
+              <Text style={{ color: colors.textMuted, fontSize: 13 }}>ft</Text>
+            </View>
+            <View
+              style={[
+                styles.inputWrapper,
+                styles.ftInput,
+                { backgroundColor: colors.input, borderColor: colors.inputBorder },
+              ]}
+            >
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="Inches"
+                placeholderTextColor={colors.textMuted}
+                value={heightIn}
+                onChangeText={(v) => setHeightIn(v.replace(/[^0-9]/g, ""))}
+                keyboardType="number-pad"
+                maxLength={2}
+                editable={!loading}
+              />
+              <Text style={{ color: colors.textMuted, fontSize: 13 }}>in</Text>
+            </View>
+          </View>
+        )}
 
         {/* Weight */}
         <View
@@ -854,6 +968,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginLeft: 4,
   },
+  unitRow: { flexDirection: "row", width: "100%", marginBottom: 8, gap: 8 },
+  unitBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  unitBtnActive: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
+  unitText: { fontSize: 12, fontWeight: "600" },
+  unitTextActive: { color: "#fff" },
+  ftRow: { flexDirection: "row", width: "100%", gap: 8 },
+  ftInput: { flex: 1, width: undefined },
   sexRow: { flexDirection: "row", width: "100%", marginBottom: 12, gap: 8 },
   sexBtn: {
     flex: 1,

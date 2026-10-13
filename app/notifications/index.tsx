@@ -5,6 +5,7 @@ import {
   BellOff,
   ChevronLeft,
   Dumbbell,
+  Ticket,
   Trophy,
   Utensils,
   X,
@@ -29,10 +30,22 @@ type Notification = {
   id: string;
   title: string;
   message: string;
-  type: "meal" | "workout" | "progress" | "achievement" | "system";
+  type: "meal" | "workout" | "progress" | "achievement" | "system" | "ticket";
   is_read: boolean;
   created_at: string;
+  // Optional: the backend may include the ticket this notification is about
+  ticket_id?: string | null;
+  data?: { ticket_id?: string } | null;
 };
+
+// A notification is about a support ticket when the backend labels it "ticket",
+// or (for older "system" notifications) when its text talks about a ticket / reply.
+const isTicketNotification = (n: Notification) =>
+  n.type === "ticket" ||
+  (n.type === "system" &&
+    /ticket|feedback|support|admin (has )?(replied|responded)|response/i.test(
+      `${n.title} ${n.message}`,
+    ));
 
 const filterConfig = [
   { key: "all", label: "All", Icon: Bell },
@@ -92,6 +105,8 @@ export default function NotificationsScreen() {
 
   const getIcon = (type: string) => {
     switch (type) {
+      case "ticket":
+        return Ticket;
       case "meal":
         return Utensils;
       case "workout":
@@ -107,6 +122,8 @@ export default function NotificationsScreen() {
 
   const getColor = (type: string) => {
     switch (type) {
+      case "ticket":
+        return "#00ACC1";
       case "meal":
         return "#4CAF50";
       case "workout":
@@ -139,6 +156,18 @@ export default function NotificationsScreen() {
     } catch (err) {
       console.error("Mark all as read error:", err);
       setNotifications(previous);
+    }
+  };
+
+  // Tapping a ticket notification opens the ticket screen so the user can read
+  // the admin's reply in the conversation. Other notifications only get marked read.
+  const handleNotificationPress = (notif: Notification) => {
+    if (!notif.is_read) markAsRead(notif.id);
+    if (isTicketNotification(notif)) {
+      const ticketId = notif.ticket_id || notif.data?.ticket_id;
+      router.push(
+        (ticketId ? `/ticket?ticketId=${ticketId}` : "/ticket") as any,
+      );
     }
   };
 
@@ -276,7 +305,9 @@ export default function NotificationsScreen() {
           </View>
         ) : (
           notifications.map((notif) => {
-            const NotifIcon = getIcon(notif.type);
+            const isTicket = isTicketNotification(notif);
+            const NotifIcon = getIcon(isTicket ? "ticket" : notif.type);
+            const iconColor = getColor(isTicket ? "ticket" : notif.type);
             return (
               <TouchableOpacity
                 key={notif.id}
@@ -288,16 +319,16 @@ export default function NotificationsScreen() {
                   },
                   !notif.is_read && { backgroundColor: colors.surface },
                 ]}
-                onPress={() => markAsRead(notif.id)}
+                onPress={() => handleNotificationPress(notif)}
                 activeOpacity={0.8}
               >
                 <View
                   style={[
                     styles.notifIconBox,
-                    { backgroundColor: getColor(notif.type) + "20" },
+                    { backgroundColor: iconColor + "20" },
                   ]}
                 >
-                  <NotifIcon size={20} color={getColor(notif.type)} />
+                  <NotifIcon size={20} color={iconColor} />
                 </View>
                 <View style={styles.notifInfo}>
                   <View style={styles.notifTitleRow}>
@@ -323,6 +354,7 @@ export default function NotificationsScreen() {
                   </Text>
                   <Text style={[styles.notifTime, { color: colors.textMuted }]}>
                     {formatTimeAgo(notif.created_at)}
+                    {isTicket ? "  ·  Tap to view conversation" : ""}
                   </Text>
                 </View>
                 <TouchableOpacity

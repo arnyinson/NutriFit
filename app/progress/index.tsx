@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { usePathname, useRouter } from "expo-router";
 import {
-  ArrowRight,
   BarChart3,
   Check,
   ChevronLeft,
@@ -10,11 +9,13 @@ import {
   RefreshCw,
   Scale,
   Target,
+  TrendingDown,
+  TrendingUp,
   User,
   Utensils,
   X,
 } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -33,6 +34,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import Svg, { Circle, Line, Path } from "react-native-svg";
 import ConfirmModal from "../../components/ConfirmModal";
 import SuccessModal from "../../components/SuccessModal";
 import api from "../../constants/api";
@@ -49,15 +51,48 @@ type Summary = {
   mealConsistency: number;
 };
 
+type Profile = {
+  id: string;
+  birthday: string;
+  sex: string;
+  height: string;
+  weight: string;
+  dietary_goal: string;
+  activity_level: string;
+  allergens: string[];
+  available_equipment: string[];
+  tdee: string;
+};
+
 const PERIODS = [
   { key: "Daily", apiValue: "daily" },
   { key: "Weekly", apiValue: "weekly" },
   { key: "Monthly", apiValue: "monthly" },
 ] as const;
 
-// Weight change na mas maliit sa halagang ito (sa kg) ay itinuturing na
-// "stable" / walang malaking pagbabago, sa halip na pilit na "pataas" o "pababa"
+// Weight change smaller than this (kg) is treated as "stable"
 const WEIGHT_STABLE_THRESHOLD = 0.3;
+
+// The weight is NOT asked daily (panel feedback). The user is only prompted to
+// re-enter it once per week; the value is saved to the profile so Stats and
+// Profile always show the same weight.
+const WEIGH_IN_INTERVAL_DAYS = 7;
+const weighInKey = (userId: string) => `lastWeighIn:${userId}`;
+
+// ~7700 kcal of surplus/deficit is roughly 1 kg of body weight
+const KCAL_PER_KG = 7700;
+
+const CHART_HEIGHT = 130;
+const CHART_PAD_X = 8;
+const CHART_PAD_TOP = 12;
+const CHART_PAD_BOTTOM = 8;
+
+const toISODate = (value: string) => {
+  const d = new Date(value);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+};
 
 export default function ProgressScreen() {
   const router = useRouter();
@@ -68,11 +103,21 @@ export default function ProgressScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [dietaryGoal, setDietaryGoal] = useState<string>("Maintenance");
-
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [weightInput, setWeightInput] = useState("");
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [chartWidth, setChartWidth] = useState(0);
+
+  const [weighInDue, setWeighInDue] = useState(false);
+  const [showWeighInModal, setShowWeighInModal] = useState(false);
+  const [showWeighInConfirm, setShowWeighInConfirm] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [weightInput, setWeightInput] = useState("");
+  const [savingWeight, setSavingWeight] = useState(false);
+
+  const didAutoSync = useRef(false);
+
+  const dietaryGoal = profile?.dietary_goal || "Maintenance";
 
   const loadSummary = useCallback(async (period: string) => {
     try {
@@ -90,82 +135,137 @@ export default function ProgressScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    loadSummary(activePeriod);
-  }, [activePeriod, loadSummary]);
+  const loadProfile = useCallback(async (): Promise<Profile | null> => {
+    try {
+      const res = await api.get("/users/me");
+      const user = res.data.user as Profile;
+      setProfile(user);
 
-  // Kunin ang dietary goal ng user (kailangan para malaman kung "maganda" o
-  // "masama" ang direksyon ng weight change — iba-iba depende sa goal)
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.get("/users/me");
-        if (res.data.user?.dietary_goal) {
-          setDietaryGoal(res.data.user.dietary_goal);
-        }
-      } catch (err) {
-        console.error("Load dietary goal error:", err);
+      // Decide whether the weekly weigh-in prompt is due. First time on this
+      // device we just start the clock instead of nagging immediately.
+      const key = weighInKey(user.id);
+      const stored = await AsyncStorage.getItem(key);
+      if (!stored) {
+        await AsyncStorage.setItem(key, String(Date.now()));
+        setWeighInDue(false);
+      } else {
+        const days = (Date.now() - Number(stored)) / (1000 * 60 * 60 * 24);
+        setWeighInDue(days >= WEIGH_IN_INTERVAL_DAYS);
       }
-    })();
+      return user;
+    } catch (err) {
+      console.error("Load profile error:", err);
+      return null;
+    }
   }, []);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadSummary(activePeriod);
-  };
-
-  const openUpdateModal = async () => {
-    // Pre-fill with the user's last known weight, for convenience
-    try {
-      const cached = await api.get("/users/me");
-      if (cached.data.user?.weight) {
-        setWeightInput(String(cached.data.user.weight));
-      }
-    } catch {
-      // ignore, just leave the field blank
-    }
-    setShowUpdateModal(true);
-  };
-
-  const performSync = async () => {
-    const weightNum = parseFloat(weightInput);
-
+  // Real-time sync: instead of asking the user to type their weight and tap a
+  // button every day, today's meal/workout/calorie stats are synced
+  // automatically whenever this screen opens or is pulled to refresh. The
+  // weight used is the one saved in the profile.
+  const autoSync = useCallback(async (user: Profile | null) => {
+    if (!user) return;
+    const weight = parseFloat(user.weight);
+    if (!Number.isFinite(weight) || weight <= 0) return;
     setSyncing(true);
     try {
       const savedMode = await AsyncStorage.getItem("mealPlanMode");
       const mode = savedMode === "continuous" ? "continuous" : "weekly";
-      await api.post("/progress/sync-today", { weight: weightNum, mode });
-      setShowUpdateModal(false);
+      await api.post("/progress/sync-today", { weight, mode });
+      setLastSynced(new Date());
+    } catch (err) {
+      console.error("Auto sync error:", err);
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
+  const refreshAll = useCallback(
+    async (period: string) => {
+      const user = await loadProfile();
+      await autoSync(user);
+      await loadSummary(period);
+    },
+    [loadProfile, autoSync, loadSummary],
+  );
+
+  // First open: profile -> sync -> summary
+  useEffect(() => {
+    if (didAutoSync.current) return;
+    didAutoSync.current = true;
+    refreshAll(activePeriod);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Switching Daily / Weekly / Monthly only re-reads the summary
+  const firstPeriodRun = useRef(true);
+  useEffect(() => {
+    if (firstPeriodRun.current) {
+      firstPeriodRun.current = false;
+      return;
+    }
+    setLoading(true);
+    loadSummary(activePeriod);
+  }, [activePeriod, loadSummary]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    refreshAll(activePeriod);
+  };
+
+  const openWeighIn = () => {
+    setWeightInput(profile?.weight ? String(profile.weight) : "");
+    setShowWeighInModal(true);
+  };
+
+  const handleWeighInSubmit = () => {
+    const w = parseFloat(weightInput);
+    if (!weightInput || isNaN(w) || w < 20 || w > 300) {
+      Alert.alert("Error", "Please enter a realistic weight (20–300 kg).");
+      return;
+    }
+    setShowWeighInConfirm(true);
+  };
+
+  // Saves the new weight to the PROFILE (single source of truth), logs it to the
+  // weight history, then re-syncs the stats.
+  const performWeighIn = async () => {
+    if (!profile) return;
+    const weightKg = parseFloat(weightInput);
+    setSavingWeight(true);
+    try {
+      await api.put("/users/me", {
+        birthday: toISODate(profile.birthday),
+        sex: profile.sex,
+        height: parseFloat(profile.height),
+        weight: weightKg,
+        dietary_goal: profile.dietary_goal,
+        activity_level: profile.activity_level,
+        allergens: profile.allergens,
+        available_equipment: profile.available_equipment,
+      });
+      await api.post("/progress/log", { weight: weightKg });
+      await AsyncStorage.setItem(weighInKey(profile.id), String(Date.now()));
+      setWeighInDue(false);
+      setShowWeighInModal(false);
+
+      const user = await loadProfile();
+      await autoSync(user);
       await loadSummary(activePeriod);
       setShowSuccessModal(true);
     } catch (err: any) {
       const message =
-        err.response?.data?.error ||
-        "Unable to update progress. Please try again.";
+        err.response?.data?.error || "Unable to save weight. Please try again.";
       Alert.alert("Error", message);
     } finally {
-      setSyncing(false);
+      setSavingWeight(false);
     }
   };
 
-  const [showSyncConfirm, setShowSyncConfirm] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-  const handleSyncProgress = () => {
-    const weightNum = parseFloat(weightInput);
-    if (!weightInput || isNaN(weightNum) || weightNum <= 0) {
-      Alert.alert("Error", "Please enter a valid weight.");
-      return;
-    }
-    setShowSyncConfirm(true);
-  };
-
-  // Kinukuha ang tamang arrow symbol at kulay para sa weight change, base sa
-  // dietary goal ng user:
-  // - Maintenance: stable = berde, kahit anong direksyon ng malaking pagbabago = pula
-  // - Cutting: bumaba = berde (maganda), tumaas = pula
-  // - Bulking: tumaas = berde (maganda), bumaba = pula
+  // Arrow symbol + color for the weight change, based on the dietary goal:
+  // - Maintenance: stable = green, any big change = red
+  // - Cutting: down = green, up = red
+  // - Bulking: up = green, down = red
   const getWeightChangeDisplay = (change: number, goal: string) => {
     const isStable = Math.abs(change) < WEIGHT_STABLE_THRESHOLD;
 
@@ -181,7 +281,6 @@ export default function ProgressScreen() {
         ? { symbol: "▲", color: "#4CAF50" }
         : { symbol: "▼", color: "#F44336" };
     }
-    // Maintenance (default)
     if (isStable) return { symbol: "~", color: "#4CAF50" };
     return change < 0
       ? { symbol: "▼", color: "#F44336" }
@@ -205,12 +304,56 @@ export default function ProgressScreen() {
     );
   }
 
-  const hasData = summary.dailyCalories.length > 0;
+  const days = summary.dailyCalories;
+  const hasData = days.length > 0;
+  const loggedDays = days.filter((d) => d.actual > 0);
+
+  // ---- Single line chart: target vs actual calories ----
   const maxCalorie = hasData
-    ? Math.max(
-        ...summary.dailyCalories.map((d) => Math.max(d.target, d.actual)),
-      )
+    ? Math.max(...days.map((d) => Math.max(d.target, d.actual)), 1)
     : 1;
+  const innerW = Math.max(chartWidth - CHART_PAD_X * 2, 1);
+  const innerH = CHART_HEIGHT - CHART_PAD_TOP - CHART_PAD_BOTTOM;
+  const xAt = (i: number) =>
+    days.length === 1
+      ? chartWidth / 2
+      : CHART_PAD_X + (innerW / (days.length - 1)) * i;
+  const yAt = (v: number) => CHART_PAD_TOP + innerH - (v / maxCalorie) * innerH;
+  const pathFor = (key: "target" | "actual") =>
+    days
+      .map((d, i) => `${i === 0 ? "M" : "L"} ${xAt(i)} ${yAt(d[key])}`)
+      .join(" ");
+  const labelEvery = Math.max(1, Math.ceil(days.length / 7));
+
+  // ---- Forecast (energy balance estimate) ----
+  const tdee = parseFloat(profile?.tdee || "");
+  const avgActual = summary.calorieAdherence.actual;
+  let forecast: {
+    perWeek: number;
+    in4Weeks: number;
+    text: string;
+  } | null = null;
+  if (
+    Number.isFinite(tdee) &&
+    tdee > 0 &&
+    avgActual > 0 &&
+    loggedDays.length >= 1
+  ) {
+    const perWeek = ((avgActual - tdee) * 7) / KCAL_PER_KG;
+    const current = summary.bodyProgress.current;
+    const in4Weeks = Math.round((current + perWeek * 4) * 10) / 10;
+    const dir =
+      Math.abs(perWeek) < 0.05
+        ? "stay about the same"
+        : perWeek > 0
+          ? `gain about ${perWeek.toFixed(2)} kg per week`
+          : `lose about ${Math.abs(perWeek).toFixed(2)} kg per week`;
+    forecast = {
+      perWeek,
+      in4Weeks,
+      text: `If you keep eating like this, you will ${dir}.`,
+    };
+  }
 
   const today = new Date();
   const dayOfWeek = today.getDay();
@@ -281,6 +424,11 @@ export default function ProgressScreen() {
     dietaryGoal,
   );
 
+  const cardStyle = [
+    styles.card,
+    { backgroundColor: colors.surface, borderColor: colors.border },
+  ];
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -336,7 +484,7 @@ export default function ProgressScreen() {
           />
         }
       >
-        {/* Period Label + Update Progress Button */}
+        {/* Period Label */}
         <View style={styles.weekHeader}>
           <View>
             <Text style={[styles.weekLabel, { color: colors.text }]}>
@@ -352,25 +500,51 @@ export default function ProgressScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.updateBtn}
-          onPress={openUpdateModal}
-          hitSlop={HIT_SLOP}
-        >
-          <RefreshCw size={16} color="#fff" />
-          <Text style={styles.updateBtnText}>Update Progress</Text>
-        </TouchableOpacity>
+        {/* Sync status — stats sync automatically, no daily weight entry */}
+        <View style={styles.syncRow}>
+          <RefreshCw size={12} color={colors.textMuted} />
+          <Text style={[styles.syncText, { color: colors.textMuted }]}>
+            {syncing
+              ? "Syncing today's stats..."
+              : lastSynced
+                ? `Synced ${lastSynced.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · pull down to refresh`
+                : "Pull down to sync"}
+          </Text>
+        </View>
 
-        {!hasData ? (
+        {/* Weekly weigh-in prompt */}
+        {weighInDue && (
           <View
             style={[
               styles.card,
               {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                alignItems: "center",
-                paddingVertical: 40,
+                backgroundColor: isDark ? "#2A2113" : "#FFF8E1",
+                borderColor: "#FF9800",
               },
+            ]}
+          >
+            <View style={styles.weighInHeader}>
+              <Scale size={18} color="#FF9800" />
+              <Text style={[styles.weighInTitle, { color: colors.text }]}>
+                Time for your weekly weigh-in
+              </Text>
+            </View>
+            <Text style={[styles.weighInBody, { color: colors.textSecondary }]}>
+              Your weight may have changed this week. Enter your current weight
+              so your targets and progress stay accurate. It will also update
+              your profile.
+            </Text>
+            <TouchableOpacity style={styles.weighInBtn} onPress={openWeighIn}>
+              <Text style={styles.weighInBtnText}>Update my weight</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!hasData ? (
+          <View
+            style={[
+              ...cardStyle,
+              { alignItems: "center", paddingVertical: 40 },
             ]}
           >
             <Text
@@ -380,39 +554,36 @@ export default function ProgressScreen() {
                 textAlign: "center",
               }}
             >
-              No progress data logged yet for this period. Tap &quot;Update
-              Progress&quot; above to log your weight and sync today&apos;s
-              stats.
+              No records for this period yet. Log your meals and workouts and
+              they will appear here automatically.
             </Text>
           </View>
         ) : (
           <>
-            {/* Body Progress */}
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
+            {/* Summary numbers (no extra charts) */}
+            <View style={cardStyle}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>
-                Body Progress
+                Overview
               </Text>
-              <View style={styles.bodyProgressRow}>
-                <View style={styles.bodyStatBox}>
-                  <Text
-                    style={[styles.bodyStatLabel, { color: colors.textMuted }]}
-                  >
-                    Start
+              <View style={styles.tileRow}>
+                <View
+                  style={[
+                    styles.tile,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.tileLabel, { color: colors.textMuted }]}>
+                    Weight
                   </Text>
-                  <Text style={[styles.bodyStatValue, { color: colors.text }]}>
-                    {summary.bodyProgress.start} kg
+                  <Text style={[styles.tileValue, { color: colors.text }]}>
+                    {summary.bodyProgress.current} kg
                   </Text>
-                </View>
-                <View style={styles.bodyArrow}>
-                  <ArrowRight size={22} color={colors.border} />
                   <Text
                     style={[
-                      styles.bodyChange,
+                      styles.tileSub,
                       { color: weightChangeDisplay.color },
                     ]}
                   >
@@ -420,141 +591,140 @@ export default function ProgressScreen() {
                     {Math.abs(summary.bodyProgress.change)} kg
                   </Text>
                 </View>
-                <View style={styles.bodyStatBox}>
-                  <Text
-                    style={[styles.bodyStatLabel, { color: colors.textMuted }]}
-                  >
-                    Current
+                <View
+                  style={[
+                    styles.tile,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.tileLabel, { color: colors.textMuted }]}>
+                    Calories vs target
                   </Text>
-                  <Text style={[styles.bodyStatValue, { color: colors.text }]}>
-                    {summary.bodyProgress.current} kg
+                  <Text style={[styles.tileValue, { color: colors.text }]}>
+                    {summary.calorieAdherence.percentage}%
                   </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Calorie Adherence */}
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.cardTitle, { color: colors.text }]}>
-                Calorie Adherence
-              </Text>
-              <View style={styles.calorieRow}>
-                <View style={styles.calorieBox}>
-                  <Text
-                    style={[styles.calorieLabel, { color: colors.textMuted }]}
-                  >
-                    Target Avg
-                  </Text>
-                  <Text style={[styles.calorieValue, { color: colors.text }]}>
+                  <Text style={[styles.tileSub, { color: colors.textMuted }]}>
+                    {summary.calorieAdherence.actual.toLocaleString()} /{" "}
                     {summary.calorieAdherence.target.toLocaleString()} kcal
                   </Text>
-                  <View
-                    style={[
-                      styles.calorieBar,
-                      { backgroundColor: colors.border },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.calorieBarFill,
-                        { width: "100%", backgroundColor: colors.border },
-                      ]}
-                    />
-                  </View>
                 </View>
-                <Text style={styles.caloriePercent}>
-                  {summary.calorieAdherence.percentage}%
-                </Text>
               </View>
-              <View style={styles.calorieRow}>
-                <View style={styles.calorieBox}>
-                  <Text
-                    style={[styles.calorieLabel, { color: colors.textMuted }]}
-                  >
-                    Actual Avg
+              <View style={[styles.tileRow, { marginTop: 10 }]}>
+                <View
+                  style={[
+                    styles.tile,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Dumbbell size={16} color={colors.text} />
+                  <Text style={[styles.tileValue, { color: colors.text }]}>
+                    {summary.workoutCompletion}%
                   </Text>
-                  <Text style={[styles.calorieValue, { color: colors.text }]}>
-                    {summary.calorieAdherence.actual.toLocaleString()} kcal
+                  <Text style={[styles.tileSub, { color: colors.textMuted }]}>
+                    Workout completion
                   </Text>
-                  <View
-                    style={[
-                      styles.calorieBar,
-                      { backgroundColor: colors.border },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.calorieBarFill,
-                        {
-                          width: `${Math.min((summary.calorieAdherence.actual / (summary.calorieAdherence.target || 1)) * 100, 100)}%`,
-                          backgroundColor: "#4CAF50",
-                        },
-                      ]}
-                    />
-                  </View>
                 </View>
-                <Text style={styles.caloriePercent}>
-                  {summary.calorieAdherence.percentage}%
-                </Text>
+                <View
+                  style={[
+                    styles.tile,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Utensils size={16} color={colors.text} />
+                  <Text style={[styles.tileValue, { color: colors.text }]}>
+                    {summary.mealConsistency}%
+                  </Text>
+                  <Text style={[styles.tileSub, { color: colors.textMuted }]}>
+                    Meal consistency
+                  </Text>
+                </View>
               </View>
+              <Text style={[styles.macroLine, { color: colors.textMuted }]}>
+                Avg macros: Protein {summary.macros.protein}% · Carbs{" "}
+                {summary.macros.carbs}% · Fats {summary.macros.fats}%
+              </Text>
             </View>
 
-            {/* Calorie Chart */}
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
+            {/* The ONE chart: calories (actual vs target) */}
+            <View style={cardStyle}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>
-                {activePeriod === "Daily"
-                  ? "Today's Calorie Intake"
-                  : "Daily Calorie Intake"}
+                Calorie Intake
               </Text>
-              <View style={styles.barChart}>
-                {summary.dailyCalories.map((day, i) => {
-                  const targetH = (day.target / maxCalorie) * 80;
-                  const actualH = (day.actual / maxCalorie) * 80;
-                  const isOver = day.actual > day.target;
-                  return (
-                    <View key={i} style={styles.barGroup}>
-                      <View style={styles.bars}>
-                        <View
-                          style={[
-                            styles.bar,
-                            { height: targetH, backgroundColor: colors.border },
-                          ]}
+              {days.length > 1 ? (
+                <View
+                  onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}
+                >
+                  {chartWidth > 0 && (
+                    <Svg width={chartWidth} height={CHART_HEIGHT}>
+                      {[0, 0.5, 1].map((t) => (
+                        <Line
+                          key={t}
+                          x1={CHART_PAD_X}
+                          x2={chartWidth - CHART_PAD_X}
+                          y1={CHART_PAD_TOP + innerH * t}
+                          y2={CHART_PAD_TOP + innerH * t}
+                          stroke={colors.border}
+                          strokeWidth={1}
                         />
-                        <View
-                          style={[
-                            styles.bar,
-                            {
-                              height: actualH,
-                              backgroundColor: isOver ? "#FF9800" : "#4CAF50",
-                            },
-                          ]}
+                      ))}
+                      <Path
+                        d={pathFor("target")}
+                        stroke={colors.textMuted}
+                        strokeWidth={2}
+                        strokeDasharray="5,4"
+                        fill="none"
+                      />
+                      <Path
+                        d={pathFor("actual")}
+                        stroke="#4CAF50"
+                        strokeWidth={2.5}
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      {days.map((d, i) => (
+                        <Circle
+                          key={i}
+                          cx={xAt(i)}
+                          cy={yAt(d.actual)}
+                          r={3.5}
+                          fill={d.actual > d.target ? "#FF9800" : "#4CAF50"}
                         />
-                      </View>
+                      ))}
+                    </Svg>
+                  )}
+                  <View style={styles.axisRow}>
+                    {days.map((d, i) => (
                       <Text
-                        style={[styles.barLabel, { color: colors.textMuted }]}
+                        key={i}
+                        style={[styles.axisLabel, { color: colors.textMuted }]}
                       >
-                        {day.day}
+                        {i % labelEvery === 0 ? d.day : ""}
                       </Text>
-                    </View>
-                  );
-                })}
-              </View>
+                    ))}
+                  </View>
+                </View>
+              ) : (
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                  A trend line needs at least 2 days. See today&apos;s record
+                  below.
+                </Text>
+              )}
               <View style={styles.legendRow}>
                 <View style={styles.legendItem}>
                   <View
                     style={[
-                      styles.legendDot,
-                      { backgroundColor: colors.border },
+                      styles.legendLine,
+                      { backgroundColor: colors.textMuted },
                     ]}
                   />
                   <Text
@@ -570,7 +740,7 @@ export default function ProgressScreen() {
                   <Text
                     style={[styles.legendText, { color: colors.textMuted }]}
                   >
-                    Under
+                    Under / on target
                   </Text>
                 </View>
                 <View style={styles.legendItem}>
@@ -586,185 +756,112 @@ export default function ProgressScreen() {
               </View>
             </View>
 
-            {/* Macronutrient Breakdown */}
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
+            {/* Records: one row per day, for Daily / Weekly / Monthly */}
+            <View style={cardStyle}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>
-                Macronutrient Breakdown
+                {activePeriod === "Daily" ? "Today's Record" : "Daily Records"}
               </Text>
-              <View style={styles.macroRow}>
-                {[
-                  {
-                    label: "Protein",
-                    value: summary.macros.protein,
-                    color: "#4CAF50",
-                  },
-                  {
-                    label: "Carbs",
-                    value: summary.macros.carbs,
-                    color: "#2196F3",
-                  },
-                  {
-                    label: "Fats",
-                    value: summary.macros.fats,
-                    color: "#FF9800",
-                  },
-                ].map((macro) => (
-                  <View key={macro.label} style={styles.macroBox}>
-                    <View
-                      style={[
-                        styles.macroCircle,
-                        { backgroundColor: colors.input },
-                      ]}
-                    >
-                      <Text
-                        style={[styles.macroPercent, { color: macro.color }]}
-                      >
-                        {macro.value}%
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.macroDot,
-                        { backgroundColor: macro.color },
-                      ]}
-                    />
+              {[...days].reverse().map((d, i) => {
+                const isOver = d.actual > d.target;
+                const noLog = d.actual === 0;
+                return (
+                  <View
+                    key={i}
+                    style={[
+                      styles.recordRow,
+                      { borderBottomColor: colors.border },
+                    ]}
+                  >
+                    <Text style={[styles.recordDay, { color: colors.text }]}>
+                      {d.day}
+                    </Text>
                     <Text
                       style={[
-                        styles.macroLabel,
+                        styles.recordKcal,
                         { color: colors.textSecondary },
                       ]}
                     >
-                      {macro.label}
+                      {d.actual.toLocaleString()} / {d.target.toLocaleString()}{" "}
+                      kcal
                     </Text>
                     <View
                       style={[
-                        styles.macroBarContainer,
-                        { backgroundColor: colors.border },
+                        styles.recordBadge,
+                        {
+                          backgroundColor: noLog
+                            ? colors.input
+                            : isOver
+                              ? "#FFF3E0"
+                              : "#E8F5E9",
+                        },
                       ]}
                     >
-                      <View
-                        style={[
-                          styles.macroBarFill,
-                          {
-                            width: `${macro.value}%`,
-                            backgroundColor: macro.color,
-                          },
-                        ]}
-                      />
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: "700",
+                          color: noLog
+                            ? colors.textMuted
+                            : isOver
+                              ? "#FF9800"
+                              : "#4CAF50",
+                        }}
+                      >
+                        {noLog ? "No log" : isOver ? "Over" : "On track"}
+                      </Text>
                     </View>
                   </View>
-                ))}
-              </View>
+                );
+              })}
             </View>
 
-            {/* Consistency */}
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.cardTitle, { color: colors.text }]}>
-                Consistency
-              </Text>
-              <View style={styles.consistencyRow}>
-                <View
+            {/* Forecast */}
+            <View style={cardStyle}>
+              <View style={styles.weighInHeader}>
+                {forecast && forecast.perWeek < 0 ? (
+                  <TrendingDown size={18} color="#4CAF50" />
+                ) : (
+                  <TrendingUp size={18} color="#4CAF50" />
+                )}
+                <Text
                   style={[
-                    styles.consistencyBox,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
-                    },
+                    styles.cardTitle,
+                    { color: colors.text, marginBottom: 0 },
                   ]}
                 >
-                  <Dumbbell
-                    size={22}
-                    color={colors.text}
-                    style={{ marginBottom: 6 }}
-                  />
-                  <Text
-                    style={[styles.consistencyValue, { color: colors.text }]}
-                  >
-                    {summary.workoutCompletion}%
-                  </Text>
-                  <Text
-                    style={[
-                      styles.consistencyLabel,
-                      { color: colors.textMuted },
-                    ]}
-                  >
-                    Workout Completion
-                  </Text>
-                  <View
-                    style={[
-                      styles.consistencyBar,
-                      { backgroundColor: colors.border },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.consistencyFill,
-                        {
-                          width: `${summary.workoutCompletion}%`,
-                          backgroundColor: "#4CAF50",
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
-                <View
-                  style={[
-                    styles.consistencyBox,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <Utensils
-                    size={22}
-                    color={colors.text}
-                    style={{ marginBottom: 6 }}
-                  />
-                  <Text
-                    style={[styles.consistencyValue, { color: colors.text }]}
-                  >
-                    {summary.mealConsistency}%
-                  </Text>
-                  <Text
-                    style={[
-                      styles.consistencyLabel,
-                      { color: colors.textMuted },
-                    ]}
-                  >
-                    Meal Consistency
-                  </Text>
-                  <View
-                    style={[
-                      styles.consistencyBar,
-                      { backgroundColor: colors.border },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.consistencyFill,
-                        {
-                          width: `${summary.mealConsistency}%`,
-                          backgroundColor: "#2196F3",
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
+                  Forecast
+                </Text>
               </View>
+              {forecast ? (
+                <>
+                  <Text
+                    style={[
+                      styles.forecastText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {forecast.text}
+                  </Text>
+                  <Text style={[styles.forecastValue, { color: colors.text }]}>
+                    ≈ {forecast.in4Weeks} kg in 4 weeks
+                  </Text>
+                  <Text
+                    style={[styles.forecastNote, { color: colors.textMuted }]}
+                  >
+                    Estimate only, based on your average logged calories versus
+                    your TDEE. Real results vary.
+                  </Text>
+                </>
+              ) : (
+                <Text
+                  style={[styles.forecastText, { color: colors.textMuted }]}
+                >
+                  Log your meals for a few days to see a weight forecast.
+                </Text>
+              )}
             </View>
 
-            {/* Recommendation */}
+            {/* Insights */}
             <View
               style={[
                 styles.card,
@@ -801,9 +898,9 @@ export default function ProgressScreen() {
         <View style={{ height: 80 + insets.bottom }} />
       </ScrollView>
 
-      {/* Update Progress Modal */}
+      {/* Weekly Weigh-in Modal */}
       <Modal
-        visible={showUpdateModal}
+        visible={showWeighInModal}
         animationType="slide"
         transparent
         statusBarTranslucent
@@ -824,10 +921,10 @@ export default function ProgressScreen() {
             >
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  Update Progress
+                  Weekly Weigh-in
                 </Text>
                 <TouchableOpacity
-                  onPress={() => setShowUpdateModal(false)}
+                  onPress={() => setShowWeighInModal(false)}
                   hitSlop={HIT_SLOP}
                 >
                   <X size={20} color={colors.textMuted} />
@@ -841,8 +938,8 @@ export default function ProgressScreen() {
               </View>
 
               <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
-                Enter your current weight. Your meal, workout, and calorie stats
-                for today will be synced automatically.
+                Enter your current weight. It will be saved to your profile and
+                used for your progress.
               </Text>
 
               <View
@@ -860,9 +957,6 @@ export default function ProgressScreen() {
                   placeholderTextColor={colors.textMuted}
                   value={weightInput}
                   onChangeText={(text) => {
-                    // Tanggapin lang ang digits at ISANG decimal point —
-                    // awtomatikong tinatanggal ang negative sign, letters,
-                    // at kahit anong ibang character
                     let cleaned = text.replace(/[^0-9.]/g, "");
                     const parts = cleaned.split(".");
                     if (parts.length > 2) {
@@ -871,7 +965,8 @@ export default function ProgressScreen() {
                     setWeightInput(cleaned);
                   }}
                   keyboardType="numeric"
-                  editable={!syncing}
+                  maxLength={6}
+                  editable={!savingWeight}
                   autoFocus
                 />
                 <Text style={[styles.inputUnit, { color: colors.textMuted }]}>
@@ -880,38 +975,40 @@ export default function ProgressScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.syncBtn, syncing && { opacity: 0.7 }]}
-                onPress={handleSyncProgress}
-                disabled={syncing}
+                style={[styles.syncBtn, savingWeight && { opacity: 0.7 }]}
+                onPress={handleWeighInSubmit}
+                disabled={savingWeight}
               >
-                {syncing ? (
+                {savingWeight ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.syncBtnText}>Save & Sync Progress</Text>
+                  <Text style={styles.syncBtnText}>Save Weight</Text>
                 )}
               </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
       <SuccessModal
         visible={showSuccessModal}
         title="Success"
-        message="Your progress has been updated!"
+        message="Your weight has been updated!"
         onClose={() => setShowSuccessModal(false)}
       />
 
       <ConfirmModal
-        visible={showSyncConfirm}
-        title="Confirm Update"
-        message={`Sync your progress with weight ${weightInput} kg?`}
-        confirmLabel="Sync Now"
+        visible={showWeighInConfirm}
+        title="Confirm Weight"
+        message={`Save ${weightInput} kg as your current weight?`}
+        confirmLabel="Save"
         onConfirm={() => {
-          setShowSyncConfirm(false);
-          performSync();
+          setShowWeighInConfirm(false);
+          performWeighIn();
         }}
-        onCancel={() => setShowSyncConfirm(false)}
+        onCancel={() => setShowWeighInConfirm(false)}
       />
+
       {/* Bottom Navigation */}
       <View
         style={[
@@ -1179,6 +1276,61 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   syncBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  syncRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginHorizontal: 20,
+    marginBottom: 12,
+  },
+  syncText: { fontSize: 11 },
+  weighInHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  weighInTitle: { fontSize: 15, fontWeight: "700", flex: 1 },
+  weighInBody: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  weighInBtn: {
+    backgroundColor: "#FF9800",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  weighInBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  tileRow: { flexDirection: "row", gap: 10 },
+  tile: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+  },
+  tileLabel: { fontSize: 11, marginBottom: 4 },
+  tileValue: { fontSize: 20, fontWeight: "bold", marginVertical: 2 },
+  tileSub: { fontSize: 11, textAlign: "center" },
+  macroLine: { fontSize: 11, textAlign: "center", marginTop: 12 },
+  axisRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
+  axisLabel: { fontSize: 9, flex: 1, textAlign: "center" },
+  legendLine: { width: 14, height: 3, borderRadius: 2 },
+  recordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  recordDay: { width: 70, fontSize: 13, fontWeight: "600" },
+  recordKcal: { flex: 1, fontSize: 12 },
+  recordBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  forecastText: { fontSize: 13, lineHeight: 19, marginTop: 8 },
+  forecastValue: { fontSize: 20, fontWeight: "bold", marginTop: 8 },
+  forecastNote: { fontSize: 11, marginTop: 8, lineHeight: 16 },
   bottomNav: {
     flexDirection: "row",
     paddingVertical: 10,

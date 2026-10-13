@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { usePathname, useRouter } from "expo-router";
 import {
+  AlertTriangle,
   BarChart3,
   Check,
   ChevronDown,
@@ -191,10 +192,15 @@ export default function DashboardScreen() {
         !workoutPlanRes.data.workoutPlan ||
         workoutPlanRes.data.workoutPlan.length === 0
       ) {
+        // Use the equipment saved in the user's profile instead of a hardcoded list
+        const savedEquipment = user.available_equipment;
         await api.post("/workouts/plan/generate", {
           mode: "weekly",
           experience_level: "Beginner",
-          available_equipment: ["Bodyweight", "Dumbbell"],
+          available_equipment:
+            Array.isArray(savedEquipment) && savedEquipment.length > 0
+              ? savedEquipment
+              : ["Bodyweight"],
         });
         workoutPlanRes = await api.get("/workouts/plan/me");
       }
@@ -321,6 +327,37 @@ export default function DashboardScreen() {
     goalCalories > 0 ? Math.round((totalCalories / goalCalories) * 100) : 0;
   const isGoalMet = percentageConsumed >= 90;
 
+  // Over / under calorie warning (compared with the daily goal / TDEE)
+  const OVER_LIMIT = 110; // % — clearly over the goal
+  const UNDER_LIMIT = 80; // % — clearly under the goal late in the day
+  const currentHour = new Date().getHours();
+  const overBy = Math.round(totalCalories - goalCalories);
+  const isOver = percentageConsumed > OVER_LIMIT;
+  const isSlightlyOver = percentageConsumed > 100 && !isOver;
+  const isUnder = currentHour >= 18 && percentageConsumed < UNDER_LIMIT;
+  const calorieWarning = isOver
+    ? {
+        color: "#F44336",
+        bg: "#FFEBEE",
+        title: "You're over your calorie goal",
+        message: `You've eaten about ${overBy.toLocaleString()} kcal more than your ${goalCalories.toLocaleString()} kcal goal today. Going over now and then is okay, but doing it often can lead to weight gain. Consider lighter meals for the rest of the day.`,
+      }
+    : isSlightlyOver
+      ? {
+          color: "#FF9800",
+          bg: "#FFF3E0",
+          title: "Slightly over your goal",
+          message: `You're ${overBy.toLocaleString()} kcal above your goal. That's close enough, just keep an eye on your next meals.`,
+        }
+      : isUnder
+        ? {
+            color: "#2196F3",
+            bg: "#E3F2FD",
+            title: "You're under your calorie goal",
+            message: `You're still ${remainingCalories.toLocaleString()} kcal short of your goal today. Eating too little for several days can slow your progress and energy. Consider a healthy snack or finishing your planned meals.`,
+          }
+        : null;
+
   const todayMealsTotal = todayMeals.reduce(
     (sum, m) => sum + toNumber(m.meal?.calories),
     0,
@@ -403,7 +440,9 @@ export default function DashboardScreen() {
           {userName ? `, ${userName.split(" ")[0]}` : ""}
         </Text>
         <Text style={[styles.subGreeting, { color: colors.textMuted }]}>
-          {remainingCalories.toLocaleString()} kcal left of your{" "}
+          {isOver || isSlightlyOver
+            ? `${Math.abs(overBy).toLocaleString()} kcal over your `
+            : `${remainingCalories.toLocaleString()} kcal left of your `}
           {goalCalories.toLocaleString()} kcal goal
         </Text>
 
@@ -411,15 +450,24 @@ export default function DashboardScreen() {
         <View
           style={[
             styles.calorieCard,
-            isGoalMet ? styles.calorieCardGreen : styles.calorieCardOrange,
+            isOver
+              ? styles.calorieCardRed
+              : isGoalMet
+                ? styles.calorieCardGreen
+                : styles.calorieCardOrange,
           ]}
         >
           <View style={styles.ringOuter}>
             <View style={styles.ringInner}>
               <Text style={styles.calorieNumber}>
-                {remainingCalories.toLocaleString()}
+                {(isOver || isSlightlyOver
+                  ? Math.abs(overBy)
+                  : remainingCalories
+                ).toLocaleString()}
               </Text>
-              <Text style={styles.calorieUnit}>kcal left</Text>
+              <Text style={styles.calorieUnit}>
+                {isOver || isSlightlyOver ? "kcal over" : "kcal left"}
+              </Text>
             </View>
           </View>
           <Text style={styles.percentageText}>
@@ -437,6 +485,31 @@ export default function DashboardScreen() {
             {goalCalories.toLocaleString()} kcal daily goal
           </Text>
         </View>
+
+        {/* Over / under calorie warning */}
+        {calorieWarning && (
+          <View
+            style={[
+              styles.warningCard,
+              {
+                backgroundColor: calorieWarning.bg,
+                borderLeftColor: calorieWarning.color,
+              },
+            ]}
+          >
+            <AlertTriangle size={18} color={calorieWarning.color} />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[styles.warningTitle, { color: calorieWarning.color }]}
+              >
+                {calorieWarning.title}
+              </Text>
+              <Text style={styles.warningMessage}>
+                {calorieWarning.message}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Today's Meal Plan */}
         <View
@@ -864,6 +937,19 @@ const styles = StyleSheet.create({
   },
   calorieCardOrange: { backgroundColor: "#FF9800" },
   calorieCardGreen: { backgroundColor: "#4CAF50" },
+  calorieCardRed: { backgroundColor: "#F44336" },
+  warningCard: {
+    flexDirection: "row",
+    gap: 10,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 14,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    alignItems: "flex-start",
+  },
+  warningTitle: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
+  warningMessage: { fontSize: 12, lineHeight: 18, color: "#424242" },
   ringOuter: {
     width: 130,
     height: 130,

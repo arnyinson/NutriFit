@@ -1,7 +1,8 @@
 import * as Notifications from "expo-notifications";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { setupNotificationTapListener } from "../constants/pushNotifications";
 import { ThemeProvider, useTheme } from "../constants/theme";
 
 // How notifications should appear while the app is open (foreground)
@@ -15,26 +16,19 @@ Notifications.setNotificationHandler({
   }),
 });
 
-
 function AppStatusBar() {
   const { isDark } = useTheme();
   return <StatusBar style={isDark ? "light" : "dark"} />;
 }
 
 export default function RootLayout() {
-  useEffect(() => {
-    // Listener for when the user taps a notification (foreground or background)
-    const responseListener =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        console.log(
-          "Notification tapped:",
-          response.notification.request.content.data,
-        );
-      });
+  const router = useRouter();
 
-    return () => {
-      responseListener.remove();
-    };
+  useEffect(() => {
+    // Tap on a notification (foreground, background, or app opened from killed state):
+    // ticket pushes open /ticket?ticketId=..., others open /notifications
+    return setupNotificationTapListener(router);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

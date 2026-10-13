@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { usePathname, useRouter } from "expo-router";
 import {
   BarChart3,
@@ -132,6 +133,46 @@ const sanitizeWeightInput = (text: string) => {
   return cleaned;
 };
 
+// Turns the saved instructions text into a list of steps. Supports:
+//  - one step per line (what the web admin form asks for)
+//  - numbered text, even on one line: "1. Mix 2. Cook 3. Serve"
+//  - plain paragraphs (falls back to splitting into sentences)
+// Leading numbers / bullets are stripped because the app numbers the steps itself.
+const parseSteps = (text: string | null | undefined): string[] => {
+  const raw = String(text || "")
+    .replace(/\r/g, "")
+    .trim();
+  if (!raw) return [];
+
+  const clean = (t: string) =>
+    t
+      .replace(/^\s*(?:step\s*)?\d+\s*[.):\-]\s*/i, "")
+      .replace(/^\s*[-•*]\s+/, "")
+      .trim();
+
+  let parts: string[] = raw
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  // Several numbered steps squeezed into one line/paragraph: "1. a 2. b 3. c"
+  if (parts.length === 1 && /(?:^|\s)\d+[.)]\s+\S/.test(parts[0])) {
+    const numbered = parts[0].split(/(?:^|\s)(?=\d+[.)]\s+\S)/).filter(Boolean);
+    if (numbered.length > 1) parts = numbered;
+  }
+
+  // Still one block: split into sentences
+  if (parts.length === 1) {
+    const sentences = parts[0]
+      .split(/(?<=[.!?])\s+(?=[A-Z])/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (sentences.length > 1) parts = sentences;
+  }
+
+  return parts.map(clean).filter(Boolean);
+};
+
 const DAY_SECTION_ESTIMATED_HEIGHT = 280;
 
 type VideoType = "uploaded" | "youtube" | "exercisedb" | "none" | null;
@@ -153,6 +194,8 @@ export default function WorkoutScreen() {
     null,
   );
   const [showDetailModal, setShowDetailModal] = useState(false);
+  // Steps ticked off while following the instructions (view-only; resets per exercise)
+  const [doneSteps, setDoneSteps] = useState<number[]>([]);
 
   const [showLogModal, setShowLogModal] = useState(false);
   const [logEntry, setLogEntry] = useState<ExerciseEntry | null>(null);
@@ -202,10 +245,22 @@ export default function WorkoutScreen() {
     try {
       let res = await api.get("/workouts/plan/me");
       if (!res.data.workoutPlan || res.data.workoutPlan.length === 0) {
+        // Use the equipment the user chose in Register / Profile instead of a
+        // hardcoded list, so the generated plan matches what they really have.
+        let equipment: string[] = ["Bodyweight"];
+        try {
+          const cachedUser = await AsyncStorage.getItem("user");
+          const saved = cachedUser
+            ? JSON.parse(cachedUser).available_equipment
+            : null;
+          if (Array.isArray(saved) && saved.length > 0) equipment = saved;
+        } catch {
+          // keep the safe default
+        }
         await api.post("/workouts/plan/generate", {
           mode: "weekly",
           experience_level: "Beginner",
-          available_equipment: ["Bodyweight", "Dumbbell"],
+          available_equipment: equipment,
         });
         res = await api.get("/workouts/plan/me");
       }
@@ -334,6 +389,7 @@ export default function WorkoutScreen() {
 
   const openExerciseDetail = async (exercise: Exercise) => {
     setSelectedExercise(exercise);
+    setDoneSteps([]);
     setShowDetailModal(true);
     setVideoUrl(null);
     setYoutubeVideoIds([]);
@@ -880,14 +936,84 @@ export default function WorkoutScreen() {
                   <Text style={[styles.modalSection, { color: colors.text }]}>
                     Instructions
                   </Text>
-                  <Text
-                    style={[
-                      styles.stepText,
-                      { color: colors.textSecondary, marginBottom: 16 },
-                    ]}
-                  >
-                    {selectedExercise.instructions}
-                  </Text>
+                  {(() => {
+                    const steps = parseSteps(selectedExercise.instructions);
+                    if (steps.length === 0) {
+                      return (
+                        <Text
+                          style={[styles.stepText, { color: colors.textMuted }]}
+                        >
+                          No instructions available for this exercise.
+                        </Text>
+                      );
+                    }
+                    return (
+                      <View style={{ marginBottom: 16 }}>
+                        <Text
+                          style={[styles.stepHint, { color: colors.textMuted }]}
+                        >
+                          Tap a step to mark it as done.
+                        </Text>
+                        {steps.map((step, i) => {
+                          const done = doneSteps.includes(i);
+                          return (
+                            <TouchableOpacity
+                              key={i}
+                              style={[
+                                styles.stepRow,
+                                {
+                                  backgroundColor: colors.input,
+                                  borderColor: done ? "#4CAF50" : "transparent",
+                                },
+                              ]}
+                              activeOpacity={0.8}
+                              onPress={() =>
+                                setDoneSteps((prev) =>
+                                  prev.includes(i)
+                                    ? prev.filter((n) => n !== i)
+                                    : [...prev, i],
+                                )
+                              }
+                            >
+                              <View
+                                style={[
+                                  styles.stepNumber,
+                                  done && { backgroundColor: "#4CAF50" },
+                                ]}
+                              >
+                                {done ? (
+                                  <Check
+                                    size={14}
+                                    color="#fff"
+                                    strokeWidth={3}
+                                  />
+                                ) : (
+                                  <Text style={styles.stepNumberText}>
+                                    {i + 1}
+                                  </Text>
+                                )}
+                              </View>
+                              <Text
+                                style={[
+                                  styles.stepBody,
+                                  {
+                                    color: done
+                                      ? colors.textMuted
+                                      : colors.textSecondary,
+                                    textDecorationLine: done
+                                      ? "line-through"
+                                      : "none",
+                                  },
+                                ]}
+                              >
+                                {step}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    );
+                  })()}
                   <TouchableOpacity
                     style={styles.modalCloseBtn}
                     onPress={() => setShowDetailModal(false)}
@@ -1657,6 +1783,26 @@ const styles = StyleSheet.create({
   videoSubtext: { fontSize: 12, color: "#888" },
   modalSection: { fontSize: 15, fontWeight: "700", marginBottom: 12 },
   stepText: { fontSize: 13, flex: 1, lineHeight: 20 },
+  stepHint: { fontSize: 11, marginBottom: 8, fontStyle: "italic" },
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 8,
+  },
+  stepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#FF9800",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepNumberText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  stepBody: { flex: 1, fontSize: 13, lineHeight: 20 },
   modalCloseBtn: {
     backgroundColor: "#4CAF50",
     padding: 14,
