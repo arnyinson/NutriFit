@@ -99,7 +99,8 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [userName, setUserName] = useState("");
+  const [userName, setUserName] = useState(""); // full name
+  const [username, setUsername] = useState(""); // login username (used in greeting)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [goalCalories, setGoalCalories] = useState(2000);
   const [todayMeals, setTodayMeals] = useState<MealEntry[]>([]);
@@ -143,6 +144,7 @@ export default function DashboardScreen() {
       if (cachedUser) {
         const parsed = JSON.parse(cachedUser);
         setUserName(parsed.name || "");
+        setUsername(parsed.username || "");
         setAvatarUrl(parsed.avatar_url || null);
         if (parsed.tdee) setGoalCalories(toNumber(parsed.tdee));
       }
@@ -151,6 +153,7 @@ export default function DashboardScreen() {
       const profileRes = await api.get("/users/me");
       const user = profileRes.data.user;
       setUserName(user.name);
+      setUsername(user.username || "");
       setAvatarUrl(user.avatar_url || null);
       if (user.tdee) setGoalCalories(toNumber(user.tdee));
       await AsyncStorage.setItem("user", JSON.stringify(user));
@@ -410,16 +413,33 @@ export default function DashboardScreen() {
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push("/calendar" as any)}
-              style={styles.dateRow}
-              hitSlop={HIT_SLOP}
-            >
-              <Text style={[styles.dateText, { color: colors.textSecondary }]}>
-                {today}
-              </Text>
-              <ChevronDown size={14} color={colors.textSecondary} />
-            </TouchableOpacity>
+            <View style={{ flexShrink: 1 }}>
+              {userName ? (
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "700",
+                    color: colors.text,
+                    marginBottom: 2,
+                  }}
+                >
+                  {userName}
+                </Text>
+              ) : null}
+              <TouchableOpacity
+                onPress={() => router.push("/calendar" as any)}
+                style={styles.dateRow}
+                hitSlop={HIT_SLOP}
+              >
+                <Text
+                  style={[styles.dateText, { color: colors.textSecondary }]}
+                >
+                  {today}
+                </Text>
+                <ChevronDown size={14} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
           <TouchableOpacity
             onPress={() => router.push("/achievements" as any)}
@@ -437,7 +457,9 @@ export default function DashboardScreen() {
         {/* Greeting */}
         <Text style={[styles.greeting, { color: colors.text }]}>
           {getGreeting()}
-          {userName ? `, ${userName.split(" ")[0]}` : ""}
+          {username || userName
+            ? `, ${username || userName.split(" ")[0]}`
+            : ""}
         </Text>
         <Text style={[styles.subGreeting, { color: colors.textMuted }]}>
           {isOver || isSlightlyOver

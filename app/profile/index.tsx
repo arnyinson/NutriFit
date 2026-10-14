@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   HeartPulse,
+  Leaf,
   Moon,
   Ruler,
   Sun,
@@ -37,19 +38,26 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
+import AllergenPicker from "../../components/AllergenPicker";
 import ConfirmModal from "../../components/ConfirmModal";
+import DietPicker, { dietLabel } from "../../components/DietPicker";
 import api from "../../constants/api";
+import { clearPushTokenCache } from "../../constants/pushNotifications";
 import { useTheme } from "../../constants/theme";
 
 type UserProfile = {
   id: string;
   name: string;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
   email: string;
   birthday: string;
   sex: string;
   height: string;
   weight: string;
   dietary_goal: string;
+  dietary_preference?: string | null;
   activity_level: string;
   allergens: string[];
   available_equipment: string[];
@@ -134,19 +142,6 @@ export default function ProfileScreen() {
     label: string;
     message: string;
   } | null>(null);
-
-  const allergenList = [
-    "Eggs",
-    "Peanuts",
-    "Tree Nuts",
-    "Dairy",
-    "Shellfish",
-    "Fish",
-    "Soy",
-    "Wheat",
-    "Sesame",
-    "Lupin",
-  ];
 
   const loadProfile = useCallback(async () => {
     try {
@@ -297,9 +292,13 @@ export default function ProfileScreen() {
   const openEditModal = () => {
     if (!profile) return;
     setEditForm({
+      first_name: profile.first_name || "",
+      middle_name: profile.middle_name || "",
+      last_name: profile.last_name || "",
       height: profile.height,
       weight: profile.weight,
       dietary_goal: profile.dietary_goal,
+      dietary_preference: profile.dietary_preference || "None",
       activity_level: profile.activity_level,
       allergens: [...profile.allergens],
       available_equipment: [...(profile.available_equipment || ["Bodyweight"])],
@@ -322,15 +321,6 @@ export default function ProfileScreen() {
       formatted = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}`;
     }
     setBirthdayInput(formatted);
-  };
-
-  const toggleAllergen = (item: string) => {
-    setEditForm((prev: any) => ({
-      ...prev,
-      allergens: prev.allergens.includes(item)
-        ? prev.allergens.filter((a: string) => a !== item)
-        : [...prev.allergens, item],
-    }));
   };
 
   const equipmentList = [
@@ -385,7 +375,15 @@ export default function ProfileScreen() {
     setHeightUnit(next);
   };
 
-  const saveProfile = async () => {
+  const performSave = async () => {
+    if (!editForm.first_name?.trim() || !editForm.last_name?.trim()) {
+      Alert.alert(
+        "Missing Name",
+        "Please enter your first name and last name.",
+      );
+      return;
+    }
+
     const isoBirthday = parseDateInput(birthdayInput);
     if (!isoBirthday) {
       Alert.alert(
@@ -417,11 +415,15 @@ export default function ProfileScreen() {
     setSaving(true);
     try {
       const res = await api.put("/users/me", {
+        first_name: editForm.first_name.trim(),
+        middle_name: (editForm.middle_name || "").trim(),
+        last_name: editForm.last_name.trim(),
         birthday: isoBirthday,
         sex: editForm.sex,
         height: heightCm,
         weight: weightKg,
         dietary_goal: editForm.dietary_goal,
+        dietary_preference: editForm.dietary_preference,
         activity_level: editForm.activity_level,
         allergens: editForm.allergens,
         available_equipment: editForm.available_equipment,
@@ -442,7 +444,11 @@ export default function ProfileScreen() {
       }
 
       setShowEditModal(false);
-      Alert.alert("Success", "Profile saved successfully!");
+      if (res.data.plan_warning) {
+        Alert.alert("Profile saved", res.data.plan_warning);
+      } else {
+        Alert.alert("Success", "Profile saved successfully!");
+      }
     } catch (err: any) {
       const message =
         err.response?.data?.error ||
@@ -454,15 +460,28 @@ export default function ProfileScreen() {
   };
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showDietConfirm, setShowDietConfirm] = useState(false);
 
   const handleLogout = () => {
     setShowLogoutConfirm(true);
+  };
+
+  // Kapag nagbago ang dietary preference, magtatanong muna bago i-regenerate ang plan
+  const saveProfile = () => {
+    const before = profile?.dietary_preference || "None";
+    const after = editForm.dietary_preference || "None";
+    if (before !== after) {
+      setShowDietConfirm(true);
+      return;
+    }
+    performSave();
   };
 
   const performLogout = async () => {
     setShowLogoutConfirm(false);
     await AsyncStorage.removeItem("token");
     await AsyncStorage.removeItem("user");
+    await clearPushTokenCache(); // so the next account re-registers its push token
     router.replace("/login");
   };
 
@@ -548,6 +567,11 @@ export default function ProfileScreen() {
     { Icon: Ruler, label: "Height", value: `${profile.height} cm` },
     { Icon: Weight, label: "Weight", value: `${profile.weight} kg` },
     { Icon: Target, label: "Dietary Goal", value: profile.dietary_goal },
+    {
+      Icon: Leaf,
+      label: "Dietary Preference",
+      value: dietLabel(profile.dietary_preference),
+    },
     {
       Icon: Activity,
       label: "Activity Level",
@@ -962,6 +986,75 @@ export default function ProfileScreen() {
                   <Text
                     style={[styles.inputLabel, { color: colors.textSecondary }]}
                   >
+                    First Name
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    value={editForm.first_name}
+                    onChangeText={(t) =>
+                      setEditForm((p: any) => ({ ...p, first_name: t }))
+                    }
+                    placeholder="First name"
+                    placeholderTextColor={colors.textMuted}
+                    autoCapitalize="words"
+                  />
+
+                  <Text
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
+                  >
+                    Middle Name (optional)
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    value={editForm.middle_name}
+                    onChangeText={(t) =>
+                      setEditForm((p: any) => ({ ...p, middle_name: t }))
+                    }
+                    placeholder="Middle name"
+                    placeholderTextColor={colors.textMuted}
+                    autoCapitalize="words"
+                  />
+
+                  <Text
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
+                  >
+                    Last Name
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: colors.input,
+                        borderColor: colors.inputBorder,
+                        color: colors.text,
+                      },
+                    ]}
+                    value={editForm.last_name}
+                    onChangeText={(t) =>
+                      setEditForm((p: any) => ({ ...p, last_name: t }))
+                    }
+                    placeholder="Last name"
+                    placeholderTextColor={colors.textMuted}
+                    autoCapitalize="words"
+                  />
+
+                  <Text
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
+                  >
                     Birthday
                   </Text>
                   <TextInput
@@ -1183,6 +1276,21 @@ export default function ProfileScreen() {
                   <Text
                     style={[styles.inputLabel, { color: colors.textSecondary }]}
                   >
+                    Dietary Preference
+                  </Text>
+                  <DietPicker
+                    value={editForm.dietary_preference || "None"}
+                    onChange={(next) =>
+                      setEditForm((p: any) => ({
+                        ...p,
+                        dietary_preference: next,
+                      }))
+                    }
+                  />
+
+                  <Text
+                    style={[styles.inputLabel, { color: colors.textSecondary }]}
+                  >
                     Activity Level
                   </Text>
                   {ACTIVITY_LEVELS.map((level) => (
@@ -1225,34 +1333,12 @@ export default function ProfileScreen() {
                   >
                     Allergens
                   </Text>
-                  <View style={styles.chipRow}>
-                    {allergenList.map((item) => (
-                      <TouchableOpacity
-                        key={item}
-                        style={[
-                          styles.chip,
-                          {
-                            backgroundColor: colors.input,
-                            borderColor: colors.inputBorder,
-                          },
-                          editForm.allergens.includes(item) &&
-                            styles.chipActive,
-                        ]}
-                        onPress={() => toggleAllergen(item)}
-                      >
-                        <Text
-                          style={[
-                            styles.chipText,
-                            { color: colors.textSecondary },
-                            editForm.allergens.includes(item) &&
-                              styles.chipTextActive,
-                          ]}
-                        >
-                          {item}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                  <AllergenPicker
+                    value={editForm.allergens}
+                    onChange={(next) =>
+                      setEditForm((prev: any) => ({ ...prev, allergens: next }))
+                    }
+                  />
 
                   <Text
                     style={[styles.inputLabel, { color: colors.textSecondary }]}
@@ -1308,6 +1394,18 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmModal
+        visible={showDietConfirm}
+        title="Change dietary preference?"
+        message={`Your upcoming meals will be regenerated to match ${dietLabel(editForm?.dietary_preference)}. Meals you already marked as taken will be kept.`}
+        confirmLabel="Regenerate"
+        onConfirm={() => {
+          setShowDietConfirm(false);
+          performSave();
+        }}
+        onCancel={() => setShowDietConfirm(false)}
+      />
 
       <ConfirmModal
         visible={showLogoutConfirm}

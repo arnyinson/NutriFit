@@ -24,6 +24,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AllergenPicker from "../../components/AllergenPicker";
+import DietPicker from "../../components/DietPicker";
 import Logo from "../../components/Logo";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
@@ -57,6 +59,9 @@ export default function RegisterScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -73,31 +78,13 @@ export default function RegisterScreen() {
   const [dietaryGoal, setDietaryGoal] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [allergens, setAllergens] = useState<string[]>([]);
+  const [dietaryPreference, setDietaryPreference] = useState("None");
   const [equipment, setEquipment] = useState<string[]>(["Bodyweight"]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [hasScrolledToEnd, setHasScrolledToEnd] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const allergenList = [
-    "Eggs",
-    "Peanuts",
-    "Tree Nuts",
-    "Dairy",
-    "Shellfish",
-    "Fish",
-    "Soy",
-    "Wheat",
-    "Sesame",
-    "Lupin",
-  ];
-
-  const toggleAllergen = (item: string) => {
-    setAllergens((prev) =>
-      prev.includes(item) ? prev.filter((a) => a !== item) : [...prev, item],
-    );
-  };
 
   const equipmentList = [
     "Bodyweight",
@@ -174,6 +161,8 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     const heightCm = getHeightCm();
     if (
+      !firstName.trim() ||
+      !lastName.trim() ||
       !email ||
       !username ||
       !password ||
@@ -233,7 +222,12 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await api.post("/auth/register", {
-        name: username, // walang hiwalay na "full name" field sa form, gamit muna ang username
+        name: [firstName.trim(), middleName.trim(), lastName.trim()]
+          .filter(Boolean)
+          .join(" "),
+        first_name: firstName.trim(),
+        middle_name: middleName.trim() || null,
+        last_name: lastName.trim(),
         email,
         username,
         password,
@@ -242,6 +236,7 @@ export default function RegisterScreen() {
         height: heightCm,
         weight: parseFloat(weight),
         dietary_goal: dietaryGoal,
+        dietary_preference: dietaryPreference,
         activity_level: activityLevel,
         allergens,
         available_equipment: equipment,
@@ -282,6 +277,66 @@ export default function RegisterScreen() {
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
           Join NutriFit and get your personalized meal and workout plan
         </Text>
+
+        {/* First Name */}
+        <View
+          style={[
+            styles.inputWrapper,
+            { backgroundColor: colors.input, borderColor: colors.inputBorder },
+          ]}
+        >
+          <User size={16} color={colors.textMuted} />
+          <TextInput
+            style={[styles.input, { color: colors.text }]}
+            placeholder="First Name"
+            placeholderTextColor={colors.textMuted}
+            value={firstName}
+            onChangeText={setFirstName}
+            autoCapitalize="words"
+            autoCorrect={false}
+            editable={!loading}
+          />
+        </View>
+
+        {/* Middle Name (optional) */}
+        <View
+          style={[
+            styles.inputWrapper,
+            { backgroundColor: colors.input, borderColor: colors.inputBorder },
+          ]}
+        >
+          <User size={16} color={colors.textMuted} />
+          <TextInput
+            style={[styles.input, { color: colors.text }]}
+            placeholder="Middle Name (optional)"
+            placeholderTextColor={colors.textMuted}
+            value={middleName}
+            onChangeText={setMiddleName}
+            autoCapitalize="words"
+            autoCorrect={false}
+            editable={!loading}
+          />
+        </View>
+
+        {/* Last Name */}
+        <View
+          style={[
+            styles.inputWrapper,
+            { backgroundColor: colors.input, borderColor: colors.inputBorder },
+          ]}
+        >
+          <User size={16} color={colors.textMuted} />
+          <TextInput
+            style={[styles.input, { color: colors.text }]}
+            placeholder="Last Name"
+            placeholderTextColor={colors.textMuted}
+            value={lastName}
+            onChangeText={setLastName}
+            autoCapitalize="words"
+            autoCorrect={false}
+            editable={!loading}
+          />
+        </View>
 
         {/* Email */}
         <View
@@ -498,7 +553,10 @@ export default function RegisterScreen() {
           <View
             style={[
               styles.inputWrapper,
-              { backgroundColor: colors.input, borderColor: colors.inputBorder },
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.inputBorder,
+              },
             ]}
           >
             <Ruler size={16} color={colors.textMuted} />
@@ -519,7 +577,10 @@ export default function RegisterScreen() {
               style={[
                 styles.inputWrapper,
                 styles.ftInput,
-                { backgroundColor: colors.input, borderColor: colors.inputBorder },
+                {
+                  backgroundColor: colors.input,
+                  borderColor: colors.inputBorder,
+                },
               ]}
             >
               <Ruler size={16} color={colors.textMuted} />
@@ -539,7 +600,10 @@ export default function RegisterScreen() {
               style={[
                 styles.inputWrapper,
                 styles.ftInput,
-                { backgroundColor: colors.input, borderColor: colors.inputBorder },
+                {
+                  backgroundColor: colors.input,
+                  borderColor: colors.inputBorder,
+                },
               ]}
             >
               <TextInput
@@ -612,32 +676,7 @@ export default function RegisterScreen() {
         <Text style={[styles.sectionLabel, { color: colors.text }]}>
           Allergen
         </Text>
-        <View style={styles.chipRow}>
-          {allergenList.map((item) => (
-            <TouchableOpacity
-              key={item}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: colors.input,
-                  borderColor: colors.inputBorder,
-                },
-                allergens.includes(item) && styles.chipActive,
-              ]}
-              onPress={() => toggleAllergen(item)}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  { color: colors.textSecondary },
-                  allergens.includes(item) && styles.chipTextActive,
-                ]}
-              >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <AllergenPicker value={allergens} onChange={setAllergens} />
 
         {/* Activity Level */}
         <Text style={[styles.sectionLabel, { color: colors.text }]}>
@@ -697,6 +736,12 @@ export default function RegisterScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Dietary Preference */}
+        <Text style={[styles.sectionLabel, { color: colors.text }]}>
+          Dietary Preference
+        </Text>
+        <DietPicker value={dietaryPreference} onChange={setDietaryPreference} />
 
         {/* Terms */}
         <View style={styles.termsRow}>
