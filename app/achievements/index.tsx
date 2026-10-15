@@ -40,7 +40,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import ViewShot from "react-native-view-shot";
 import Logo from "../../components/Logo";
-import api from "../../constants/api";
+import { apiGetCached } from "../../constants/offline";
 import { useTheme } from "../../constants/theme";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
@@ -123,10 +123,13 @@ export default function AchievementsScreen() {
 
   const loadAchievements = useCallback(async () => {
     try {
-      const res = await api.get("/achievements/me");
-      setAchievements(res.data.achievements);
-      setTotalXP(res.data.totalXP);
-      setStats(res.data.stats);
+      // Saved achievements show right away; fresh ones replace them when they arrive
+      await apiGetCached<any>("/achievements/me", (data) => {
+        setAchievements(data.achievements || []);
+        setTotalXP(data.totalXP || 0);
+        if (data.stats) setStats(data.stats);
+        setLoading(false);
+      });
     } catch (err) {
       console.error("Load achievements error:", err);
     } finally {

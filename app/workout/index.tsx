@@ -41,6 +41,13 @@ import {
 import ConfirmModal from "../../components/ConfirmModal";
 import SuccessModal from "../../components/SuccessModal";
 import api from "../../constants/api";
+import {
+  apiGetCached,
+  loadWithCache,
+  mutate,
+  newClientId,
+  patchCachePrefix,
+} from "../../constants/offline";
 import { useTheme } from "../../constants/theme";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
@@ -175,6 +182,17 @@ const parseSteps = (text: string | null | undefined): string[] => {
 
 const DAY_SECTION_ESTIMATED_HEIGHT = 280;
 
+// Keep every saved copy of the workout plan in step with what the user just did
+// (the Dashboard reads the same saved copy).
+const patchWorkoutCaches = (updater: (e: any) => any) =>
+  patchCachePrefix<any>("/workouts/plan/me", (data) => ({
+    ...data,
+    workoutPlan: (data.workoutPlan || []).map((d: any) => ({
+      ...d,
+      exercises: (d.exercises || []).map(updater),
+    })),
+  }));
+
 type VideoType = "uploaded" | "youtube" | "exercisedb" | "none" | null;
 
 export default function WorkoutScreen() {
@@ -243,49 +261,58 @@ export default function WorkoutScreen() {
 
   const loadWorkoutPlan = useCallback(async () => {
     try {
-      let res = await api.get("/workouts/plan/me");
-      if (!res.data.workoutPlan || res.data.workoutPlan.length === 0) {
-        // Use the equipment the user chose in Register / Profile instead of a
-        // hardcoded list, so the generated plan matches what they really have.
-        let equipment: string[] = ["Bodyweight"];
-        try {
-          const cachedUser = await AsyncStorage.getItem("user");
-          const saved = cachedUser
-            ? JSON.parse(cachedUser).available_equipment
-            : null;
-          if (Array.isArray(saved) && saved.length > 0) equipment = saved;
-        } catch {
-          // keep the safe default
-        }
-        await api.post("/workouts/plan/generate", {
-          mode: "weekly",
-          experience_level: "Beginner",
-          available_equipment: equipment,
-        });
-        res = await api.get("/workouts/plan/me");
-      }
-
-      const weekDates = getWeekDates();
-      const existingDays = new Map<string, ExerciseEntry[]>(
-        res.data.workoutPlan.map(
-          (d: { day: string; exercises: ExerciseEntry[] }) => [
-            d.day,
-            d.exercises,
-          ],
-        ),
+      // Saved plan shows right away; fresh data replaces it when it arrives.
+      await loadWithCache<any>(
+        "/workouts/plan/me",
+        async () => {
+          let res = await api.get("/workouts/plan/me");
+          if (!res.data.workoutPlan || res.data.workoutPlan.length === 0) {
+            // Use the equipment the user chose in Register / Profile instead of a
+            // hardcoded list, so the generated plan matches what they really have.
+            let equipment: string[] = ["Bodyweight"];
+            try {
+              const cachedUser = await AsyncStorage.getItem("user");
+              const saved = cachedUser
+                ? JSON.parse(cachedUser).available_equipment
+                : null;
+              if (Array.isArray(saved) && saved.length > 0) equipment = saved;
+            } catch {
+              // keep the safe default
+            }
+            await api.post("/workouts/plan/generate", {
+              mode: "weekly",
+              experience_level: "Beginner",
+              available_equipment: equipment,
+            });
+            res = await api.get("/workouts/plan/me");
+          }
+          return res.data;
+        },
+        (data) => {
+          const weekDates = getWeekDates();
+          const existingDays = new Map<string, ExerciseEntry[]>(
+            (data.workoutPlan || []).map(
+              (d: { day: string; exercises: ExerciseEntry[] }) => [
+                d.day,
+                d.exercises,
+              ],
+            ),
+          );
+          const fullWeek: WorkoutDay[] = ALL_DAYS.map((day, i) => ({
+            day,
+            date: weekDates[i],
+            exercises: existingDays.get(day) || [],
+          }));
+          setWorkoutPlan(fullWeek);
+          setLoading(false);
+        },
       );
-      const fullWeek: WorkoutDay[] = ALL_DAYS.map((day, i) => ({
-        day,
-        date: weekDates[i],
-        exercises: existingDays.get(day) || [],
-      }));
-
-      setWorkoutPlan(fullWeek);
     } catch (err) {
+      // Only reached when there is no saved plan AND the server cannot be reached
       console.error("Load workout plan error:", err);
       Alert.alert(
         "Error",
-        "Unable to load your workout plan. Please try again.",
+        "Unable to load your workout plan. Check your connection and try again.",
       );
     } finally {
       setLoading(false);
@@ -337,9 +364,13 @@ export default function WorkoutScreen() {
       ),
     );
     try {
-      await api.patch(`/workouts/plan/${entry.plan_id}/toggle`, {
+      // Offline? It is saved on the phone and sent when the connection is back.
+      await mutate("patch", `/workouts/plan/${entry.plan_id}/toggle`, {
         done: true,
       });
+      await patchWorkoutCaches((e) =>
+        e.plan_id === entry.plan_id ? { ...e, done: true } : e,
+      );
     } catch (err) {
       console.error("Mark exercise done error:", err);
       setWorkoutPlan((prev) =>
@@ -369,12 +400,15 @@ export default function WorkoutScreen() {
       ),
     );
     try {
-      await Promise.all(
-        previous
-          .filter((e) => !e.done)
-          .map((e) =>
-            api.patch(`/workouts/plan/${e.plan_id}/toggle`, { done: true }),
-          ),
+      // One after another, so the saved offline queue keeps the order
+      const ids = previous.filter((e) => !e.done).map((e) => e.plan_id);
+      for (const planId of ids) {
+        await mutate("patch", `/workouts/plan/${planId}/toggle`, {
+          done: true,
+        });
+      }
+      await patchWorkoutCaches((e) =>
+        ids.includes(e.plan_id) ? { ...e, done: true } : e,
       );
     } catch (err) {
       console.error("Log all error:", err);
@@ -441,17 +475,22 @@ export default function WorkoutScreen() {
     if (!logEntry) return;
 
     try {
-      await api.post("/workouts/log", {
+      // client_id lets the server ignore the same log if it is ever sent twice
+      const { queued } = await mutate("post", "/workouts/log", {
         exercise_id: logEntry.exercise.id,
         sets_completed: logSets,
         reps_completed: logReps,
         weight_used: logWeight || null,
+        client_id: newClientId(),
       });
 
       if (!logEntry.done) {
-        await api.patch(`/workouts/plan/${logEntry.plan_id}/toggle`, {
+        await mutate("patch", `/workouts/plan/${logEntry.plan_id}/toggle`, {
           done: true,
         });
+        await patchWorkoutCaches((e) =>
+          e.plan_id === logEntry.plan_id ? { ...e, done: true } : e,
+        );
         setWorkoutPlan((prev) =>
           prev.map((day) => ({
             ...day,
@@ -463,9 +502,9 @@ export default function WorkoutScreen() {
       }
 
       setShowLogModal(false);
-      setSuccessModalTitle("Logged!");
+      setSuccessModalTitle(queued ? "Saved offline" : "Logged!");
       setSuccessModalMessage(
-        `${logEntry.exercise.name} — ${logSets} sets x ${logReps} reps${logWeight ? ` @ ${logWeight}` : ""}`,
+        `${logEntry.exercise.name} — ${logSets} sets x ${logReps} reps${logWeight ? ` @ ${logWeight}` : ""}${queued ? "\nWill be sent when you're back online." : ""}`,
       );
       setShowSuccessModal(true);
     } catch (err) {
@@ -496,10 +535,11 @@ export default function WorkoutScreen() {
     const timeout = setTimeout(async () => {
       setSearchingCustom(true);
       try {
-        const res = await api.get("/workouts", {
-          params: { search: customSearch },
-        });
-        setCustomSearchResults(res.data.exercises || []);
+        await apiGetCached<any>(
+          "/workouts",
+          (data) => setCustomSearchResults(data.exercises || []),
+          { search: customSearch },
+        );
       } catch (err) {
         console.error("Search exercises error:", err);
       } finally {
@@ -543,7 +583,7 @@ export default function WorkoutScreen() {
 
     setSavingCustomLog(true);
     try {
-      await api.post("/workouts/plan/custom", {
+      const { queued } = await mutate("post", "/workouts/plan/custom", {
         day: dayName,
         exercise_id: customSelectedExercise?.id || undefined,
         custom_exercise_name: customSelectedExercise
@@ -552,13 +592,40 @@ export default function WorkoutScreen() {
         sets: customSets,
         reps: customReps,
         weight_used: customWeight || null,
+        client_id: newClientId(),
       });
 
       setShowCustomLogModal(false);
-      await loadWorkoutPlan();
-      setSuccessModalTitle("Added!");
+      if (queued) {
+        // Show it right away; the real entry replaces this after the next sync
+        const tempEntry: ExerciseEntry = {
+          plan_id: `local-${newClientId()}`,
+          sets: Number(customSets),
+          reps: String(customReps),
+          done: true,
+          exercise: customSelectedExercise || {
+            id: `local-${newClientId()}`,
+            name,
+            muscle_group: "Custom",
+            equipment: "Custom",
+            difficulty: "-",
+            instructions: "",
+            video_url: null,
+          },
+        };
+        setWorkoutPlan((prev) =>
+          prev.map((d, di) =>
+            di === customDayIndex
+              ? { ...d, exercises: [...d.exercises, tempEntry] }
+              : d,
+          ),
+        );
+      } else {
+        await loadWorkoutPlan();
+      }
+      setSuccessModalTitle(queued ? "Saved offline" : "Added!");
       setSuccessModalMessage(
-        `${name} — ${customSets} sets x ${customReps} reps${customWeight ? ` @ ${customWeight}` : ""} added to ${dayName}.`,
+        `${name} — ${customSets} sets x ${customReps} reps${customWeight ? ` @ ${customWeight}` : ""} added to ${dayName}.${queued ? "\nWill be sent when you're back online." : ""}`,
       );
       setShowSuccessModal(true);
     } catch (err) {

@@ -2,6 +2,8 @@ import * as Notifications from "expo-notifications";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import OfflineBanner from "../components/OfflineBanner";
+import { useOfflineSync } from "../constants/offline";
 import { setupNotificationTapListener } from "../constants/pushNotifications";
 import { ThemeProvider, useTheme } from "../constants/theme";
 
@@ -23,6 +25,7 @@ function AppStatusBar() {
 
 export default function RootLayout() {
   const router = useRouter();
+  useOfflineSync(); // send saved offline changes when the connection returns
 
   useEffect(() => {
     // Tap on a notification (foreground, background, or app opened from killed state):
@@ -34,6 +37,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AppStatusBar />
+      <OfflineBanner />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login/index" />

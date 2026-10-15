@@ -33,6 +33,7 @@ import {
 } from "react-native-safe-area-context";
 import ConfirmModal from "../../components/ConfirmModal";
 import api from "../../constants/api";
+import { loadWithCache, mutate, patchCachePrefix } from "../../constants/offline";
 import { registerAndSavePushToken } from "../../constants/pushNotifications";
 import { useTheme } from "../../constants/theme";
 
@@ -138,95 +139,141 @@ export default function DashboardScreen() {
   });
 
   const loadDashboardData = useCallback(async () => {
+    const todayDate = getTodayDateString();
+    let user: any = null;
+
+    // Saved user first, for an instant greeting
     try {
-      // Get cached user for instant greeting
       const cachedUser = await AsyncStorage.getItem("user");
       if (cachedUser) {
-        const parsed = JSON.parse(cachedUser);
-        setUserName(parsed.name || "");
-        setUsername(parsed.username || "");
-        setAvatarUrl(parsed.avatar_url || null);
-        if (parsed.tdee) setGoalCalories(toNumber(parsed.tdee));
+        user = JSON.parse(cachedUser);
+        setUserName(user.name || "");
+        setUsername(user.username || "");
+        setAvatarUrl(user.avatar_url || null);
+        if (user.tdee) setGoalCalories(toNumber(user.tdee));
       }
+    } catch {
+      // ignore unreadable saved user
+    }
 
-      // Refresh profile
-      const profileRes = await api.get("/users/me");
-      const user = profileRes.data.user;
-      setUserName(user.name);
-      setUsername(user.username || "");
-      setAvatarUrl(user.avatar_url || null);
-      if (user.tdee) setGoalCalories(toNumber(user.tdee));
-      await AsyncStorage.setItem("user", JSON.stringify(user));
-
-      const todayDate = getTodayDateString();
-
-      // Gamitin ang naka-save na plan mode preference (Weekly o Continuous)
-      const savedMode = await AsyncStorage.getItem(MEAL_PLAN_MODE_KEY);
-      const mealMode: "weekly" | "continuous" =
-        savedMode === "continuous" ? "continuous" : "weekly";
-
-      // Get meal plan
-      let mealPlanRes = await api.get("/meals/plan/me", {
-        params: { mode: mealMode },
-      });
-      if (
-        !mealPlanRes.data.mealPlan ||
-        mealPlanRes.data.mealPlan.length === 0
-      ) {
-        await api.post("/meals/plan/generate", { mode: mealMode });
-        mealPlanRes = await api.get("/meals/plan/me", {
-          params: { mode: mealMode },
-        });
+    // Each section loads on its own and shows saved data first. One slow or failed
+    // request no longer blocks the rest of the screen.
+    const loadProfile = async () => {
+      try {
+        const profileRes = await api.get("/users/me");
+        user = profileRes.data.user;
+        setUserName(user.name);
+        setUsername(user.username || "");
+        setAvatarUrl(user.avatar_url || null);
+        if (user.tdee) setGoalCalories(toNumber(user.tdee));
+        await AsyncStorage.setItem("user", JSON.stringify(user));
+      } catch (err) {
+        console.warn("Profile refresh skipped:", err);
       }
-      const todayEntry = mealPlanRes.data.mealPlan.find(
-        (d: any) => d.date === todayDate,
-      );
-      setTodayMeals(todayEntry ? todayEntry.meals : []);
+    };
 
-      // Get manually logged food ("Log Outside Food") for today
-      const foodLogsRes = await api.get("/meals/log", {
-        params: { date: todayDate },
-      });
-      setTodayFoodLogs(foodLogsRes.data.foodLogs || []);
+    const loadMeals = async () => {
+      try {
+        // Gamitin ang naka-save na plan mode preference (Weekly o Continuous)
+        const savedMode = await AsyncStorage.getItem(MEAL_PLAN_MODE_KEY);
+        const mealMode: "weekly" | "continuous" =
+          savedMode === "continuous" ? "continuous" : "weekly";
 
-      // Get workout plan
-      let workoutPlanRes = await api.get("/workouts/plan/me");
-      if (
-        !workoutPlanRes.data.workoutPlan ||
-        workoutPlanRes.data.workoutPlan.length === 0
-      ) {
-        // Use the equipment saved in the user's profile instead of a hardcoded list
-        const savedEquipment = user.available_equipment;
-        await api.post("/workouts/plan/generate", {
-          mode: "weekly",
-          experience_level: "Beginner",
-          available_equipment:
-            Array.isArray(savedEquipment) && savedEquipment.length > 0
-              ? savedEquipment
-              : ["Bodyweight"],
-        });
-        workoutPlanRes = await api.get("/workouts/plan/me");
+        await loadWithCache<any>(
+          `/meals/plan/me?${JSON.stringify({ mode: mealMode })}`,
+          async () => {
+            let res = await api.get("/meals/plan/me", {
+              params: { mode: mealMode },
+            });
+            if (!res.data.mealPlan || res.data.mealPlan.length === 0) {
+              await api.post("/meals/plan/generate", { mode: mealMode });
+              res = await api.get("/meals/plan/me", {
+                params: { mode: mealMode },
+              });
+            }
+            return res.data;
+          },
+          (data) => {
+            const todayEntry = (data.mealPlan || []).find(
+              (d: any) => d.date === todayDate,
+            );
+            setTodayMeals(todayEntry ? todayEntry.meals : []);
+            setLoading(false);
+          },
+        );
+      } catch (err) {
+        console.warn("Meal plan load skipped:", err);
       }
-      const todayDayName = getTodayDayName();
-      const todayWorkoutEntry = workoutPlanRes.data.workoutPlan.find(
-        (d: any) => d.day === todayDayName,
-      );
-      if (todayWorkoutEntry && todayWorkoutEntry.exercises.length > 0) {
-        setTodayExercises(todayWorkoutEntry.exercises);
-        const muscleGroups = [
-          ...new Set(
-            todayWorkoutEntry.exercises.map(
-              (e: ExerciseEntry) => e.exercise.muscle_group,
-            ),
-          ),
-        ];
-        setTodayWorkoutFocus(muscleGroups.join(" + "));
-      } else {
-        setTodayExercises([]);
-        setTodayWorkoutFocus("Rest Day");
+    };
+
+    // Manually logged food ("Log Outside Food") for today
+    const loadFoodLogs = async () => {
+      try {
+        await loadWithCache<any>(
+          `/meals/log?${JSON.stringify({ date: todayDate })}`,
+          async () =>
+            (await api.get("/meals/log", { params: { date: todayDate } })).data,
+          (data) => setTodayFoodLogs(data.foodLogs || []),
+        );
+      } catch (err) {
+        console.warn("Food logs load skipped:", err);
       }
-    } catch (err) {
-      console.error("Dashboard load error:", err);
+    };
+
+    const loadWorkout = async () => {
+      try {
+        await loadWithCache<any>(
+          "/workouts/plan/me",
+          async () => {
+            let res = await api.get("/workouts/plan/me");
+            if (!res.data.workoutPlan || res.data.workoutPlan.length === 0) {
+              // Use the equipment saved in the user's profile instead of a hardcoded list
+              const savedEquipment = user?.available_equipment;
+              await api.post("/workouts/plan/generate", {
+                mode: "weekly",
+                experience_level: "Beginner",
+                available_equipment:
+                  Array.isArray(savedEquipment) && savedEquipment.length > 0
+                    ? savedEquipment
+                    : ["Bodyweight"],
+              });
+              res = await api.get("/workouts/plan/me");
+            }
+            return res.data;
+          },
+          (data) => {
+            const todayWorkoutEntry = (data.workoutPlan || []).find(
+              (d: any) => d.day === getTodayDayName(),
+            );
+            if (todayWorkoutEntry && todayWorkoutEntry.exercises.length > 0) {
+              setTodayExercises(todayWorkoutEntry.exercises);
+              const muscleGroups = [
+                ...new Set(
+                  todayWorkoutEntry.exercises.map(
+                    (e: ExerciseEntry) => e.exercise.muscle_group,
+                  ),
+                ),
+              ];
+              setTodayWorkoutFocus(muscleGroups.join(" + "));
+            } else {
+              setTodayExercises([]);
+              setTodayWorkoutFocus("Rest Day");
+            }
+            setLoading(false);
+          },
+        );
+      } catch (err) {
+        console.warn("Workout plan load skipped:", err);
+      }
+    };
+
+    try {
+      await Promise.all([
+        loadProfile(),
+        loadMeals(),
+        loadFoodLogs(),
+        loadWorkout(),
+      ]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -243,6 +290,17 @@ export default function DashboardScreen() {
     loadDashboardData();
   };
 
+  // Keep the saved plans in step with what the user just did, so the Meal screen
+  // and the next app start show the same thing even when offline.
+  const patchMealCaches = (updater: (m: any) => any) =>
+    patchCachePrefix<any>("/meals/plan/me", (data) => ({
+      ...data,
+      mealPlan: (data.mealPlan || []).map((d: any) => ({
+        ...d,
+        meals: (d.meals || []).map(updater),
+      })),
+    }));
+
   // "Take" — PERMANENTE, hindi na maaaring bawiin pagkatapos
   const takeMeal = async (planId: string) => {
     setTodayMeals((prev) =>
@@ -251,7 +309,11 @@ export default function DashboardScreen() {
       ),
     );
     try {
-      await api.patch(`/meals/plan/${planId}/toggle`, { taken: true });
+      // Offline? It is saved on the phone and sent when the connection is back.
+      await mutate("patch", `/meals/plan/${planId}/toggle`, { taken: true });
+      await patchMealCaches((m) =>
+        m.plan_id === planId ? { ...m, taken: true, skipped: false } : m,
+      );
     } catch (err) {
       console.error("Take meal error:", err);
       setTodayMeals((prev) =>
@@ -270,7 +332,10 @@ export default function DashboardScreen() {
       ),
     );
     try {
-      await api.patch(`/meals/plan/${planId}/toggle`, { taken: false });
+      await mutate("patch", `/meals/plan/${planId}/toggle`, { taken: false });
+      await patchMealCaches((m) =>
+        m.plan_id === planId ? { ...m, taken: false, skipped: true } : m,
+      );
     } catch (err) {
       console.error("Skip meal error:", err);
       setTodayMeals((prev) =>
@@ -283,16 +348,17 @@ export default function DashboardScreen() {
 
   const takeAllMeals = async () => {
     const previous = todayMeals;
+    const ids = previous.filter((m) => !m.taken).map((m) => m.plan_id);
     setTodayMeals((prev) =>
       prev.map((m) => ({ ...m, taken: true, skipped: false })),
     );
     try {
-      await Promise.all(
-        previous
-          .filter((m) => !m.taken)
-          .map((m) =>
-            api.patch(`/meals/plan/${m.plan_id}/toggle`, { taken: true }),
-          ),
+      // One after another, so the saved offline queue keeps the order
+      for (const planId of ids) {
+        await mutate("patch", `/meals/plan/${planId}/toggle`, { taken: true });
+      }
+      await patchMealCaches((m) =>
+        ids.includes(m.plan_id) ? { ...m, taken: true, skipped: false } : m,
       );
     } catch (err) {
       console.error("Take all meals error:", err);
@@ -306,7 +372,16 @@ export default function DashboardScreen() {
       prev.map((e) => (e.plan_id === planId ? { ...e, done: true } : e)),
     );
     try {
-      await api.patch(`/workouts/plan/${planId}/toggle`, { done: true });
+      await mutate("patch", `/workouts/plan/${planId}/toggle`, { done: true });
+      await patchCachePrefix<any>("/workouts/plan/me", (data) => ({
+        ...data,
+        workoutPlan: (data.workoutPlan || []).map((d: any) => ({
+          ...d,
+          exercises: (d.exercises || []).map((e: any) =>
+            e.plan_id === planId ? { ...e, done: true } : e,
+          ),
+        })),
+      }));
     } catch (err) {
       console.error("Toggle workout error:", err);
       setTodayExercises((prev) =>

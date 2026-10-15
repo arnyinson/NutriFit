@@ -42,6 +42,12 @@ import AllergenPicker from "../../components/AllergenPicker";
 import ConfirmModal from "../../components/ConfirmModal";
 import DietPicker, { dietLabel } from "../../components/DietPicker";
 import api from "../../constants/api";
+import {
+  apiGetCached,
+  clearCache,
+  isNetworkError,
+  writeCache,
+} from "../../constants/offline";
 import { clearPushTokenCache } from "../../constants/pushNotifications";
 import { useTheme } from "../../constants/theme";
 
@@ -145,12 +151,18 @@ export default function ProfileScreen() {
 
   const loadProfile = useCallback(async () => {
     try {
-      const res = await api.get("/users/me");
-      setProfile(res.data.user);
-      await AsyncStorage.setItem("user", JSON.stringify(res.data.user));
+      // Saved profile shows right away; the fresh one replaces it when it arrives
+      await apiGetCached<any>("/users/me", async (data) => {
+        setProfile(data.user);
+        setLoading(false);
+        await AsyncStorage.setItem("user", JSON.stringify(data.user));
+      });
     } catch (err) {
       console.error("Load profile error:", err);
-      Alert.alert("Error", "Unable to load your profile.");
+      Alert.alert(
+        "Error",
+        "Unable to load your profile. Check your connection and try again.",
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -160,10 +172,14 @@ export default function ProfileScreen() {
   const loadWeightHistory = useCallback(async (range: string) => {
     setLoadingWeight(true);
     try {
-      const res = await api.get("/progress/weight-history", {
-        params: { range },
-      });
-      setWeightHistory(res.data.weightHistory);
+      await apiGetCached<any>(
+        "/progress/weight-history",
+        (data) => {
+          setWeightHistory(data.weightHistory || []);
+          setLoadingWeight(false);
+        },
+        { range },
+      );
     } catch (err) {
       console.error("Load weight history error:", err);
     } finally {
@@ -430,6 +446,7 @@ export default function ProfileScreen() {
       });
       setProfile(res.data.user);
       await AsyncStorage.setItem("user", JSON.stringify(res.data.user));
+      await writeCache("/users/me", { user: res.data.user });
 
       // Only add a weight-history entry when the weight actually changed,
       // so editing other fields does not create duplicate points on the chart
@@ -450,9 +467,11 @@ export default function ProfileScreen() {
         Alert.alert("Success", "Profile saved successfully!");
       }
     } catch (err: any) {
-      const message =
-        err.response?.data?.error ||
-        "Unable to save profile. Please try again.";
+      // Saving a profile needs the server (it recalculates your targets and meal plan)
+      const message = isNetworkError(err)
+        ? "You're offline. Connect to the internet to save profile changes."
+        : err.response?.data?.error ||
+          "Unable to save profile. Please try again.";
       Alert.alert("Error", message);
     } finally {
       setSaving(false);
@@ -482,6 +501,7 @@ export default function ProfileScreen() {
     await AsyncStorage.removeItem("token");
     await AsyncStorage.removeItem("user");
     await clearPushTokenCache(); // so the next account re-registers its push token
+    await clearCache(); // so the next account never sees this account's saved data
     router.replace("/login");
   };
 

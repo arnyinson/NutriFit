@@ -42,6 +42,14 @@ import {
 } from "react-native-safe-area-context";
 import ConfirmModal from "../../components/ConfirmModal";
 import api from "../../constants/api";
+import {
+  apiGetCached,
+  loadWithCache,
+  mutate,
+  newClientId,
+  patchCache,
+  patchCachePrefix,
+} from "../../constants/offline";
 import { useTheme } from "../../constants/theme";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
@@ -177,6 +185,53 @@ const isFutureDay = (dateStr: string) => dateStr > getTodayDateString();
 // Rough estimated height (in px) of each collapsed day section card, para sa scroll positioning
 const DAY_SECTION_ESTIMATED_HEIGHT = 340;
 
+// Keep every saved copy of the meal plan in step with what the user just did,
+// so the Dashboard and the next app start show the same thing, even offline.
+const patchMealCaches = (updater: (m: any) => any) =>
+  patchCachePrefix<any>("/meals/plan/me", (data) => ({
+    ...data,
+    mealPlan: (data.mealPlan || []).map((d: any) => ({
+      ...d,
+      meals: (d.meals || []).map(updater),
+    })),
+  }));
+
+// Saves a "Log Outside Food" entry. Offline, it is kept on the phone and sent later.
+// client_id lets the server ignore the same entry if it is ever sent twice.
+// Returns true when it was only saved on the phone (queued).
+const saveFoodLog = async (payload: {
+  food_name: string;
+  calories: number;
+  protein?: number;
+  carbs?: number;
+  fats?: number;
+  weight_grams?: number;
+}) => {
+  const clientId = newClientId();
+  const { queued } = await mutate("post", "/meals/log", {
+    ...payload,
+    client_id: clientId,
+  });
+  // Show it in the Dashboard's saved "today" list right away
+  await patchCache<any>(
+    `/meals/log?${JSON.stringify({ date: getTodayDateString() })}`,
+    (data) => ({
+      ...data,
+      foodLogs: [
+        {
+          id: clientId,
+          food_name: payload.food_name,
+          calories: payload.calories,
+          weight_grams: payload.weight_grams ?? null,
+          logged_at: new Date().toISOString(),
+        },
+        ...(data.foodLogs || []),
+      ],
+    }),
+  );
+  return queued;
+};
+
 export default function MealScreen() {
   const router = useRouter();
   const pathname = usePathname();
@@ -246,20 +301,39 @@ export default function MealScreen() {
 
   const loadMealPlan = useCallback(async (mode: "weekly" | "continuous") => {
     try {
-      const cachedUser = await AsyncStorage.getItem("user");
-      if (cachedUser) {
-        setUserAllergens(JSON.parse(cachedUser).allergens || []);
+      try {
+        const cachedUser = await AsyncStorage.getItem("user");
+        if (cachedUser) {
+          setUserAllergens(JSON.parse(cachedUser).allergens || []);
+        }
+      } catch {
+        // ignore unreadable saved user
       }
 
-      let res = await api.get("/meals/plan/me", { params: { mode } });
-      if (!res.data.mealPlan || res.data.mealPlan.length === 0) {
-        await api.post("/meals/plan/generate", { mode });
-        res = await api.get("/meals/plan/me", { params: { mode } });
-      }
-      setMealPlan(res.data.mealPlan);
+      // Saved plan shows right away; fresh data replaces it when it arrives.
+      // Same key as the Dashboard, so both screens share one saved copy.
+      await loadWithCache<any>(
+        `/meals/plan/me?${JSON.stringify({ mode })}`,
+        async () => {
+          let res = await api.get("/meals/plan/me", { params: { mode } });
+          if (!res.data.mealPlan || res.data.mealPlan.length === 0) {
+            await api.post("/meals/plan/generate", { mode });
+            res = await api.get("/meals/plan/me", { params: { mode } });
+          }
+          return res.data;
+        },
+        (data) => {
+          setMealPlan(data.mealPlan || []);
+          setLoading(false);
+        },
+      );
     } catch (err) {
+      // Only reached when there is no saved plan AND the server cannot be reached
       console.error("Load meal plan error:", err);
-      Alert.alert("Error", "Unable to load your meal plan. Please try again.");
+      Alert.alert(
+        "Error",
+        "Unable to load your meal plan. Check your connection and try again.",
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -324,7 +398,13 @@ export default function MealScreen() {
       ),
     );
     try {
-      await api.patch(`/meals/plan/${entry.plan_id}/toggle`, { taken: true });
+      // Offline? It is saved on the phone and sent when the connection is back.
+      await mutate("patch", `/meals/plan/${entry.plan_id}/toggle`, {
+        taken: true,
+      });
+      await patchMealCaches((m) =>
+        m.plan_id === entry.plan_id ? { ...m, taken: true, skipped: false } : m,
+      );
     } catch (err) {
       console.error("Toggle meal error:", err);
       setMealPlan((prev) =>
@@ -362,7 +442,12 @@ export default function MealScreen() {
       ),
     );
     try {
-      await api.patch(`/meals/plan/${entry.plan_id}/toggle`, { taken: false });
+      await mutate("patch", `/meals/plan/${entry.plan_id}/toggle`, {
+        taken: false,
+      });
+      await patchMealCaches((m) =>
+        m.plan_id === entry.plan_id ? { ...m, taken: false, skipped: true } : m,
+      );
     } catch (err) {
       console.error("Skip meal error:", err);
       setMealPlan((prev) =>
@@ -385,6 +470,7 @@ export default function MealScreen() {
   const takeAllMeals = async (dayIndex: number) => {
     const day = mealPlan[dayIndex];
     const previous = day.meals;
+    const ids = previous.filter((m) => !m.taken).map((m) => m.plan_id);
     setMealPlan((prev) =>
       prev.map((d, di) =>
         di === dayIndex
@@ -400,12 +486,12 @@ export default function MealScreen() {
       ),
     );
     try {
-      await Promise.all(
-        previous
-          .filter((m) => !m.taken)
-          .map((m) =>
-            api.patch(`/meals/plan/${m.plan_id}/toggle`, { taken: true }),
-          ),
+      // One after another, so the saved offline queue keeps the order
+      for (const planId of ids) {
+        await mutate("patch", `/meals/plan/${planId}/toggle`, { taken: true });
+      }
+      await patchMealCaches((m) =>
+        ids.includes(m.plan_id) ? { ...m, taken: true, skipped: false } : m,
       );
     } catch (err) {
       console.error("Take all error:", err);
@@ -437,8 +523,11 @@ export default function MealScreen() {
       const params: Record<string, string> = search
         ? { search }
         : { meal_type: mealType };
-      const res = await api.get("/meals", { params });
-      setEditPlanResults(res.data.meals);
+      await apiGetCached<any>(
+        "/meals",
+        (data) => setEditPlanResults(data.meals || []),
+        params,
+      );
     } catch (err) {
       console.error("Search meals error:", err);
     } finally {
@@ -456,9 +545,14 @@ export default function MealScreen() {
   const replaceMealSlot = async (newMeal: Meal) => {
     if (editPlanDayIndex === null || !editPlanSlot) return;
     try {
-      await api.patch(`/meals/plan/${editPlanSlot.plan_id}/replace`, {
+      await mutate("patch", `/meals/plan/${editPlanSlot.plan_id}/replace`, {
         new_meal_id: newMeal.id,
       });
+      await patchMealCaches((m) =>
+        m.plan_id === editPlanSlot.plan_id
+          ? { ...m, meal: newMeal, taken: false, skipped: false }
+          : m,
+      );
       setMealPlan((prev) =>
         prev.map((day, di) =>
           di === editPlanDayIndex
@@ -502,8 +596,11 @@ export default function MealScreen() {
           const params: Record<string, string> = editMealSearch
             ? { search: editMealSearch }
             : { meal_type: editingEntry.meal_type };
-          const res = await api.get("/meals", { params });
-          setEditMealResults(res.data.meals);
+          await apiGetCached<any>(
+            "/meals",
+            (data) => setEditMealResults(data.meals || []),
+            params,
+          );
         } catch (err) {
           console.error("Search error:", err);
         }
@@ -515,9 +612,14 @@ export default function MealScreen() {
   const replaceWholeMeal = async (newMeal: Meal) => {
     if (editPlanDayIndex === null || !editingEntry) return;
     try {
-      await api.patch(`/meals/plan/${editingEntry.plan_id}/replace`, {
+      await mutate("patch", `/meals/plan/${editingEntry.plan_id}/replace`, {
         new_meal_id: newMeal.id,
       });
+      await patchMealCaches((m) =>
+        m.plan_id === editingEntry.plan_id
+          ? { ...m, meal: newMeal, taken: false, skipped: false }
+          : m,
+      );
       setMealPlan((prev) =>
         prev.map((day, di) =>
           di === editPlanDayIndex
@@ -550,10 +652,11 @@ export default function MealScreen() {
     ) {
       (async () => {
         try {
-          const res = await api.get("/meals", {
-            params: { search: editMealSearch },
-          });
-          setLogSearchResults(res.data.meals);
+          await apiGetCached<any>(
+            "/meals",
+            (data) => setLogSearchResults(data.meals || []),
+            { search: editMealSearch },
+          );
         } catch (err) {
           console.error("Log search error:", err);
         }
@@ -566,7 +669,7 @@ export default function MealScreen() {
 
   const logFoodFromDb = async (meal: Meal) => {
     try {
-      await api.post("/meals/log", {
+      const queued = await saveFoodLog({
         food_name: meal.name,
         calories: meal.calories,
         protein: meal.protein,
@@ -574,8 +677,10 @@ export default function MealScreen() {
         fats: meal.fats,
       });
       Alert.alert(
-        "Logged!",
-        `${meal.name} (${meal.calories} kcal) added to your log.`,
+        queued ? "Saved offline" : "Logged!",
+        queued
+          ? `${meal.name} (${meal.calories} kcal) will be added to your log when you're back online.`
+          : `${meal.name} (${meal.calories} kcal) added to your log.`,
       );
       setEditMealSearch("");
       setShowEditMealModal(false);
@@ -591,14 +696,16 @@ export default function MealScreen() {
       return;
     }
     try {
-      await api.post("/meals/log", {
+      const queued = await saveFoodLog({
         food_name: manualFoodName,
         calories: Number(manualKcal),
         weight_grams: manualWeight ? Number(manualWeight) : undefined,
       });
       Alert.alert(
-        "Logged!",
-        `${manualFoodName} — ${manualKcal} kcal added to your log.`,
+        queued ? "Saved offline" : "Logged!",
+        queued
+          ? `${manualFoodName} — ${manualKcal} kcal will be added to your log when you're back online.`
+          : `${manualFoodName} — ${manualKcal} kcal added to your log.`,
       );
       setManualFoodName("");
       setManualKcal("");

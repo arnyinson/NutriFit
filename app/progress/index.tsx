@@ -38,6 +38,12 @@ import Svg, { Circle, Line, Path } from "react-native-svg";
 import ConfirmModal from "../../components/ConfirmModal";
 import SuccessModal from "../../components/SuccessModal";
 import api from "../../constants/api";
+import {
+  apiGetCached,
+  isNetworkError,
+  mutate,
+  patchCache,
+} from "../../constants/offline";
 import { useTheme } from "../../constants/theme";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
@@ -123,10 +129,15 @@ export default function ProgressScreen() {
     try {
       const apiPeriod =
         PERIODS.find((p) => p.key === period)?.apiValue || "weekly";
-      const res = await api.get("/progress/weekly-summary", {
-        params: { period: apiPeriod },
-      });
-      setSummary(res.data.summary);
+      // Saved stats show right away; fresh numbers replace them when they arrive
+      await apiGetCached<any>(
+        "/progress/weekly-summary",
+        (data) => {
+          if (data?.summary) setSummary(data.summary);
+          setLoading(false);
+        },
+        { period: apiPeriod },
+      );
     } catch (err) {
       console.error("Load summary error:", err);
     } finally {
@@ -137,13 +148,17 @@ export default function ProgressScreen() {
 
   const loadProfile = useCallback(async (): Promise<Profile | null> => {
     try {
-      const res = await api.get("/users/me");
-      const user = res.data.user as Profile;
-      setProfile(user);
+      const holder: { user: Profile | null } = { user: null };
+      await apiGetCached<any>("/users/me", (data) => {
+        holder.user = data.user as Profile;
+        setProfile(holder.user);
+      });
+      if (!holder.user) return null;
+      const profileUser: Profile = holder.user;
 
       // Decide whether the weekly weigh-in prompt is due. First time on this
       // device we just start the clock instead of nagging immediately.
-      const key = weighInKey(user.id);
+      const key = weighInKey(profileUser.id);
       const stored = await AsyncStorage.getItem(key);
       if (!stored) {
         await AsyncStorage.setItem(key, String(Date.now()));
@@ -152,7 +167,7 @@ export default function ProgressScreen() {
         const days = (Date.now() - Number(stored)) / (1000 * 60 * 60 * 24);
         setWeighInDue(days >= WEIGH_IN_INTERVAL_DAYS);
       }
-      return user;
+      return profileUser;
     } catch (err) {
       console.error("Load profile error:", err);
       return null;
@@ -174,7 +189,8 @@ export default function ProgressScreen() {
       await api.post("/progress/sync-today", { weight, mode });
       setLastSynced(new Date());
     } catch (err) {
-      console.error("Auto sync error:", err);
+      // No signal is normal here; the saved stats are shown instead
+      if (!isNetworkError(err)) console.error("Auto sync error:", err);
     } finally {
       setSyncing(false);
     }
@@ -234,7 +250,8 @@ export default function ProgressScreen() {
     const weightKg = parseFloat(weightInput);
     setSavingWeight(true);
     try {
-      await api.put("/users/me", {
+      // Offline? Both are saved on the phone and sent, in order, when back online.
+      const { queued } = await mutate("put", "/users/me", {
         birthday: toISODate(profile.birthday),
         sex: profile.sex,
         height: parseFloat(profile.height),
@@ -244,10 +261,32 @@ export default function ProgressScreen() {
         allergens: profile.allergens,
         available_equipment: profile.available_equipment,
       });
-      await api.post("/progress/log", { weight: weightKg });
+      await mutate("post", "/progress/log", { weight: weightKg });
       await AsyncStorage.setItem(weighInKey(profile.id), String(Date.now()));
       setWeighInDue(false);
       setShowWeighInModal(false);
+
+      if (queued) {
+        // Show the new weight right away and keep the saved profile in step
+        setProfile({ ...profile, weight: String(weightKg) });
+        await patchCache<any>("/users/me", (data) => ({
+          ...data,
+          user: { ...data.user, weight: String(weightKg) },
+        }));
+        setSummary((prev) =>
+          prev
+            ? {
+                ...prev,
+                bodyProgress: { ...prev.bodyProgress, current: weightKg },
+              }
+            : prev,
+        );
+        Alert.alert(
+          "Saved offline",
+          "Your new weight will be saved to your profile when you're back online.",
+        );
+        return;
+      }
 
       const user = await loadProfile();
       await autoSync(user);
@@ -286,6 +325,42 @@ export default function ProgressScreen() {
       ? { symbol: "▼", color: "#F44336" }
       : { symbol: "▲", color: "#F44336" };
   };
+
+  if (!loading && !summary) {
+    return (
+      <SafeAreaView
+        style={[
+          styles.safe,
+          {
+            backgroundColor: colors.background,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 24,
+          },
+        ]}
+      >
+        <Text
+          style={{
+            color: colors.textMuted,
+            fontSize: 14,
+            textAlign: "center",
+            marginBottom: 16,
+          }}
+        >
+          Unable to load your stats. Check your connection and try again.
+        </Text>
+        <TouchableOpacity
+          style={styles.syncBtn}
+          onPress={() => {
+            setLoading(true);
+            refreshAll(activePeriod);
+          }}
+        >
+          <Text style={styles.syncBtnText}>Retry</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   if (loading || !summary) {
     return (
