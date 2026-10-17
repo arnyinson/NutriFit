@@ -314,10 +314,12 @@ export async function syncQueue(): Promise<{
   return { sent, remaining: await pendingCount(), dropped };
 }
 
+// Only a phone that is really disconnected counts as offline. NetInfo's "internet reachable"
+// test can be wrong on some networks, so the real request decides in mutate() instead.
 const isOnlineState = (s: {
   isConnected: boolean | null;
   isInternetReachable: boolean | null;
-}) => s.isConnected !== false && s.isInternetReachable !== false;
+}) => s.isConnected !== false;
 
 /**
  * Send a change to the server, or save it for later when there is no connection.
@@ -333,21 +335,24 @@ export async function mutate(
   const net = await NetInfo.fetch();
   const online = isOnlineState(net);
 
-  // No connection: save it for later.
+  // Phone is really disconnected: save it for later.
   if (!online) {
     await enqueue(method, url, data);
     return { queued: true };
   }
 
-  // Keep the order: if something is already waiting, this action waits behind it.
+  // Keep the order: send what is already waiting first. Only if something is still
+  // stuck, this action waits behind it.
   if ((await pendingCount()) > 0) {
-    await enqueue(method, url, data);
-    syncQueue();
-    return { queued: true };
+    await syncQueue();
+    if ((await pendingCount()) > 0) {
+      await enqueue(method, url, data);
+      return { queued: true };
+    }
   }
 
   try {
-    const response = await api.request({ method, url, data, timeout: 15000 });
+    const response = await api.request({ method, url, data, timeout: 30000 });
     return { queued: false, response };
   } catch (err) {
     if (isNetworkError(err)) {

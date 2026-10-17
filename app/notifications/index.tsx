@@ -23,6 +23,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
+import { publishUnread } from "../../constants/unread";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -183,6 +184,11 @@ export default function NotificationsScreen() {
   };
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  // Keep the red badge on the other screens in step (only when the list shows ALL types)
+  useEffect(() => {
+    if (!loading && activeFilter === "all") publishUnread(unreadCount);
+  }, [unreadCount, loading, activeFilter]);
 
   if (loading) {
     return (

@@ -32,10 +32,16 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import ConfirmModal from "../../components/ConfirmModal";
+import NavBadge from "../../components/NavBadge";
 import api from "../../constants/api";
-import { loadWithCache, mutate, patchCachePrefix } from "../../constants/offline";
+import {
+  loadWithCache,
+  mutate,
+  patchCachePrefix,
+} from "../../constants/offline";
 import { registerAndSavePushToken } from "../../constants/pushNotifications";
 import { useTheme } from "../../constants/theme";
+import { useUnreadCount } from "../../constants/unread";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -94,6 +100,7 @@ const toNumber = (value: unknown) => parseFloat(String(value ?? 0)) || 0;
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const unreadCount = useUnreadCount();
   const pathname = usePathname();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -968,11 +975,14 @@ export default function DashboardScreen() {
               style={styles.navItem}
               onPress={() => router.push(tab.route as any)}
             >
-              <tab.Icon
-                size={22}
-                color={isActive ? "#4CAF50" : colors.textMuted}
-                strokeWidth={isActive ? 2.4 : 2}
-              />
+              <View>
+                <tab.Icon
+                  size={22}
+                  color={isActive ? "#4CAF50" : colors.textMuted}
+                  strokeWidth={isActive ? 2.4 : 2}
+                />
+                {tab.name === "Profile" && <NavBadge count={unreadCount} />}
+              </View>
               <Text
                 style={[
                   styles.navLabel,

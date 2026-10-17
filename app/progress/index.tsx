@@ -36,6 +36,7 @@ import {
 } from "react-native-safe-area-context";
 import Svg, { Circle, Line, Path } from "react-native-svg";
 import ConfirmModal from "../../components/ConfirmModal";
+import NavBadge from "../../components/NavBadge";
 import SuccessModal from "../../components/SuccessModal";
 import api from "../../constants/api";
 import {
@@ -45,6 +46,7 @@ import {
   patchCache,
 } from "../../constants/offline";
 import { useTheme } from "../../constants/theme";
+import { useUnreadCount } from "../../constants/unread";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -102,6 +104,7 @@ const toISODate = (value: string) => {
 
 export default function ProgressScreen() {
   const router = useRouter();
+  const unreadCount = useUnreadCount();
   const pathname = usePathname();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -1110,11 +1113,14 @@ export default function ProgressScreen() {
               style={styles.navItem}
               onPress={() => router.push(tab.route as any)}
             >
-              <tab.Icon
-                size={22}
-                color={isActive ? "#4CAF50" : colors.textMuted}
-                strokeWidth={isActive ? 2.4 : 2}
-              />
+              <View>
+                <tab.Icon
+                  size={22}
+                  color={isActive ? "#4CAF50" : colors.textMuted}
+                  strokeWidth={isActive ? 2.4 : 2}
+                />
+                {tab.name === "Profile" && <NavBadge count={unreadCount} />}
+              </View>
               <Text
                 style={[
                   styles.navLabel,

@@ -39,6 +39,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import ConfirmModal from "../../components/ConfirmModal";
+import NavBadge from "../../components/NavBadge";
 import SuccessModal from "../../components/SuccessModal";
 import api from "../../constants/api";
 import {
@@ -49,6 +50,7 @@ import {
   patchCachePrefix,
 } from "../../constants/offline";
 import { useTheme } from "../../constants/theme";
+import { useUnreadCount } from "../../constants/unread";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -197,11 +199,13 @@ type VideoType = "uploaded" | "youtube" | "exercisedb" | "none" | null;
 
 export default function WorkoutScreen() {
   const router = useRouter();
+  const unreadCount = useUnreadCount();
   const pathname = usePathname();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
   const scrollViewRef = useRef<ScrollView>(null);
+  const savingLogRef = useRef(false);
   const hasAutoScrolledRef = useRef(false);
 
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutDay[]>([]);
@@ -473,6 +477,8 @@ export default function WorkoutScreen() {
       return;
     }
     if (!logEntry) return;
+    if (savingLogRef.current) return; // already saving: ignore repeated taps
+    savingLogRef.current = true;
 
     try {
       // client_id lets the server ignore the same log if it is ever sent twice
@@ -510,6 +516,8 @@ export default function WorkoutScreen() {
     } catch (err) {
       console.error("Save log error:", err);
       Alert.alert("Error", "Unable to save workout log. Please try again.");
+    } finally {
+      savingLogRef.current = false;
     }
   };
 
@@ -1630,11 +1638,14 @@ export default function WorkoutScreen() {
               style={styles.navItem}
               onPress={() => router.push(tab.route as any)}
             >
-              <tab.Icon
-                size={22}
-                color={isActive ? "#4CAF50" : colors.textMuted}
-                strokeWidth={isActive ? 2.4 : 2}
-              />
+              <View>
+                <tab.Icon
+                  size={22}
+                  color={isActive ? "#4CAF50" : colors.textMuted}
+                  strokeWidth={isActive ? 2.4 : 2}
+                />
+                {tab.name === "Profile" && <NavBadge count={unreadCount} />}
+              </View>
               <Text
                 style={[
                   styles.navLabel,

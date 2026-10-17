@@ -41,6 +41,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import ConfirmModal from "../../components/ConfirmModal";
+import NavBadge from "../../components/NavBadge";
 import api from "../../constants/api";
 import {
   apiGetCached,
@@ -51,6 +52,7 @@ import {
   patchCachePrefix,
 } from "../../constants/offline";
 import { useTheme } from "../../constants/theme";
+import { useUnreadCount } from "../../constants/unread";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -234,6 +236,7 @@ const saveFoodLog = async (payload: {
 
 export default function MealScreen() {
   const router = useRouter();
+  const unreadCount = useUnreadCount();
   const pathname = usePathname();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -270,6 +273,9 @@ export default function MealScreen() {
   const [manualFoodName, setManualFoodName] = useState("");
   const [manualKcal, setManualKcal] = useState("");
   const [manualWeight, setManualWeight] = useState("");
+  // Blocks repeated taps on the Log buttons while one log is still being saved
+  const loggingRef = useRef(false);
+  const [loggingFood, setLoggingFood] = useState(false);
 
   // Confirmation modal bago mag-mark ng meal(s) — "Take" ay PERMANENTE
   // (hindi na mababago pagkatapos), pero ang "Skip" ay REVERSIBLE — baka
@@ -668,6 +674,9 @@ export default function MealScreen() {
   }, [editMealSearch, editTab]);
 
   const logFoodFromDb = async (meal: Meal) => {
+    if (loggingRef.current) return;
+    loggingRef.current = true;
+    setLoggingFood(true);
     try {
       const queued = await saveFoodLog({
         food_name: meal.name,
@@ -687,6 +696,9 @@ export default function MealScreen() {
     } catch (err) {
       console.error("Log food error:", err);
       Alert.alert("Error", "Unable to log food. Please try again.");
+    } finally {
+      loggingRef.current = false;
+      setLoggingFood(false);
     }
   };
 
@@ -695,6 +707,9 @@ export default function MealScreen() {
       Alert.alert("Error", "Please enter food name and calories.");
       return;
     }
+    if (loggingRef.current) return;
+    loggingRef.current = true;
+    setLoggingFood(true);
     try {
       const queued = await saveFoodLog({
         food_name: manualFoodName,
@@ -714,6 +729,9 @@ export default function MealScreen() {
     } catch (err) {
       console.error("Log manual food error:", err);
       Alert.alert("Error", "Unable to log food. Please try again.");
+    } finally {
+      loggingRef.current = false;
+      setLoggingFood(false);
     }
   };
 
@@ -1643,6 +1661,7 @@ export default function MealScreen() {
                             },
                           ]}
                           onPress={() => logFoodFromDb(item)}
+                          disabled={loggingFood}
                         >
                           <View style={styles.dbMealInfo}>
                             <Text
@@ -1733,10 +1752,18 @@ export default function MealScreen() {
                     maxLength={4}
                   />
                   <TouchableOpacity
-                    style={styles.modalCloseBtn}
+                    style={[
+                      styles.modalCloseBtn,
+                      loggingFood && { opacity: 0.6 },
+                    ]}
                     onPress={logManualFood}
+                    disabled={loggingFood}
                   >
-                    <Text style={styles.modalCloseBtnText}>Log Food</Text>
+                    {loggingFood ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.modalCloseBtnText}>Log Food</Text>
+                    )}
                   </TouchableOpacity>
                 </ScrollView>
               )}
@@ -1807,11 +1834,14 @@ export default function MealScreen() {
               style={styles.navItem}
               onPress={() => router.push(tab.route as any)}
             >
-              <tab.Icon
-                size={22}
-                color={isActive ? "#4CAF50" : colors.textMuted}
-                strokeWidth={isActive ? 2.4 : 2}
-              />
+              <View>
+                <tab.Icon
+                  size={22}
+                  color={isActive ? "#4CAF50" : colors.textMuted}
+                  strokeWidth={isActive ? 2.4 : 2}
+                />
+                {tab.name === "Profile" && <NavBadge count={unreadCount} />}
+              </View>
               <Text
                 style={[
                   styles.navLabel,

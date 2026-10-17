@@ -41,6 +41,7 @@ import Svg, { Circle, Path } from "react-native-svg";
 import AllergenPicker from "../../components/AllergenPicker";
 import ConfirmModal from "../../components/ConfirmModal";
 import DietPicker, { dietLabel } from "../../components/DietPicker";
+import NavBadge from "../../components/NavBadge";
 import api from "../../constants/api";
 import {
   apiGetCached,
@@ -50,6 +51,7 @@ import {
 } from "../../constants/offline";
 import { clearPushTokenCache } from "../../constants/pushNotifications";
 import { useTheme } from "../../constants/theme";
+import { publishUnread, useUnreadCount } from "../../constants/unread";
 
 type UserProfile = {
   id: string;
@@ -121,6 +123,7 @@ const BMI_WARNING_KEY = "lastBmiWarningCategory";
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const unreadCount = useUnreadCount();
   const { isDark, toggleTheme, colors } = useTheme();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -501,6 +504,7 @@ export default function ProfileScreen() {
     await AsyncStorage.removeItem("token");
     await AsyncStorage.removeItem("user");
     await clearPushTokenCache(); // so the next account re-registers its push token
+    publishUnread(0);
     await clearCache(); // so the next account never sees this account's saved data
     router.replace("/login");
   };
@@ -639,7 +643,10 @@ export default function ProfileScreen() {
               onPress={() => router.push("/notifications" as any)}
               hitSlop={HIT_SLOP}
             >
-              <Bell size={22} color={colors.textMuted} />
+              <View>
+                <Bell size={22} color={colors.textMuted} />
+                <NavBadge count={unreadCount} />
+              </View>
             </TouchableOpacity>
           </View>
         </View>
