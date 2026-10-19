@@ -90,12 +90,16 @@ export async function clearPushTokenCache() {
   } catch {}
 }
 
+const HANDLED_KEY = "lastHandledNotificationId";
+
 // Call once in app/_layout.tsx:  useEffect(() => setupNotificationTapListener(router), [])
 // Backend push must send: data: { type: "ticket", ticket_id: <id> }
 export function setupNotificationTapListener(router: {
   push: (p: any) => void;
 }) {
-  const handle = (data: any) => {
+  let active = true;
+
+  const navigate = (data: any) => {
     if (data?.type === "ticket" && data?.ticket_id) {
       router.push(`/ticket?ticketId=${data.ticket_id}` as any);
     } else {
@@ -103,13 +107,48 @@ export function setupNotificationTapListener(router: {
     }
   };
 
+  // Handle each tapped notification only once.
+  // Without this, the OS keeps returning the last tapped notification,
+  // so every normal app launch jumped to the Notifications screen.
+  const handleResponse = async (r: Notifications.NotificationResponse) => {
+    try {
+      // Only real taps on the notification, not other actions
+      if (r.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER)
+        return;
+
+      const id = r.notification.request.identifier;
+      const lastHandled = await AsyncStorage.getItem(HANDLED_KEY);
+      if (lastHandled === id) return;
+
+      await AsyncStorage.setItem(HANDLED_KEY, id);
+
+      // Remove the stored response so it is not returned again (if supported)
+      try {
+        const n: any = Notifications;
+        if (typeof n.clearLastNotificationResponse === "function") {
+          n.clearLastNotificationResponse();
+        } else if (typeof n.clearLastNotificationResponseAsync === "function") {
+          await n.clearLastNotificationResponseAsync();
+        }
+      } catch {}
+
+      if (active) navigate(r.notification.request.content.data);
+    } catch (e) {
+      console.log("Notification tap handling failed:", e);
+    }
+  };
+
   // App opened from a killed state by tapping a notification
   Notifications.getLastNotificationResponseAsync().then((r) => {
-    if (r) handle(r.notification.request.content.data);
+    if (r) handleResponse(r);
   });
 
-  const sub = Notifications.addNotificationResponseReceivedListener((r) =>
-    handle(r.notification.request.content.data),
-  );
-  return () => sub.remove();
+  const sub = Notifications.addNotificationResponseReceivedListener((r) => {
+    handleResponse(r);
+  });
+
+  return () => {
+    active = false;
+    sub.remove();
+  };
 }

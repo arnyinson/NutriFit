@@ -56,6 +56,61 @@ import { useUnreadCount } from "../../constants/unread";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
+// Cooked rice values per 100 g (PhilFCT, DOST-FNRI).
+// White = "Rice, well-milled, boiled" (entry 2982).
+// Brown = estimate: undermilled rice (entry 2976) scaled by the cooking ratio of white rice.
+type RiceKey = "white" | "brown";
+const RICE_TYPES: {
+  key: RiceKey;
+  chip: string;
+  name: string;
+  kcal: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+}[] = [
+  {
+    key: "white",
+    chip: "White",
+    name: "White rice",
+    kcal: 129,
+    protein: 2.1,
+    carbs: 29.7,
+    fats: 0.2,
+  },
+  {
+    key: "brown",
+    chip: "Brown",
+    name: "Brown rice",
+    kcal: 132,
+    protein: 2.9,
+    carbs: 27.6,
+    fats: 1.0,
+  },
+];
+
+// About 80 g of cooked rice per 1/2 cup (FNRI food exchange: 1/2 cup = 100 kcal, 23 g carbs)
+const RICE_PORTIONS = [
+  { label: "\u00BD cup", grams: 80 },
+  { label: "1 cup", grams: 160 },
+  { label: "1\u00BD cups", grams: 240 },
+  { label: "2 cups", grams: 320 },
+];
+
+const getRiceNutrition = (
+  rice: { kcal: number; protein: number; carbs: number; fats: number },
+  grams: number,
+) => {
+  const f = grams / 100;
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  return {
+    calories: Math.round(rice.kcal * f),
+    protein: r1(rice.protein * f),
+    carbs: r1(rice.carbs * f),
+    fats: r1(rice.fats * f),
+  };
+};
+
 type Meal = {
   id: string;
   name: string;
@@ -257,6 +312,10 @@ export default function MealScreen() {
   // Steps the user ticked off while cooking (view-only, resets when the modal
   // is opened for another meal)
   const [doneSteps, setDoneSteps] = useState<number[]>([]);
+  // "Add rice" section in the meal detail (not shown for meals of future days)
+  const [selectedMealFuture, setSelectedMealFuture] = useState(false);
+  const [riceType, setRiceType] = useState<RiceKey>("white");
+  const [ricePortion, setRicePortion] = useState(1);
 
   const [showEditPlanModal, setShowEditPlanModal] = useState(false);
   const [editPlanDayIndex, setEditPlanDayIndex] = useState<number | null>(null);
@@ -735,6 +794,40 @@ export default function MealScreen() {
     }
   };
 
+  // Logs the chosen rice as its own food log. The meal's nutrition is not changed.
+  const logRice = async () => {
+    if (loggingRef.current) return;
+    const rice = RICE_TYPES.find((r) => r.key === riceType) || RICE_TYPES[0];
+    const portion = RICE_PORTIONS[ricePortion];
+    const n = getRiceNutrition(rice, portion.grams);
+    const name = `${rice.name} (${portion.label})`;
+    loggingRef.current = true;
+    setLoggingFood(true);
+    try {
+      const queued = await saveFoodLog({
+        food_name: name,
+        calories: n.calories,
+        protein: n.protein,
+        carbs: n.carbs,
+        fats: n.fats,
+        weight_grams: portion.grams,
+      });
+      Alert.alert(
+        queued ? "Saved offline" : "Logged!",
+        queued
+          ? `${name} (${n.calories} kcal) will be added to your log when you're back online.`
+          : `${name} (${n.calories} kcal) added to your log.`,
+      );
+      setShowMealModal(false);
+    } catch (err) {
+      console.error("Log rice error:", err);
+      Alert.alert("Error", "Unable to log rice. Please try again.");
+    } finally {
+      loggingRef.current = false;
+      setLoggingFood(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView
@@ -909,6 +1002,9 @@ export default function MealScreen() {
                     onPress={() => {
                       setSelectedMeal(entry.meal);
                       setDoneSteps([]);
+                      setSelectedMealFuture(isFuture);
+                      setRiceType("white");
+                      setRicePortion(1);
                       setShowMealModal(true);
                     }}
                     activeOpacity={0.8}
@@ -1113,6 +1209,188 @@ export default function MealScreen() {
                       </View>
                     ))}
                   </View>
+                  {!selectedMealFuture &&
+                    (() => {
+                      const rice =
+                        RICE_TYPES.find((r) => r.key === riceType) ||
+                        RICE_TYPES[0];
+                      const portion = RICE_PORTIONS[ricePortion];
+                      const n = getRiceNutrition(rice, portion.grams);
+                      return (
+                        <View style={styles.riceBox}>
+                          <View style={styles.riceTitleRow}>
+                            <Text
+                              style={[styles.riceTitle, { color: colors.text }]}
+                            >
+                              {"\uD83C\uDF5A"} Add rice
+                            </Text>
+                            <Text
+                              style={[
+                                styles.riceOptional,
+                                { color: colors.textMuted },
+                              ]}
+                            >
+                              Optional
+                            </Text>
+                          </View>
+
+                          <Text
+                            style={[
+                              styles.riceLabel,
+                              { color: colors.textMuted },
+                            ]}
+                          >
+                            TYPE
+                          </Text>
+                          <View style={styles.riceChipRow}>
+                            {RICE_TYPES.map((r) => {
+                              const on = r.key === riceType;
+                              return (
+                                <TouchableOpacity
+                                  key={r.key}
+                                  style={[
+                                    styles.riceChip,
+                                    {
+                                      backgroundColor: on
+                                        ? "#4CAF50"
+                                        : colors.input,
+                                    },
+                                  ]}
+                                  onPress={() => setRiceType(r.key)}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.riceChipText,
+                                      {
+                                        color: on
+                                          ? "#fff"
+                                          : colors.textSecondary,
+                                      },
+                                    ]}
+                                  >
+                                    {r.chip}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+
+                          <Text
+                            style={[
+                              styles.riceLabel,
+                              { color: colors.textMuted },
+                            ]}
+                          >
+                            AMOUNT (cooked)
+                          </Text>
+                          <View style={styles.riceChipRow}>
+                            {RICE_PORTIONS.map((p, i) => {
+                              const on = i === ricePortion;
+                              return (
+                                <TouchableOpacity
+                                  key={p.label}
+                                  style={[
+                                    styles.riceChip,
+                                    {
+                                      backgroundColor: on
+                                        ? "#4CAF50"
+                                        : colors.input,
+                                    },
+                                  ]}
+                                  onPress={() => setRicePortion(i)}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.riceChipText,
+                                      {
+                                        color: on
+                                          ? "#fff"
+                                          : colors.textSecondary,
+                                      },
+                                    ]}
+                                  >
+                                    {p.label}
+                                  </Text>
+                                  <Text
+                                    style={[
+                                      styles.riceChipSub,
+                                      {
+                                        color: on
+                                          ? "#E8F5E9"
+                                          : colors.textMuted,
+                                      },
+                                    ]}
+                                  >
+                                    ~{p.grams} g
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+
+                          <View
+                            style={[
+                              styles.riceResult,
+                              { backgroundColor: colors.input },
+                            ]}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text
+                                style={[
+                                  styles.riceResultName,
+                                  { color: colors.text },
+                                ]}
+                              >
+                                {rice.name} {"\u00B7"} {portion.label} (~
+                                {portion.grams} g)
+                              </Text>
+                              <Text style={styles.riceResultMacros}>
+                                P {n.protein}g {"\u00B7"} C {n.carbs}g{" "}
+                                {"\u00B7"} F {n.fats}g
+                              </Text>
+                            </View>
+                            <Text
+                              style={[
+                                styles.riceResultKcal,
+                                { color: colors.text },
+                              ]}
+                            >
+                              {n.calories} kcal
+                            </Text>
+                          </View>
+
+                          <TouchableOpacity
+                            style={[
+                              styles.riceLogBtn,
+                              loggingFood && { opacity: 0.6 },
+                            ]}
+                            onPress={logRice}
+                            disabled={loggingFood}
+                          >
+                            {loggingFood ? (
+                              <ActivityIndicator color="#fff" />
+                            ) : (
+                              <Text style={styles.riceLogBtnText}>
+                                Log rice
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                          <Text
+                            style={[
+                              styles.riceNote,
+                              { color: colors.textMuted },
+                            ]}
+                          >
+                            {rice.key === "brown"
+                              ? "Brown rice is an estimate based on PhilFCT values. "
+                              : ""}
+                           Logged separately. Does not change the meal&apos;s nutrition above.
+                          </Text>
+                        </View>
+                      );
+                    })()}
                   {selectedMeal.allergens?.length > 0 && (
                     <>
                       <Text
@@ -1861,6 +2139,54 @@ export default function MealScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  riceBox: {
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: "#4CAF50",
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  riceTitleRow: { flexDirection: "row", alignItems: "center" },
+  riceTitle: { fontSize: 15, fontWeight: "700", flex: 1 },
+  riceOptional: { fontSize: 11, fontWeight: "500" },
+  riceLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  riceChipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  riceChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18 },
+  riceChipText: { fontSize: 12.5, fontWeight: "600" },
+  riceChipSub: { fontSize: 10, fontWeight: "500", marginTop: 1 },
+  riceResult: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  riceResultName: { fontSize: 13, fontWeight: "700" },
+  riceResultMacros: {
+    fontSize: 11,
+    color: "#4CAF50",
+    fontWeight: "600",
+    marginTop: 3,
+  },
+  riceResultKcal: { fontSize: 17, fontWeight: "700" },
+  riceLogBtn: {
+    marginTop: 10,
+    backgroundColor: "#4CAF50",
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: "center",
+  },
+  riceLogBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  riceNote: { fontSize: 10.5, textAlign: "center", marginTop: 8 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
