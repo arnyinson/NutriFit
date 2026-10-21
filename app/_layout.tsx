@@ -2,9 +2,13 @@ import * as Notifications from "expo-notifications";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { AppAlertHost, installAlertOverride } from "../components/appAlert";
 import { useOfflineSync } from "../constants/offline";
 import { setupNotificationTapListener } from "../constants/pushNotifications";
 import { ThemeProvider, useTheme } from "../constants/theme";
+
+// All Alert.alert(...) calls use the app's own alert design (see constants/appAlert.tsx)
+installAlertOverride();
 
 // How notifications should appear while the app is open (foreground)
 Notifications.setNotificationHandler({
@@ -52,6 +56,7 @@ export default function RootLayout() {
         <Stack.Screen name="calendar/index" />
         <Stack.Screen name="ticket/index" />
       </Stack>
+      <AppAlertHost />
     </ThemeProvider>
   );
 }
