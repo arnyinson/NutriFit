@@ -341,15 +341,17 @@ export default function WorkoutScreen() {
     const todayKey = getTodayDateString();
     const todayIndex = workoutPlan.findIndex((d) => d.date === todayKey);
 
+    // Today is not in this plan (for example an old saved week): wait for the next update
+    if (todayIndex === -1) return;
+
+    hasAutoScrolledRef.current = true;
     if (todayIndex > 0) {
-      const timeout = setTimeout(() => {
+      // The timer is not cancelled when the plan refreshes, so the scroll still happens
+      setTimeout(() => {
         const yOffset = todayIndex * DAY_SECTION_ESTIMATED_HEIGHT;
         scrollViewRef.current?.scrollTo({ y: yOffset, animated: true });
       }, 300);
-      hasAutoScrolledRef.current = true;
-      return () => clearTimeout(timeout);
     }
-    hasAutoScrolledRef.current = true;
   }, [loading, workoutPlan]);
 
   // Palaging TRUE lang ang itinatakda dito — one-way lang ito (hindi na

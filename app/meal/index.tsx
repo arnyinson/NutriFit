@@ -434,15 +434,17 @@ export default function MealScreen() {
     const todayKey = getTodayDateString();
     const todayIndex = mealPlan.findIndex((d) => d.date === todayKey);
 
+    // Today is not in this plan (for example an old saved week): wait for the next update
+    if (todayIndex === -1) return;
+
+    hasAutoScrolledRef.current = true;
     if (todayIndex > 0) {
-      const timeout = setTimeout(() => {
+      // The timer is not cancelled when the plan refreshes, so the scroll still happens
+      setTimeout(() => {
         const yOffset = todayIndex * DAY_SECTION_ESTIMATED_HEIGHT;
         scrollViewRef.current?.scrollTo({ y: yOffset, animated: true });
       }, 300);
-      hasAutoScrolledRef.current = true;
-      return () => clearTimeout(timeout);
     }
-    hasAutoScrolledRef.current = true;
   }, [loading, mealPlan]);
 
   // "Take" — PERMANENTE, hindi na maaaring bawiin pagkatapos. Palaging
@@ -1386,7 +1388,8 @@ export default function MealScreen() {
                             {rice.key === "brown"
                               ? "Brown rice is an estimate based on PhilFCT values. "
                               : ""}
-                           Logged separately. Does not change the meal&apos;s nutrition above.
+                            Logged separately. Does not change the meal&apos;s
+                            nutrition above.
                           </Text>
                         </View>
                       );

@@ -3,16 +3,16 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, ShieldCheck } from "lucide-react-native";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import api from "../../constants/api";
 import { useTheme } from "../../constants/theme";
@@ -118,11 +118,11 @@ export default function VerifyOtpScreen() {
                 {
                   color: colors.text,
                   textAlign: "center",
-                  letterSpacing: 8,
+                  letterSpacing: otp.length > 0 ? 8 : 0,
                   fontSize: 20,
                 },
               ]}
-              placeholder="------"
+              placeholder="- - - - - -"
               placeholderTextColor={colors.textMuted}
               value={otp}
               onChangeText={(v) => setOtp(v.replace(/[^0-9]/g, "").slice(0, 6))}
