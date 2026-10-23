@@ -92,6 +92,36 @@ export async function clearPushTokenCache() {
 
 const HANDLED_KEY = "lastHandledNotificationId";
 
+// ---------------------------------------------------------------
+// Cold start handling.
+// When the app is opened from a killed state by tapping a push, the
+// start screen (app/index.tsx) is still checking the login and will
+// redirect to the dashboard. If we pushed /ticket right away, that
+// redirect would replace it. So on cold start we only remember the
+// target; app/index.tsx opens it right after the dashboard.
+// ---------------------------------------------------------------
+let pendingTarget: string | null = null;
+let appReady = false;
+
+export function consumePendingTarget(): string | null {
+  const t = pendingTarget;
+  pendingTarget = null;
+  return t;
+}
+
+// Called by app/index.tsx once the user is logged in and the first
+// screen is about to show. Taps after this point can navigate directly.
+export function markAppReady() {
+  appReady = true;
+}
+
+function targetFromData(data: any): string {
+  if (data?.type === "ticket" && data?.ticket_id) {
+    return `/ticket?ticketId=${data.ticket_id}`;
+  }
+  return "/notifications";
+}
+
 // Call once in app/_layout.tsx:  useEffect(() => setupNotificationTapListener(router), [])
 // Backend push must send: data: { type: "ticket", ticket_id: <id> }
 export function setupNotificationTapListener(router: {
@@ -99,18 +129,13 @@ export function setupNotificationTapListener(router: {
 }) {
   let active = true;
 
-  const navigate = (data: any) => {
-    if (data?.type === "ticket" && data?.ticket_id) {
-      router.push(`/ticket?ticketId=${data.ticket_id}` as any);
-    } else {
-      router.push("/notifications" as any);
-    }
-  };
-
   // Handle each tapped notification only once.
   // Without this, the OS keeps returning the last tapped notification,
   // so every normal app launch jumped to the Notifications screen.
-  const handleResponse = async (r: Notifications.NotificationResponse) => {
+  const handleResponse = async (
+    r: Notifications.NotificationResponse,
+    fromColdStart: boolean,
+  ) => {
     try {
       // Only real taps on the notification, not other actions
       if (r.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER)
@@ -132,7 +157,16 @@ export function setupNotificationTapListener(router: {
         }
       } catch {}
 
-      if (active) navigate(r.notification.request.content.data);
+      if (!active) return;
+
+      const target = targetFromData(r.notification.request.content.data);
+
+      if (fromColdStart && !appReady) {
+        // Start screen is still deciding where to go: let it open this
+        pendingTarget = target;
+      } else {
+        router.push(target as any);
+      }
     } catch (e) {
       console.log("Notification tap handling failed:", e);
     }
@@ -140,11 +174,11 @@ export function setupNotificationTapListener(router: {
 
   // App opened from a killed state by tapping a notification
   Notifications.getLastNotificationResponseAsync().then((r) => {
-    if (r) handleResponse(r);
+    if (r) handleResponse(r, true);
   });
 
   const sub = Notifications.addNotificationResponseReceivedListener((r) => {
-    handleResponse(r);
+    handleResponse(r, false);
   });
 
   return () => {

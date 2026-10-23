@@ -104,6 +104,18 @@ const calcAge = (isoDate: string) => {
   return age >= 0 ? age : null;
 };
 
+// Names: letters, spaces, apostrophes, periods and hyphens only (no numbers)
+const sanitizeName = (v: string) => v.replace(/[^A-Za-zÀ-ÿ .'-]/g, "");
+const NAME_PATTERN = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]*$/;
+
+const LB_PER_KG = 2.20462;
+const kgToLb = (kg: string | number) => {
+  const n = parseFloat(String(kg));
+  return Number.isFinite(n) ? String(Math.round(n * LB_PER_KG * 10) / 10) : "";
+};
+
+const sortedKey = (arr?: string[] | null) => [...(arr || [])].sort().join("|");
+
 const parseDateInput = (mmddyyyy: string) => {
   const parts = mmddyyyy.split("/");
   if (parts.length !== 3) return null;
@@ -138,6 +150,9 @@ export default function ProfileScreen() {
   const [heightUnit, setHeightUnit] = useState<"cm" | "ft">("cm");
   const [heightFt, setHeightFt] = useState("");
   const [heightIn, setHeightIn] = useState("");
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg");
+  const [weightLb, setWeightLb] = useState("");
+  const [weightLbDirty, setWeightLbDirty] = useState(false);
 
   const [activeWeightTab, setActiveWeightTab] = useState("1M");
   const [weightHistory, setWeightHistory] = useState<
@@ -328,6 +343,9 @@ export default function ProfileScreen() {
     const totalIn = Math.round(parseFloat(profile.height) / 2.54);
     setHeightFt(String(Math.floor(totalIn / 12)));
     setHeightIn(String(totalIn % 12));
+    setWeightUnit("kg");
+    setWeightLb(kgToLb(profile.weight));
+    setWeightLbDirty(false);
     setShowEditModal(true);
   };
 
@@ -394,11 +412,46 @@ export default function ProfileScreen() {
     setHeightUnit(next);
   };
 
+  // Weight is always saved in kg; pounds input is converted (1 kg = 2.20462 lb)
+  const getEditWeightKg = (): number | null => {
+    if (weightUnit === "lb" && weightLbDirty) {
+      const lb = parseFloat(weightLb);
+      return Number.isFinite(lb) ? Math.round((lb / LB_PER_KG) * 10) / 10 : null;
+    }
+    const kg = parseFloat(editForm.weight);
+    return Number.isFinite(kg) ? kg : null;
+  };
+
+  const switchWeightUnit = (next: "kg" | "lb") => {
+    if (next === weightUnit) return;
+    if (next === "lb") {
+      setWeightLb(kgToLb(editForm.weight));
+      setWeightLbDirty(false);
+    } else if (weightLbDirty) {
+      const kg = getEditWeightKg();
+      if (kg !== null) setEditForm((p: any) => ({ ...p, weight: String(kg) }));
+    }
+    setWeightUnit(next);
+  };
+
   const performSave = async () => {
     if (!editForm.first_name?.trim() || !editForm.last_name?.trim()) {
       Alert.alert(
         "Missing Name",
         "Please enter your first name and last name.",
+      );
+      return;
+    }
+
+    const nameParts = [
+      editForm.first_name.trim(),
+      (editForm.middle_name || "").trim(),
+      editForm.last_name.trim(),
+    ].filter(Boolean);
+    if (nameParts.some((n: string) => !NAME_PATTERN.test(n))) {
+      Alert.alert(
+        "Invalid Name",
+        "Names can only contain letters, spaces, apostrophes, periods and hyphens.",
       );
       return;
     }
@@ -413,7 +466,7 @@ export default function ProfileScreen() {
     }
 
     const heightCm = getEditHeightCm();
-    const weightKg = parseFloat(editForm.weight);
+    const weightKg = getEditWeightKg();
     if (heightCm === null || heightCm < 100 || heightCm > 250) {
       Alert.alert(
         "Invalid Height",
@@ -421,7 +474,7 @@ export default function ProfileScreen() {
       );
       return;
     }
-    if (!Number.isFinite(weightKg) || weightKg < 20 || weightKg > 300) {
+    if (weightKg === null || weightKg < 20 || weightKg > 300) {
       Alert.alert(
         "Invalid Weight",
         "Please enter a realistic weight (20–300 kg).",
@@ -482,21 +535,65 @@ export default function ProfileScreen() {
   };
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [showDietConfirm, setShowDietConfirm] = useState(false);
+  const [planPrompt, setPlanPrompt] = useState<{
+    meal: string[];
+    workout: string[];
+  } | null>(null);
 
   const handleLogout = () => {
     setShowLogoutConfirm(true);
   };
 
-  // Kapag nagbago ang dietary preference, magtatanong muna bago i-regenerate ang plan
+  // Kapag may nagbago na nakakaapekto sa meal o workout plan, magtatanong muna
+  // bago i-save at i-regenerate. Meal: goal, diet, activity level, allergens.
+  // Workout: goal, equipment.
   const saveProfile = () => {
-    const before = profile?.dietary_preference || "None";
-    const after = editForm.dietary_preference || "None";
-    if (before !== after) {
-      setShowDietConfirm(true);
+    if (!profile) return;
+    const meal: string[] = [];
+    const workout: string[] = [];
+
+    if (editForm.dietary_goal !== profile.dietary_goal) {
+      meal.push("Dietary Goal");
+      workout.push("Dietary Goal");
+    }
+    if (
+      (editForm.dietary_preference || "None") !==
+      (profile.dietary_preference || "None")
+    ) {
+      meal.push("Dietary Preference");
+    }
+    if (editForm.activity_level !== profile.activity_level) {
+      meal.push("Activity Level");
+    }
+    if (sortedKey(editForm.allergens) !== sortedKey(profile.allergens)) {
+      meal.push("Allergens");
+    }
+    if (
+      sortedKey(editForm.available_equipment) !==
+      sortedKey(profile.available_equipment || ["Bodyweight"])
+    ) {
+      workout.push("Equipment");
+    }
+
+    if (meal.length > 0 || workout.length > 0) {
+      setPlanPrompt({ meal, workout });
       return;
     }
     performSave();
+  };
+
+  const planPromptMessage = () => {
+    if (!planPrompt) return "";
+    const lines: string[] = [];
+    if (planPrompt.meal.length > 0) {
+      lines.push(`• Meal plan, upcoming days (${planPrompt.meal.join(", ")})`);
+    }
+    if (planPrompt.workout.length > 0) {
+      lines.push(
+        `• Workout plan, today onward (${planPrompt.workout.join(", ")})`,
+      );
+    }
+    return `Your changes will update:\n\n${lines.join("\n")}\n\nMeals and workouts you already completed will be kept.`;
   };
 
   const performLogout = async () => {
@@ -1026,7 +1123,7 @@ export default function ProfileScreen() {
                     ]}
                     value={editForm.first_name}
                     onChangeText={(t) =>
-                      setEditForm((p: any) => ({ ...p, first_name: t }))
+                      setEditForm((p: any) => ({ ...p, first_name: sanitizeName(t) }))
                     }
                     placeholder="First name"
                     placeholderTextColor={colors.textMuted}
@@ -1049,7 +1146,7 @@ export default function ProfileScreen() {
                     ]}
                     value={editForm.middle_name}
                     onChangeText={(t) =>
-                      setEditForm((p: any) => ({ ...p, middle_name: t }))
+                      setEditForm((p: any) => ({ ...p, middle_name: sanitizeName(t) }))
                     }
                     placeholder="Middle name"
                     placeholderTextColor={colors.textMuted}
@@ -1072,7 +1169,7 @@ export default function ProfileScreen() {
                     ]}
                     value={editForm.last_name}
                     onChangeText={(t) =>
-                      setEditForm((p: any) => ({ ...p, last_name: t }))
+                      setEditForm((p: any) => ({ ...p, last_name: sanitizeName(t) }))
                     }
                     placeholder="Last name"
                     placeholderTextColor={colors.textMuted}
@@ -1238,8 +1335,34 @@ export default function ProfileScreen() {
                   <Text
                     style={[styles.inputLabel, { color: colors.textSecondary }]}
                   >
-                    Weight (kg)
+                    Weight
                   </Text>
+                  <View style={styles.sexRow}>
+                    {(["kg", "lb"] as const).map((u) => (
+                      <TouchableOpacity
+                        key={u}
+                        style={[
+                          styles.sexBtn,
+                          {
+                            borderColor: colors.inputBorder,
+                            backgroundColor: colors.input,
+                          },
+                          weightUnit === u && styles.sexBtnMale,
+                        ]}
+                        onPress={() => switchWeightUnit(u)}
+                      >
+                        <Text
+                          style={[
+                            styles.sexBtnText,
+                            { color: colors.textSecondary },
+                            weightUnit === u && styles.sexBtnTextActive,
+                          ]}
+                        >
+                          {u === "kg" ? "Kilograms" : "Pounds"}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                   <TextInput
                     style={[
                       styles.input,
@@ -1249,18 +1372,38 @@ export default function ProfileScreen() {
                         color: colors.text,
                       },
                     ]}
-                    value={String(editForm.weight)}
-                    onChangeText={(v) =>
-                      setEditForm((p: any) => ({
-                        ...p,
-                        weight: v.replace(/[^0-9.]/g, ""),
-                      }))
+                    value={
+                      weightUnit === "kg"
+                        ? String(editForm.weight)
+                        : weightLb
                     }
+                    onChangeText={(v) => {
+                      const cleaned = v.replace(/[^0-9.]/g, "");
+                      if (weightUnit === "kg") {
+                        setEditForm((p: any) => ({ ...p, weight: cleaned }));
+                      } else {
+                        setWeightLb(cleaned);
+                        setWeightLbDirty(true);
+                      }
+                    }}
                     maxLength={6}
-                    placeholder="e.g. 69.39"
+                    placeholder={
+                      weightUnit === "kg" ? "e.g. 69.39" : "e.g. 153"
+                    }
                     placeholderTextColor={colors.textMuted}
                     keyboardType="numeric"
                   />
+                  {weightUnit === "lb" && getEditWeightKg() !== null && (
+                    <Text
+                      style={{
+                        color: colors.textMuted,
+                        fontSize: 11,
+                        marginTop: 4,
+                      }}
+                    >
+                      ≈ {getEditWeightKg()} kg (saved in kilograms)
+                    </Text>
+                  )}
 
                   <Text
                     style={[styles.inputLabel, { color: colors.textSecondary }]}
@@ -1423,15 +1566,15 @@ export default function ProfileScreen() {
       </Modal>
 
       <ConfirmModal
-        visible={showDietConfirm}
-        title="Change dietary preference?"
-        message={`Your upcoming meals will be regenerated to match ${dietLabel(editForm?.dietary_preference)}. Meals you already marked as taken will be kept.`}
+        visible={planPrompt !== null}
+        title="Update your plans?"
+        message={planPromptMessage()}
         confirmLabel="Regenerate"
         onConfirm={() => {
-          setShowDietConfirm(false);
+          setPlanPrompt(null);
           performSave();
         }}
-        onCancel={() => setShowDietConfirm(false)}
+        onCancel={() => setPlanPrompt(null)}
       />
 
       <ConfirmModal

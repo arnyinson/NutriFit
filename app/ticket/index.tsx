@@ -24,6 +24,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import api from "../../constants/api";
+import { connectTicketSocket } from "../../constants/socket";
 import { useTheme } from "../../constants/theme";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
@@ -75,22 +76,37 @@ export default function TicketScreen() {
     "Other",
   ];
 
-  const loadMyTickets = useCallback(async () => {
-    setLoadingTickets(true);
+  // silent = live refresh from the socket: no loading spinner
+  const loadMyTickets = useCallback(async (silent = false) => {
+    if (!silent) setLoadingTickets(true);
     try {
       const res = await api.get("/tickets/me");
       setMyTickets(res.data.tickets);
     } catch (err) {
       console.error("Load my tickets error:", err);
     } finally {
-      setLoadingTickets(false);
+      if (!silent) setLoadingTickets(false);
     }
   }, []);
 
+  // While My Tickets is open: load once, then stay live. The server tells us
+  // when a ticket changes (admin reply / status), and we also refresh after
+  // a reconnect and when the app comes back to the foreground.
   useEffect(() => {
-    if (showHistory) {
-      loadMyTickets();
-    }
+    if (!showHistory) return;
+    loadMyTickets();
+
+    let cancelled = false;
+    let disconnect: (() => void) | null = null;
+    connectTicketSocket(() => loadMyTickets(true)).then((stop) => {
+      if (cancelled) stop();
+      else disconnect = stop;
+    });
+
+    return () => {
+      cancelled = true;
+      if (disconnect) disconnect();
+    };
   }, [showHistory, loadMyTickets]);
 
   // Opened from a notification: show My Tickets with that ticket expanded

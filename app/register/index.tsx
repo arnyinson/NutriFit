@@ -56,6 +56,12 @@ const isValidPassword = (password: string) => {
   return hasMinLength && hasUppercase && hasNumber && hasSpecialChar;
 };
 
+// Names: letters, spaces, apostrophes, periods and hyphens only (no numbers)
+const sanitizeName = (v: string) => v.replace(/[^A-Za-zÀ-ÿ .'-]/g, "");
+const NAME_PATTERN = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]*$/;
+
+const LB_PER_KG = 2.20462;
+
 const ERR = "#EF5350";
 const MIN_AGE = 12;
 const MAX_AGE = 75;
@@ -261,6 +267,7 @@ export default function RegisterScreen() {
   const [height, setHeight] = useState("");
   const [heightFt, setHeightFt] = useState("");
   const [heightIn, setHeightIn] = useState("");
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg");
   const [weight, setWeight] = useState("");
   const [activityLevel, setActivityLevel] = useState("");
   const [dietaryGoal, setDietaryGoal] = useState("");
@@ -351,6 +358,30 @@ export default function RegisterScreen() {
       return next;
     });
 
+  // ---------- Weight ----------
+  // Weight is always sent to the backend in kilograms. When the user picks
+  // pounds we convert here (1 kg = 2.20462 lb).
+  const getWeightKg = (): number | null => {
+    const n = parseFloat(weight);
+    if (!Number.isFinite(n)) return null;
+    return weightUnit === "kg" ? n : Math.round((n / LB_PER_KG) * 10) / 10;
+  };
+
+  const switchWeightUnit = (next: "kg" | "lb") => {
+    if (next === weightUnit) return;
+    // Carry the value over so the user does not have to retype it
+    const n = parseFloat(weight);
+    if (Number.isFinite(n)) {
+      setWeight(
+        next === "lb"
+          ? String(Math.round(n * LB_PER_KG * 10) / 10)
+          : String(Math.round((n / LB_PER_KG) * 10) / 10),
+      );
+    }
+    setWeightUnit(next);
+    clearError("weight");
+  };
+
   // Checks the fields of one step and returns the problems found
   const validateStep = (s: number): Record<string, string> => {
     const e: Record<string, string> = {};
@@ -371,7 +402,13 @@ export default function RegisterScreen() {
 
     if (s === 1) {
       if (!firstName.trim()) e.firstName = "First name is required.";
+      else if (!NAME_PATTERN.test(firstName.trim()))
+        e.firstName = "Use letters only, no numbers.";
+      if (middleName.trim() && !NAME_PATTERN.test(middleName.trim()))
+        e.middleName = "Use letters only, no numbers.";
       if (!lastName.trim()) e.lastName = "Last name is required.";
+      else if (!NAME_PATTERN.test(lastName.trim()))
+        e.lastName = "Use letters only, no numbers.";
       const bErr = validateBirthday(birthMonth, birthDay, birthYear);
       if (bErr) e.birthday = bErr;
     }
@@ -382,10 +419,10 @@ export default function RegisterScreen() {
       else if (heightCm < 100 || heightCm > 250)
         e.height =
           "Enter a realistic height (about 100 cm / 3'3\" up to 250 cm / 8'2\").";
-      const w = parseFloat(weight);
+      const w = getWeightKg();
       if (!weight) e.weight = "Weight is required.";
-      else if (!Number.isFinite(w) || w < 20 || w > 300)
-        e.weight = "Enter a realistic weight (20 to 300 kg).";
+      else if (w === null || w < 20 || w > 300)
+        e.weight = "Enter a realistic weight (20 to 300 kg / 44 to 661 lb).";
       if (!activityLevel)
         e.activityLevel = "Please choose your activity level.";
     }
@@ -432,7 +469,7 @@ export default function RegisterScreen() {
         birthday: formattedBirthday,
         sex,
         height: heightCm,
-        weight: parseFloat(weight),
+        weight: getWeightKg(),
         dietary_goal: dietaryGoal,
         dietary_preference: dietaryPreference,
         activity_level: activityLevel,
@@ -685,7 +722,7 @@ export default function RegisterScreen() {
                 placeholderTextColor={colors.textMuted}
                 value={firstName}
                 onChangeText={(v) => {
-                  setFirstName(v);
+                  setFirstName(sanitizeName(v));
                   clearError("firstName");
                 }}
                 autoCapitalize="words"
@@ -695,27 +732,23 @@ export default function RegisterScreen() {
             </View>
             {errText("firstName")}
 
-            <View
-              style={[
-                styles.inputWrapper,
-                {
-                  backgroundColor: colors.input,
-                  borderColor: colors.inputBorder,
-                },
-              ]}
-            >
+            <View style={boxStyle("middleName")}>
               <User size={16} color={colors.textMuted} />
               <TextInput
                 style={[styles.input, { color: colors.text }]}
                 placeholder="Middle Name (optional)"
                 placeholderTextColor={colors.textMuted}
                 value={middleName}
-                onChangeText={setMiddleName}
+                onChangeText={(v) => {
+                  setMiddleName(sanitizeName(v));
+                  clearError("middleName");
+                }}
                 autoCapitalize="words"
                 autoCorrect={false}
                 editable={!loading}
               />
             </View>
+            {errText("middleName")}
 
             <View style={boxStyle("lastName")}>
               <User size={16} color={colors.textMuted} />
@@ -725,7 +758,7 @@ export default function RegisterScreen() {
                 placeholderTextColor={colors.textMuted}
                 value={lastName}
                 onChangeText={(v) => {
-                  setLastName(v);
+                  setLastName(sanitizeName(v));
                   clearError("lastName");
                 }}
                 autoCapitalize="words"
@@ -935,11 +968,41 @@ export default function RegisterScreen() {
             )}
             {errText("height")}
 
+            {/* Weight: kg or lb; converted to kg before sending */}
+            <View style={styles.unitRow}>
+              {(["kg", "lb"] as const).map((u) => (
+                <TouchableOpacity
+                  key={u}
+                  style={[
+                    styles.unitBtn,
+                    {
+                      borderColor: colors.inputBorder,
+                      backgroundColor: colors.input,
+                    },
+                    weightUnit === u && styles.unitBtnActive,
+                  ]}
+                  onPress={() => switchWeightUnit(u)}
+                  disabled={loading}
+                >
+                  <Text
+                    style={[
+                      styles.unitText,
+                      { color: colors.textSecondary },
+                      weightUnit === u && styles.unitTextActive,
+                    ]}
+                  >
+                    {u === "kg" ? "Kilograms" : "Pounds"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <View style={boxStyle("weight")}>
               <Weight size={16} color={colors.textMuted} />
               <TextInput
                 style={[styles.input, { color: colors.text }]}
-                placeholder="Weight (kg)"
+                placeholder={
+                  weightUnit === "kg" ? "Weight (kg)" : "Weight (lb)"
+                }
                 placeholderTextColor={colors.textMuted}
                 value={weight}
                 onChangeText={(v) => {

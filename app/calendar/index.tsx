@@ -6,6 +6,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Dumbbell,
   Flame,
   Moon,
   Repeat,
@@ -41,6 +42,20 @@ type MealEntry = {
   meal: Meal;
 };
 
+type WorkoutEntry = {
+  plan_id: string;
+  sets: number;
+  reps: string;
+  done: boolean;
+  exercise: { name: string; muscle_group: string };
+};
+
+type WorkoutDay = {
+  date: string; // YYYY-MM-DD
+  day: string;
+  exercises: WorkoutEntry[];
+};
+
 type DayPlan = {
   date: string; // YYYY-MM-DD
   day: string;
@@ -71,6 +86,7 @@ export default function CalendarScreen() {
   const [planMode, setPlanMode] = useState<"weekly" | "continuous">("weekly");
   const [modeLoaded, setModeLoaded] = useState(false);
   const [mealPlan, setMealPlan] = useState<DayPlan[]>([]);
+  const [workoutHistory, setWorkoutHistory] = useState<WorkoutDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -122,15 +138,30 @@ export default function CalendarScreen() {
     }
   }, []);
 
+  // Saved workout plans (past weeks + this week). If it fails, the calendar
+  // still works with meals only.
+  const loadWorkoutHistory = useCallback(async () => {
+    try {
+      const res = await api.get("/workouts/plan/me", {
+        params: { history: true },
+      });
+      setWorkoutHistory(res.data.workoutPlan || []);
+    } catch (err) {
+      console.error("Load calendar workout history error:", err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!modeLoaded) return;
     setLoading(true);
     loadMealPlan(planMode);
-  }, [modeLoaded, planMode, loadMealPlan]);
+    loadWorkoutHistory();
+  }, [modeLoaded, planMode, loadMealPlan, loadWorkoutHistory]);
 
   const onRefresh = () => {
     setRefreshing(true);
     loadMealPlan(planMode);
+    loadWorkoutHistory();
   };
 
   const getDaysInMonth = () => {
@@ -166,6 +197,12 @@ export default function CalendarScreen() {
   const selectedDateObj = new Date(selectedYear, selectedMonth, selectedDate);
   const selectedDateKey = toDateKey(selectedDateObj);
   const selectedDayData = mealPlan.find((d) => d.date === selectedDateKey);
+  const selectedWorkout = workoutHistory.find(
+    (d) => d.date === selectedDateKey,
+  );
+  const workoutDone = selectedWorkout
+    ? selectedWorkout.exercises.filter((e) => e.done).length
+    : 0;
 
   const getDateLabel = () => {
     const diffDays = Math.round(
@@ -306,6 +343,20 @@ export default function CalendarScreen() {
                       ),
                   );
 
+                const hasWorkout =
+                  day !== null &&
+                  workoutHistory.some(
+                    (d) =>
+                      d.date ===
+                      toDateKey(
+                        new Date(
+                          currentMonth.getFullYear(),
+                          currentMonth.getMonth(),
+                          day,
+                        ),
+                      ),
+                  );
+
                 return (
                   <TouchableOpacity
                     key={index}
@@ -331,17 +382,57 @@ export default function CalendarScreen() {
                     >
                       {day ?? ""}
                     </Text>
-                    {day !== null && hasPlan && !isSelected && (
-                      <View
-                        style={[
-                          styles.planDot,
-                          { backgroundColor: colors.primary },
-                        ]}
-                      />
+                    {day !== null && (hasPlan || hasWorkout) && (
+                      <View style={styles.dotRow}>
+                        {hasPlan && (
+                          <View
+                            style={[
+                              styles.planDot,
+                              {
+                                backgroundColor: isSelected
+                                  ? "#fff"
+                                  : colors.primary,
+                              },
+                            ]}
+                          />
+                        )}
+                        {hasWorkout && (
+                          <View
+                            style={[
+                              styles.planDot,
+                              {
+                                backgroundColor: isSelected
+                                  ? "#fff"
+                                  : "#FF9800",
+                              },
+                            ]}
+                          />
+                        )}
+                      </View>
                     )}
                   </TouchableOpacity>
                 );
               })}
+            </View>
+
+            {/* Legend */}
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View
+                  style={[styles.planDot, { backgroundColor: colors.primary }]}
+                />
+                <Text style={[styles.legendText, { color: colors.textMuted }]}>
+                  Meals
+                </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View
+                  style={[styles.planDot, { backgroundColor: "#FF9800" }]}
+                />
+                <Text style={[styles.legendText, { color: colors.textMuted }]}>
+                  Workout
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -432,6 +523,84 @@ export default function CalendarScreen() {
                 </Text>
               </View>
             )}
+
+            {/* Selected Day Workout */}
+            <View style={styles.workoutHeaderRow}>
+              <Text
+                style={[
+                  styles.dayHeader,
+                  { color: colors.text, marginBottom: 0 },
+                ]}
+              >
+                Workout
+              </Text>
+              {selectedWorkout && (
+                <View style={styles.workoutCountBadge}>
+                  <Text style={styles.workoutCountText}>
+                    {workoutDone} of {selectedWorkout.exercises.length} done
+                  </Text>
+                </View>
+              )}
+            </View>
+            {selectedWorkout ? (
+              selectedWorkout.exercises.map((entry) => (
+                <View
+                  key={entry.plan_id}
+                  style={[
+                    styles.mealCard,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                    entry.done && styles.mealCardTaken,
+                  ]}
+                >
+                  <View
+                    style={[styles.mealIcon, { backgroundColor: colors.input }]}
+                  >
+                    <Dumbbell size={18} color="#FF9800" />
+                  </View>
+                  <View style={styles.mealInfo}>
+                    <Text style={[styles.mealType, { color: colors.text }]}>
+                      {entry.exercise?.name}
+                    </Text>
+                    <Text
+                      style={[styles.mealName, { color: colors.textMuted }]}
+                    >
+                      {entry.sets} sets × {entry.reps}
+                      {entry.exercise?.muscle_group
+                        ? ` • ${entry.exercise.muscle_group}`
+                        : ""}
+                    </Text>
+                  </View>
+                  {entry.done ? (
+                    <View style={styles.takenBadge}>
+                      <Check size={12} color="#fff" strokeWidth={3} />
+                      <Text style={styles.takenText}>Done</Text>
+                    </View>
+                  ) : (
+                    <Text
+                      style={[styles.notDoneText, { color: colors.textMuted }]}
+                    >
+                      Not done
+                    </Text>
+                  )}
+                </View>
+              ))
+            ) : (
+              <View
+                style={[
+                  styles.noWorkoutCard,
+                  { backgroundColor: colors.surface },
+                ]}
+              >
+                <Text
+                  style={[styles.noPlanSubtitle, { color: colors.textMuted }]}
+                >
+                  No workout for this date.
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={{ height: 40 }} />
@@ -495,7 +664,32 @@ const styles = StyleSheet.create({
   dateCellSelected: { backgroundColor: "#4CAF50" },
   dateText: { fontSize: 14 },
   dateTextSelected: { color: "#fff", fontWeight: "700" },
-  planDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
+  planDot: { width: 4, height: 4, borderRadius: 2 },
+  dotRow: { flexDirection: "row", gap: 3, marginTop: 2 },
+  legendRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 16,
+    marginTop: 10,
+  },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  legendText: { fontSize: 11 },
+  workoutHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 18,
+    marginBottom: 12,
+  },
+  workoutCountBadge: {
+    backgroundColor: "#FFF3E0",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  workoutCountText: { color: "#E65100", fontSize: 12, fontWeight: "700" },
+  notDoneText: { fontSize: 12, fontWeight: "600" },
+  noWorkoutCard: { borderRadius: 12, padding: 16, alignItems: "center" },
   mealsSection: { paddingHorizontal: 16 },
   dayHeader: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
   mealCard: {

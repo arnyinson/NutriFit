@@ -54,6 +54,7 @@ const filterConfig = [
   { key: "workout", label: "Workout", Icon: Dumbbell },
   { key: "progress", label: "Progress", Icon: BarChart3 },
   { key: "achievement", label: "Achievement", Icon: Trophy },
+  { key: "ticket", label: "Ticket", Icon: Ticket },
 ] as const;
 
 const formatTimeAgo = (isoDate: string) => {
@@ -77,7 +78,7 @@ export default function NotificationsScreen() {
   const { colors } = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [activeFilter, setActiveFilter] = useState<
-    "all" | "meal" | "workout" | "progress" | "achievement"
+    "all" | "meal" | "workout" | "progress" | "achievement" | "ticket"
   >("all");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

@@ -62,15 +62,19 @@ export default function DietPicker({ value, onChange }: Props) {
         >
           {DIET_OPTIONS.map((o, i) => {
             const selected = o.value === current;
+            const isLast = i === DIET_OPTIONS.length - 1;
             return (
               <TouchableOpacity
                 key={o.value}
                 style={[
                   styles.option,
-                  i < DIET_OPTIONS.length - 1 && {
+                  !isLast && {
                     borderBottomWidth: 1,
                     borderBottomColor: colors.inputBorder,
                   },
+                  // Extra room under the last option so its hint is not
+                  // pressed against the bottom edge of the menu
+                  isLast && styles.optionLast,
                 ]}
                 onPress={() => {
                   onChange(o.value);
@@ -129,8 +133,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 14,
+    minHeight: 58,
   },
+  optionLast: { paddingBottom: 18 },
   optionLabel: { fontSize: 14, fontWeight: "600" },
   optionHint: { fontSize: 12, marginTop: 2 },
   note: { fontSize: 12, marginTop: 8 },

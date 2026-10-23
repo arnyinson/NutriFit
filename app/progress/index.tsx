@@ -72,8 +72,8 @@ type Profile = {
   tdee: string;
 };
 
+// The Daily view was removed (panel feedback): only Weekly and Monthly remain.
 const PERIODS = [
-  { key: "Daily", apiValue: "daily" },
   { key: "Weekly", apiValue: "weekly" },
   { key: "Monthly", apiValue: "monthly" },
 ] as const;
