@@ -618,6 +618,13 @@ export default function ProgressScreen() {
           </View>
         )}
 
+        {/* Weight input is always available on Weekly and Monthly (not Daily) */}
+        {!weighInDue && activePeriod !== "Daily" && (
+          <TouchableOpacity style={styles.updateBtn} onPress={openWeighIn}>
+            <Text style={styles.updateBtnText}>Update weight</Text>
+          </TouchableOpacity>
+        )}
+
         {!hasData ? (
           <View
             style={[
