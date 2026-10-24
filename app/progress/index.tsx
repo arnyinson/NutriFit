@@ -72,8 +72,8 @@ type Profile = {
   tdee: string;
 };
 
-// The Daily view was removed (panel feedback): only Weekly and Monthly remain.
 const PERIODS = [
+  { key: "Daily", apiValue: "daily" },
   { key: "Weekly", apiValue: "weekly" },
   { key: "Monthly", apiValue: "monthly" },
 ] as const;
@@ -590,8 +590,8 @@ export default function ProgressScreen() {
           </Text>
         </View>
 
-        {/* Weekly weigh-in prompt */}
-        {weighInDue && (
+        {/* Weight entry is only offered on Weekly and Monthly, never on Daily */}
+        {weighInDue && activePeriod !== "Daily" && (
           <View
             style={[
               styles.card,
