@@ -57,6 +57,7 @@ type Summary = {
   macros: { protein: number; carbs: number; fats: number };
   workoutCompletion: number;
   mealConsistency: number;
+  maintenanceTdee?: number;
 };
 
 type Profile = {
@@ -89,6 +90,11 @@ const weighInKey = (userId: string) => `lastWeighIn:${userId}`;
 
 // ~7700 kcal of surplus/deficit is roughly 1 kg of body weight
 const KCAL_PER_KG = 7700;
+
+// The forecast is only shown when the logs are complete enough to trust:
+// at least 3 logged days and an average that is not below the 1,200 kcal safety floor.
+const MIN_FORECAST_DAYS = 3;
+const MIN_FORECAST_KCAL = 1200;
 
 const CHART_HEIGHT = 130;
 const CHART_PAD_X = 8;
@@ -133,13 +139,15 @@ export default function ProgressScreen() {
       const apiPeriod =
         PERIODS.find((p) => p.key === period)?.apiValue || "weekly";
       // Saved stats show right away; fresh numbers replace them when they arrive
+      const savedMode = await AsyncStorage.getItem("mealPlanMode");
+      const mode = savedMode === "continuous" ? "continuous" : "weekly";
       await apiGetCached<any>(
         "/progress/weekly-summary",
         (data) => {
           if (data?.summary) setSummary(data.summary);
           setLoading(false);
         },
-        { period: apiPeriod },
+        { period: apiPeriod, mode },
       );
     } catch (err) {
       console.error("Load summary error:", err);
@@ -404,7 +412,8 @@ export default function ProgressScreen() {
   const labelEvery = Math.max(1, Math.ceil(days.length / 7));
 
   // ---- Forecast (energy balance estimate) ----
-  const tdee = parseFloat(profile?.tdee || "");
+  // Maintenance calories come from the backend (users.tdee is the goal-adjusted target)
+  const maintenance = summary.maintenanceTdee ?? 0;
   const avgActual = summary.calorieAdherence.actual;
   let forecast: {
     perWeek: number;
@@ -412,12 +421,11 @@ export default function ProgressScreen() {
     text: string;
   } | null = null;
   if (
-    Number.isFinite(tdee) &&
-    tdee > 0 &&
-    avgActual > 0 &&
-    loggedDays.length >= 1
+    maintenance > 0 &&
+    avgActual >= MIN_FORECAST_KCAL &&
+    loggedDays.length >= MIN_FORECAST_DAYS
   ) {
-    const perWeek = ((avgActual - tdee) * 7) / KCAL_PER_KG;
+    const perWeek = ((avgActual - maintenance) * 7) / KCAL_PER_KG;
     const current = summary.bodyProgress.current;
     const in4Weeks = Math.round((current + perWeek * 4) * 10) / 10;
     const dir =
@@ -941,7 +949,8 @@ export default function ProgressScreen() {
                 <Text
                   style={[styles.forecastText, { color: colors.textMuted }]}
                 >
-                  Log your meals for a few days to see a weight forecast.
+                  Log your meals for at least 3 days (about 1,200 kcal or more
+                  per day) to see a weight forecast.
                 </Text>
               )}
             </View>
