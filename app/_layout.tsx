@@ -55,6 +55,7 @@ export default function RootLayout() {
         <Stack.Screen name="notifications/index" />
         <Stack.Screen name="calendar/index" />
         <Stack.Screen name="ticket/index" />
+        <Stack.Screen name="banned/index" />
       </Stack>
       <AppAlertHost />
     </ThemeProvider>

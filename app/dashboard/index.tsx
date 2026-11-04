@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { usePathname, useRouter } from "expo-router";
+import { useLocalSearchParams, usePathname, useRouter } from "expo-router";
 import {
   AlertTriangle,
   BarChart3,
@@ -33,6 +33,7 @@ import {
 } from "react-native-safe-area-context";
 import ConfirmModal from "../../components/ConfirmModal";
 import NavBadge from "../../components/NavBadge";
+import Tutorial from "../../components/Tutorial";
 import api from "../../constants/api";
 import {
   loadWithCache,
@@ -78,6 +79,7 @@ type FoodLogEntry = {
 };
 
 const MEAL_PLAN_MODE_KEY = "mealPlanMode";
+const tutorialKey = (userId: string) => `tutorialSeen:${userId}`;
 
 const mealTypeIcon = (type: string) => {
   if (type === "Breakfast") return Sunrise;
@@ -104,6 +106,9 @@ export default function DashboardScreen() {
   const pathname = usePathname();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  // "tour" changes every time Profile > Replay tutorial is pressed
+  const { tour } = useLocalSearchParams<{ tour?: string }>();
+  const [showTutorial, setShowTutorial] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -291,6 +296,43 @@ export default function DashboardScreen() {
     loadDashboardData();
     registerAndSavePushToken();
   }, [loadDashboardData]);
+
+  // First time this account opens the Dashboard: show the tutorial once.
+  // (Saved per account, so a second account on the same phone sees it too.)
+  useEffect(() => {
+    if (loading) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem("user");
+        const id = raw ? JSON.parse(raw)?.id : null;
+        if (!id) return;
+        const seen = await AsyncStorage.getItem(tutorialKey(String(id)));
+        if (!seen && !cancelled) setShowTutorial(true);
+      } catch {
+        // tutorial is optional, never block the app
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading]);
+
+  // Replay from Profile
+  useEffect(() => {
+    if (tour) setShowTutorial(true);
+  }, [tour]);
+
+  const closeTutorial = async () => {
+    setShowTutorial(false);
+    try {
+      const raw = await AsyncStorage.getItem("user");
+      const id = raw ? JSON.parse(raw)?.id : null;
+      if (id) await AsyncStorage.setItem(tutorialKey(String(id)), "1");
+    } catch {
+      // ignore
+    }
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -996,6 +1038,8 @@ export default function DashboardScreen() {
           );
         })}
       </View>
+
+      <Tutorial visible={showTutorial} onClose={closeTutorial} />
     </SafeAreaView>
   );
 }

@@ -10,6 +10,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Compass,
   HeartPulse,
   Leaf,
   Moon,
@@ -416,7 +417,9 @@ export default function ProfileScreen() {
   const getEditWeightKg = (): number | null => {
     if (weightUnit === "lb" && weightLbDirty) {
       const lb = parseFloat(weightLb);
-      return Number.isFinite(lb) ? Math.round((lb / LB_PER_KG) * 10) / 10 : null;
+      return Number.isFinite(lb)
+        ? Math.round((lb / LB_PER_KG) * 10) / 10
+        : null;
     }
     const kg = parseFloat(editForm.weight);
     return Number.isFinite(kg) ? kg : null;
@@ -1041,6 +1044,27 @@ export default function ProfileScreen() {
           <ChevronRight size={20} color={colors.textMuted} />
         </TouchableOpacity>
 
+        {/* Replay the first-time tutorial */}
+        <TouchableOpacity
+          style={[
+            styles.ticketBtn,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+          onPress={() =>
+            router.push({
+              pathname: "/dashboard",
+              params: { tour: String(Date.now()) },
+            } as any)
+          }
+          hitSlop={HIT_SLOP}
+        >
+          <Compass size={20} color={colors.primary} />
+          <Text style={[styles.ticketText, { color: colors.text }]}>
+            Replay tutorial
+          </Text>
+          <ChevronRight size={20} color={colors.textMuted} />
+        </TouchableOpacity>
+
         {/* Logout */}
         <TouchableOpacity
           style={[styles.logoutBtn, { borderColor: colors.border }]}
@@ -1123,7 +1147,10 @@ export default function ProfileScreen() {
                     ]}
                     value={editForm.first_name}
                     onChangeText={(t) =>
-                      setEditForm((p: any) => ({ ...p, first_name: sanitizeName(t) }))
+                      setEditForm((p: any) => ({
+                        ...p,
+                        first_name: sanitizeName(t),
+                      }))
                     }
                     placeholder="First name"
                     placeholderTextColor={colors.textMuted}
@@ -1146,7 +1173,10 @@ export default function ProfileScreen() {
                     ]}
                     value={editForm.middle_name}
                     onChangeText={(t) =>
-                      setEditForm((p: any) => ({ ...p, middle_name: sanitizeName(t) }))
+                      setEditForm((p: any) => ({
+                        ...p,
+                        middle_name: sanitizeName(t),
+                      }))
                     }
                     placeholder="Middle name"
                     placeholderTextColor={colors.textMuted}
@@ -1169,7 +1199,10 @@ export default function ProfileScreen() {
                     ]}
                     value={editForm.last_name}
                     onChangeText={(t) =>
-                      setEditForm((p: any) => ({ ...p, last_name: sanitizeName(t) }))
+                      setEditForm((p: any) => ({
+                        ...p,
+                        last_name: sanitizeName(t),
+                      }))
                     }
                     placeholder="Last name"
                     placeholderTextColor={colors.textMuted}
@@ -1373,9 +1406,7 @@ export default function ProfileScreen() {
                       },
                     ]}
                     value={
-                      weightUnit === "kg"
-                        ? String(editForm.weight)
-                        : weightLb
+                      weightUnit === "kg" ? String(editForm.weight) : weightLb
                     }
                     onChangeText={(v) => {
                       const cleaned = v.replace(/[^0-9.]/g, "");

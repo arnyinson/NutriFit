@@ -24,9 +24,10 @@ api.interceptors.request.use(async (config) => {
 
 // If the admin bans or deactivates the account while the user is still logged
 // in (the JWT lasts 30 days), the backend answers every request with
-// ACCOUNT_BANNED / ACCOUNT_DEACTIVATED. Log the user out right away and tell
-// them why. The login request itself is skipped because the login screen
-// already shows its own error message.
+// ACCOUNT_BANNED / ACCOUNT_DEACTIVATED. Log the user out right away.
+// Banned users go to the Banned screen (reason + appeal); deactivated users
+// get an alert. The login request itself is skipped because the login screen
+// handles its own errors.
 let handlingBlockedAccount = false;
 
 api.interceptors.response.use(
@@ -47,26 +48,34 @@ api.interceptors.response.use(
       try {
         await AsyncStorage.multiRemove(["token", "user"]);
       } catch {
-        // ignore storage errors, we still send the user to the login screen
+        // ignore storage errors, we still send the user away
       }
 
-      const title =
-        code === "ACCOUNT_BANNED" ? "Account Banned" : "Account Deactivated";
-      const message =
-        data?.error ||
-        (code === "ACCOUNT_BANNED"
-          ? "Your account has been banned. Please contact support if you believe this is a mistake."
-          : "Your account has been deactivated. Please contact support.");
-
-      router.replace("/login" as any);
-      Alert.alert(title, message, [
-        {
-          text: "OK",
-          onPress: () => {
-            handlingBlockedAccount = false;
+      if (code === "ACCOUNT_BANNED") {
+        router.replace({
+          pathname: "/banned",
+          params: {
+            reason: data?.ban_reason || "",
+            appealToken: data?.appealToken || "",
           },
-        },
-      ]);
+        } as any);
+        setTimeout(() => {
+          handlingBlockedAccount = false;
+        }, 3000);
+      } else {
+        const message =
+          data?.error ||
+          "Your account has been deactivated. Please contact support.";
+        router.replace("/login" as any);
+        Alert.alert("Account Deactivated", message, [
+          {
+            text: "OK",
+            onPress: () => {
+              handlingBlockedAccount = false;
+            },
+          },
+        ]);
+      }
     }
 
     return Promise.reject(error);

@@ -69,7 +69,13 @@ export default function LoginScreen() {
       // Banned / deactivated accounts get a specific title; message from the
       // server already includes the ban reason when there is one.
       if (errorData?.code === "ACCOUNT_BANNED") {
-        Alert.alert("Account Banned", message);
+        router.replace({
+          pathname: "/banned",
+          params: {
+            reason: errorData?.ban_reason || "",
+            appealToken: errorData?.appealToken || "",
+          },
+        } as any);
         return;
       }
       if (errorData?.code === "ACCOUNT_DEACTIVATED") {
