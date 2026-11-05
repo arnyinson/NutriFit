@@ -571,6 +571,21 @@ export default function ProfileScreen() {
     if (sortedKey(editForm.allergens) !== sortedKey(profile.allergens)) {
       meal.push("Allergens");
     }
+    // Body data changes the daily calories, so the meal plan follows it
+    const newWeight = getEditWeightKg();
+    const newHeight = getEditHeightCm();
+    if (newWeight !== null && newWeight !== parseFloat(profile.weight)) {
+      meal.push("Weight");
+    }
+    if (newHeight !== null && newHeight !== parseFloat(profile.height)) {
+      meal.push("Height");
+    }
+    if (birthdayInput !== formatDateDisplay(profile.birthday)) {
+      meal.push("Birthday");
+    }
+    if (editForm.sex !== profile.sex) {
+      meal.push("Sex");
+    }
     if (
       sortedKey(editForm.available_equipment) !==
       sortedKey(profile.available_equipment || ["Bodyweight"])
@@ -596,7 +611,7 @@ export default function ProfileScreen() {
         `• Workout plan, today onward (${planPrompt.workout.join(", ")})`,
       );
     }
-    return `Your changes will update:\n\n${lines.join("\n")}\n\nMeals and workouts you already completed will be kept.`;
+    return `Your changes will update:\n\n${lines.join("\n")}\n\nMeals and workouts you already completed will be kept. This uses 1 of your 7 plan updates this week.`;
   };
 
   const performLogout = async () => {

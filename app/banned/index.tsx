@@ -1,17 +1,17 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ban, CheckCircle2, ChevronLeft } from "lucide-react-native";
+import { Ban, CheckCircle2, ChevronLeft, UserX } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    BackHandler,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  BackHandler,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import api from "../../constants/api";
@@ -29,10 +29,14 @@ export default function BannedScreen() {
   const params = useLocalSearchParams<{
     reason?: string;
     appealToken?: string;
+    kind?: string;
   }>();
 
-  const reason =
-    (params.reason as string) || "Violation of the Terms and Conditions";
+  // Same screen for a banned account and a deactivated one
+  const isDeactivated = params.kind === "deactivated";
+  const reason = isDeactivated
+    ? "Your account was deactivated by an administrator."
+    : (params.reason as string) || "Violation of the Terms and Conditions";
   const appealToken = (params.appealToken as string) || "";
 
   const [showForm, setShowForm] = useState(false);
@@ -82,6 +86,10 @@ export default function BannedScreen() {
       if (data?.code === "APPEAL_PENDING") {
         // Already sent one before: show the same confirmation
         setSent(true);
+      } else if (data?.code === "APPEAL_DENIED") {
+        setError(
+          "Your appeal was reviewed and was not approved. This decision is final.",
+        );
       } else if (!err?.response) {
         setError(
           "Unable to connect to the server. Please check your connection and try again.",
@@ -123,8 +131,9 @@ export default function BannedScreen() {
               Send an appeal
             </Text>
             <Text style={[styles.formSub, { color: colors.textMuted }]}>
-              Tell us why you think the ban is a mistake. An admin will review
-              it and reply to your email.
+              {isDeactivated
+                ? "Tell us why your account should be activated again. An admin will review it and reply to your email."
+                : "Tell us why you think the ban is a mistake. An admin will review it and reply to your email."}
             </Text>
 
             {sent ? (
@@ -205,13 +214,19 @@ export default function BannedScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       <View style={styles.center}>
         <View style={styles.iconCircle}>
-          <Ban size={44} color="#F44336" />
+          {isDeactivated ? (
+            <UserX size={44} color="#F44336" />
+          ) : (
+            <Ban size={44} color="#F44336" />
+          )}
         </View>
         <Text style={[styles.title, { color: colors.text }]}>
-          Account Banned
+          {isDeactivated ? "Account Deactivated" : "Account Banned"}
         </Text>
         <Text style={[styles.sub, { color: colors.textMuted }]}>
-          Your account has been banned and you can no longer use NutriFit.
+          {isDeactivated
+            ? "Your account is deactivated and you can't use NutriFit for now."
+            : "Your account has been banned and you can no longer use NutriFit."}
         </Text>
 
         <View
@@ -221,7 +236,7 @@ export default function BannedScreen() {
           ]}
         >
           <Text style={[styles.reasonLabel, { color: colors.textMuted }]}>
-            Reason
+            {isDeactivated ? "Status" : "Reason"}
           </Text>
           <Text style={[styles.reasonText, { color: colors.text }]}>
             {reason}
@@ -231,7 +246,9 @@ export default function BannedScreen() {
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           {sent
             ? "Your appeal was sent. We'll review it and email you."
-            : "If you believe this is a mistake, you can send an appeal to our support team."}
+            : isDeactivated
+              ? "If you think this is a mistake, or you want your account back, you can send an appeal to our support team."
+              : "If you believe this is a mistake, you can send an appeal to our support team."}
         </Text>
       </View>
 

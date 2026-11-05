@@ -72,6 +72,7 @@ export default function LoginScreen() {
         router.replace({
           pathname: "/banned",
           params: {
+            kind: "banned",
             reason: errorData?.ban_reason || "",
             appealToken: errorData?.appealToken || "",
           },
@@ -79,7 +80,13 @@ export default function LoginScreen() {
         return;
       }
       if (errorData?.code === "ACCOUNT_DEACTIVATED") {
-        Alert.alert("Account Deactivated", message);
+        router.replace({
+          pathname: "/banned",
+          params: {
+            kind: "deactivated",
+            appealToken: errorData?.appealToken || "",
+          },
+        } as any);
         return;
       }
       Alert.alert("Login Failed", message);

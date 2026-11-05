@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { router } from "expo-router";
-import { Alert } from "react-native";
 
 const API_BASE_URL = "https://nutrifit-backend-api-t21p.onrender.com/api";
 
@@ -51,31 +50,19 @@ api.interceptors.response.use(
         // ignore storage errors, we still send the user away
       }
 
-      if (code === "ACCOUNT_BANNED") {
-        router.replace({
-          pathname: "/banned",
-          params: {
-            reason: data?.ban_reason || "",
-            appealToken: data?.appealToken || "",
-          },
-        } as any);
-        setTimeout(() => {
-          handlingBlockedAccount = false;
-        }, 3000);
-      } else {
-        const message =
-          data?.error ||
-          "Your account has been deactivated. Please contact support.";
-        router.replace("/login" as any);
-        Alert.alert("Account Deactivated", message, [
-          {
-            text: "OK",
-            onPress: () => {
-              handlingBlockedAccount = false;
-            },
-          },
-        ]);
-      }
+      // Banned and deactivated users both go to the same screen (reason +
+      // appeal). It is not an alert any more.
+      router.replace({
+        pathname: "/banned",
+        params: {
+          kind: code === "ACCOUNT_BANNED" ? "banned" : "deactivated",
+          reason: data?.ban_reason || "",
+          appealToken: data?.appealToken || "",
+        },
+      } as any);
+      setTimeout(() => {
+        handlingBlockedAccount = false;
+      }, 3000);
     }
 
     return Promise.reject(error);
