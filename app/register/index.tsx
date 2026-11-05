@@ -279,6 +279,21 @@ export default function RegisterScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [hasScrolledToEnd, setHasScrolledToEnd] = useState(false);
+  // Sizes of the Terms scroll area, used to enable "I Agree" when the whole
+  // text already fits on screen (no scrolling needed)
+  const [termsViewH, setTermsViewH] = useState(0);
+  const [termsContentH, setTermsContentH] = useState(0);
+
+  useEffect(() => {
+    if (
+      showTermsModal &&
+      termsViewH > 0 &&
+      termsContentH > 0 &&
+      termsContentH <= termsViewH + 24
+    ) {
+      setHasScrolledToEnd(true);
+    }
+  }, [showTermsModal, termsViewH, termsContentH]);
   const [loading, setLoading] = useState(false);
 
   const equipmentList = [
@@ -1243,15 +1258,19 @@ export default function RegisterScreen() {
             <ScrollView
               showsVerticalScrollIndicator={false}
               style={styles.termsScroll}
+              bounces={false}
+              overScrollMode="never"
+              onLayout={(e) => setTermsViewH(e.nativeEvent.layout.height)}
+              onContentSizeChange={(_w, h) => setTermsContentH(h)}
               onScroll={({ nativeEvent }) => {
                 const { layoutMeasurement, contentOffset, contentSize } =
                   nativeEvent;
                 const isCloseToBottom =
                   layoutMeasurement.height + contentOffset.y >=
-                  contentSize.height - 24;
+                  contentSize.height - 40;
                 if (isCloseToBottom) setHasScrolledToEnd(true);
               }}
-              scrollEventThrottle={100}
+              scrollEventThrottle={16}
             >
               <Text style={[styles.termsSectionTitle, { color: colors.text }]}>
                 1. Account Information
@@ -1310,13 +1329,15 @@ export default function RegisterScreen() {
                 6. Nutritional Basis and Professional Review
               </Text>
               <Text style={[styles.termsBody, { color: colors.textSecondary }]}>
-                The calorie and macronutrient formulas, meal database, and
-                allergen substitution recommendations used by NutriFit were
-                reviewed and validated by a licensed nutritionist-dietitian,
-                Marc Cyrill E. De Veas, to help ensure they align with sound
-                nutritional practice. This review does not replace
-                individualized medical or dietary advice from a professional who
-                has access to your complete health history.
+                To ensure accuracy, safety, and reliability, all nutritional
+                computations, calorie formulas, meal nutrition data (calories
+                and macronutrients), and allergy-related food substitution
+                recommendations used by NutriFit were reviewed and validated by
+                a licensed nutritionist-dietitian, Marc Cyrill E. De Veas, to
+                help ensure they align with sound nutritional practice. This
+                review does not replace individualized medical or dietary advice
+                from a professional who has access to your complete health
+                history.
               </Text>
 
               <Text style={[styles.termsSectionTitle, { color: colors.text }]}>
@@ -1326,6 +1347,44 @@ export default function RegisterScreen() {
                 You are responsible for maintaining the confidentiality of your
                 account password. Notify us immediately if you suspect
                 unauthorized access to your account.
+              </Text>
+
+              <Text style={[styles.termsSectionTitle, { color: colors.text }]}>
+                8. Acceptable Use (Prohibited Conduct)
+              </Text>
+              <Text style={[styles.termsBody, { color: colors.textSecondary }]}>
+                To keep NutriFit safe and fair, you agree not to:{"\n"}
+                {"\u2022"} Give false information on purpose, such as fake body
+                data or a fake profile, to misuse the app.{"\n"}
+                {"\u2022"} Abuse the app, such as using bots or scripts, or
+                changing your profile again and again to get around the weekly
+                plan update limit.{"\n"}
+                {"\u2022"} Share your account or use someone else&apos;s
+                account.{"\n"}
+                {"\u2022"} Create more than one account, or a new account to
+                avoid a ban.{"\n"}
+                {"\u2022"} Try to hack, break, or bypass the security of the
+                app, its servers, or other users&apos; accounts.{"\n"}
+                {"\u2022"} Harass, threaten, or spam the NutriFit support team
+                or other users.{"\n"}
+                {"\u2022"} Post or share illegal, offensive, or inappropriate
+                content.{"\n"}
+                {"\u2022"} Use the app in a way that breaks the law or the
+                rights of others.
+              </Text>
+
+              <Text style={[styles.termsSectionTitle, { color: colors.text }]}>
+                9. Ban, Deactivation and Appeals
+              </Text>
+              <Text style={[styles.termsBody, { color: colors.textSecondary }]}>
+                If you break Section 8, an administrator may ban or deactivate
+                your account, and the reason will be shown to you. A ban or
+                deactivation stops you from using the app, but your data is not
+                sold or shared. You may send one appeal from the account blocked
+                screen. An administrator will review it and send the result to
+                your email. If the appeal is denied, the decision is final.
+                Accounts that are not used for 30 days are archived
+                automatically and are restored when you log in again.
               </Text>
 
               <Text
@@ -1603,7 +1662,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    maxHeight: "80%",
+    maxHeight: "85%",
   },
   modalHeader: {
     flexDirection: "row",
@@ -1612,7 +1671,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: { fontSize: 18, fontWeight: "bold", flex: 1 },
-  termsScroll: { marginBottom: 16 },
+  termsScroll: { flexShrink: 1, marginBottom: 16 },
   termsSectionTitle: {
     fontSize: 14,
     fontWeight: "700",
