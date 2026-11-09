@@ -12,7 +12,7 @@ type Props = {
   onError?: (message: string) => void; // captcha could not load / failed
 };
 
-// Invisible hCaptcha: call ref.current.show(); a challenge only appears if needed.
+// hCaptcha popup: call ref.current.show() and the user sees the checkbox/challenge.
 const Captcha = forwardRef<CaptchaHandle, Props>(function Captcha(
   { onToken, onCancel, onError },
   ref,
@@ -28,11 +28,13 @@ const Captcha = forwardRef<CaptchaHandle, Props>(function Captcha(
       ref={inner}
       siteKey={SITE_KEY}
       baseUrl="https://hcaptcha.com"
-      size="invisible"
+      size="normal"
       languageCode="en"
       onMessage={(event: any) => {
         if (!event) return;
         const data = event.nativeEvent?.data;
+        // Progress messages, not results: keep the popup open
+        if (data === "open" || data === "loaded") return;
         if (data === "challenge-closed" || data === "cancel") {
           inner.current?.hide();
           event.reset?.();
