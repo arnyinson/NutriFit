@@ -1,20 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useLocalSearchParams, usePathname, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   AlertTriangle,
-  BarChart3,
   Check,
   ChevronDown,
-  Dumbbell,
   Flame,
-  Home,
   Moon,
   Plus,
   Sun,
   Sunrise,
   Trophy,
-  User,
-  Utensils,
 } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -31,8 +26,8 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import BottomNav from "../../components/BottomNav";
 import ConfirmModal from "../../components/ConfirmModal";
-import NavBadge from "../../components/NavBadge";
 import Tutorial from "../../components/Tutorial";
 import api from "../../constants/api";
 import {
@@ -42,7 +37,6 @@ import {
 } from "../../constants/offline";
 import { registerAndSavePushToken } from "../../constants/pushNotifications";
 import { useTheme } from "../../constants/theme";
-import { useUnreadCount } from "../../constants/unread";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -102,8 +96,6 @@ const toNumber = (value: unknown) => parseFloat(String(value ?? 0)) || 0;
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const unreadCount = useUnreadCount();
-  const pathname = usePathname();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   // "tour" changes every time Profile > Replay tutorial is pressed
@@ -524,7 +516,7 @@ export default function DashboardScreen() {
         <View style={[styles.header, { backgroundColor: colors.background }]}>
           <View style={styles.headerLeft}>
             <TouchableOpacity
-              onPress={() => router.push("/profile" as any)}
+              onPress={() => router.replace("/profile" as any)}
               hitSlop={HIT_SLOP}
             >
               {avatarUrl ? (
@@ -681,7 +673,7 @@ export default function DashboardScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.editBtn}
-                onPress={() => router.push("/meal" as any)}
+                onPress={() => router.replace("/meal" as any)}
                 hitSlop={HIT_SLOP}
               >
                 <Text style={styles.editText}>View Plan</Text>
@@ -869,7 +861,7 @@ export default function DashboardScreen() {
             <View style={styles.sectionActions}>
               <TouchableOpacity
                 style={styles.seeAllBtn}
-                onPress={() => router.push("/workout" as any)}
+                onPress={() => router.replace("/workout" as any)}
                 hitSlop={HIT_SLOP}
               >
                 <Text style={styles.seeAllText}>See all</Text>
@@ -991,53 +983,7 @@ export default function DashboardScreen() {
         }}
       />
 
-      {/* Bottom Navigation */}
-      <View
-        style={[
-          styles.bottomNav,
-          {
-            backgroundColor: colors.navBg,
-            borderTopColor: colors.border,
-            paddingBottom: insets.bottom + 6,
-            height: 56 + insets.bottom,
-          },
-        ]}
-      >
-        {[
-          { name: "Home", Icon: Home, route: "/dashboard" },
-          { name: "Stats", Icon: BarChart3, route: "/progress" },
-          { name: "Meal", Icon: Utensils, route: "/meal" },
-          { name: "Workout", Icon: Dumbbell, route: "/workout" },
-          { name: "Profile", Icon: User, route: "/profile" },
-        ].map((tab) => {
-          const isActive = pathname === tab.route;
-          return (
-            <TouchableOpacity
-              key={tab.name}
-              style={styles.navItem}
-              onPress={() => router.push(tab.route as any)}
-            >
-              <View>
-                <tab.Icon
-                  size={22}
-                  color={isActive ? "#4CAF50" : colors.textMuted}
-                  strokeWidth={isActive ? 2.4 : 2}
-                />
-                {tab.name === "Profile" && <NavBadge count={unreadCount} />}
-              </View>
-              <Text
-                style={[
-                  styles.navLabel,
-                  { color: colors.textMuted },
-                  isActive && styles.navLabelActive,
-                ]}
-              >
-                {tab.name}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <BottomNav />
 
       <Tutorial visible={showTutorial} onClose={closeTutorial} />
     </SafeAreaView>
@@ -1235,16 +1181,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   exerciseCheckDone: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
-  bottomNav: {
-    flexDirection: "row",
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  navItem: { flex: 1, alignItems: "center" },
-  navLabel: { fontSize: 11, marginTop: 2 },
-  navLabelActive: { color: "#4CAF50", fontWeight: "700" },
 });

@@ -37,9 +37,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import AllergenPicker from "../../components/AllergenPicker";
+import BottomNav from "../../components/BottomNav";
 import ConfirmModal from "../../components/ConfirmModal";
 import DietPicker, { dietLabel } from "../../components/DietPicker";
 import NavBadge from "../../components/NavBadge";
@@ -138,6 +142,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const unreadCount = useUnreadCount();
   const { isDark, toggleTheme, colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -740,7 +745,10 @@ export default function ProfileScreen() {
             },
           ]}
         >
-          <TouchableOpacity onPress={() => router.back()} hitSlop={HIT_SLOP}>
+          <TouchableOpacity
+            onPress={() => router.replace("/dashboard" as any)}
+            hitSlop={HIT_SLOP}
+          >
             <ChevronLeft size={24} color={colors.primary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -1066,7 +1074,7 @@ export default function ProfileScreen() {
             { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
           onPress={() =>
-            router.push({
+            router.replace({
               pathname: "/dashboard",
               params: { tour: String(Date.now()) },
             } as any)
@@ -1089,7 +1097,7 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: 80 + insets.bottom }} />
       </ScrollView>
 
       {/* BMI Health Warning Modal */}
@@ -1631,6 +1639,8 @@ export default function ProfileScreen() {
         onConfirm={performLogout}
         onCancel={() => setShowLogoutConfirm(false)}
       />
+
+      <BottomNav />
     </SafeAreaView>
   );
 }

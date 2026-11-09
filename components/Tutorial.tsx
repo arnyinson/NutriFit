@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import {
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// tab = index of the bottom-nav tab to highlight (Home, Stats, Meal, Workout,
+// tab = index of the bottom-nav tab to highlight (Home, Meal, Workout, Stats,
 // Profile). null = no highlight.
 type Step = { emoji: string; title: string; body: string; tab: number | null };
 
-const TABS = ["Home", "Stats", "Meal", "Workout", "Profile"];
+const TABS = ["Home", "Meal", "Workout", "Stats", "Profile"];
 
 const STEPS: Step[] = [
   {
@@ -23,21 +23,21 @@ const STEPS: Step[] = [
     tab: 0,
   },
   {
-    emoji: "📊",
-    title: "Track your Progress",
-    body: "Daily, weekly and monthly records of your calories and weight, with a forecast of your goal.",
-    tab: 1,
-  },
-  {
     emoji: "🍽️",
     title: "Your Meal Plan",
     body: "Meals picked for your calories, diet and allergies. Tap a meal to see the recipe and mark it as taken.",
-    tab: 2,
+    tab: 1,
   },
   {
     emoji: "💪",
     title: "Your Workout Plan",
     body: "A weekly plan that fits your goal and equipment. Check each exercise when you finish it.",
+    tab: 2,
+  },
+  {
+    emoji: "📊",
+    title: "Track your Progress",
+    body: "Daily, weekly and monthly records of your calories and weight, with a forecast of your goal.",
     tab: 3,
   },
   {

@@ -1,17 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import {
-  BarChart3,
   Check,
   ChevronLeft,
   Dumbbell,
-  Home,
   RefreshCw,
   Scale,
   Target,
   TrendingDown,
   TrendingUp,
-  User,
   Utensils,
   X,
 } from "lucide-react-native";
@@ -35,8 +32,8 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import Svg, { Circle, Line, Path } from "react-native-svg";
+import BottomNav from "../../components/BottomNav";
 import ConfirmModal from "../../components/ConfirmModal";
-import NavBadge from "../../components/NavBadge";
 import SuccessModal from "../../components/SuccessModal";
 import api from "../../constants/api";
 import {
@@ -46,7 +43,6 @@ import {
   patchCache,
 } from "../../constants/offline";
 import { useTheme } from "../../constants/theme";
-import { useUnreadCount } from "../../constants/unread";
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
@@ -110,8 +106,6 @@ const toISODate = (value: string) => {
 
 export default function ProgressScreen() {
   const router = useRouter();
-  const unreadCount = useUnreadCount();
-  const pathname = usePathname();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [activePeriod, setActivePeriod] = useState("Weekly");
@@ -528,7 +522,10 @@ export default function ProgressScreen() {
         ]}
       >
         <View style={styles.headerTopRow}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={HIT_SLOP}>
+          <TouchableOpacity
+            onPress={() => router.replace("/dashboard" as any)}
+            hitSlop={HIT_SLOP}
+          >
             <ChevronLeft size={24} color={colors.primary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -1103,53 +1100,7 @@ export default function ProgressScreen() {
         onCancel={() => setShowWeighInConfirm(false)}
       />
 
-      {/* Bottom Navigation */}
-      <View
-        style={[
-          styles.bottomNav,
-          {
-            backgroundColor: colors.navBg,
-            borderTopColor: colors.border,
-            paddingBottom: insets.bottom + 6,
-            height: 56 + insets.bottom,
-          },
-        ]}
-      >
-        {[
-          { name: "Home", Icon: Home, route: "/dashboard" },
-          { name: "Stats", Icon: BarChart3, route: "/progress" },
-          { name: "Meal", Icon: Utensils, route: "/meal" },
-          { name: "Workout", Icon: Dumbbell, route: "/workout" },
-          { name: "Profile", Icon: User, route: "/profile" },
-        ].map((tab) => {
-          const isActive = pathname === tab.route;
-          return (
-            <TouchableOpacity
-              key={tab.name}
-              style={styles.navItem}
-              onPress={() => router.push(tab.route as any)}
-            >
-              <View>
-                <tab.Icon
-                  size={22}
-                  color={isActive ? "#4CAF50" : colors.textMuted}
-                  strokeWidth={isActive ? 2.4 : 2}
-                />
-                {tab.name === "Profile" && <NavBadge count={unreadCount} />}
-              </View>
-              <Text
-                style={[
-                  styles.navLabel,
-                  { color: colors.textMuted },
-                  isActive && styles.navLabelActive,
-                ]}
-              >
-                {tab.name}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <BottomNav />
     </SafeAreaView>
   );
 }
@@ -1428,16 +1379,4 @@ const styles = StyleSheet.create({
   forecastText: { fontSize: 13, lineHeight: 19, marginTop: 8 },
   forecastValue: { fontSize: 20, fontWeight: "bold", marginTop: 8 },
   forecastNote: { fontSize: 11, marginTop: 8, lineHeight: 16 },
-  bottomNav: {
-    flexDirection: "row",
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  navItem: { flex: 1, alignItems: "center" },
-  navLabel: { fontSize: 11, marginTop: 2 },
-  navLabelActive: { color: "#4CAF50", fontWeight: "700" },
 });
