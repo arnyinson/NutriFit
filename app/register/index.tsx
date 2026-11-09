@@ -26,6 +26,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AllergenPicker from "../../components/AllergenPicker";
+import Captcha, { CaptchaHandle } from "../../components/Captcha";
 import DietPicker from "../../components/DietPicker";
 import Logo from "../../components/Logo";
 import api from "../../constants/api";
@@ -248,6 +249,7 @@ export default function RegisterScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
+  const captchaRef = useRef<CaptchaHandle>(null);
 
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -464,6 +466,12 @@ export default function RegisterScreen() {
       }
     }
 
+    // All fields are fine: ask the captcha, then submitRegister(token) runs
+    setLoading(true);
+    captchaRef.current?.show();
+  };
+
+  const submitRegister = async (captchaToken: string) => {
     const heightCm = getHeightCm() as number;
     const mm = String((birthMonth as number) + 1).padStart(2, "0");
     const dd = String(birthDay as number).padStart(2, "0");
@@ -472,6 +480,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await api.post("/auth/register", {
+        captcha_token: captchaToken,
         name: [firstName.trim(), middleName.trim(), lastName.trim()]
           .filter(Boolean)
           .join(" "),
@@ -1236,6 +1245,19 @@ export default function RegisterScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      <Captcha
+        ref={captchaRef}
+        onToken={submitRegister}
+        onCancel={() => setLoading(false)}
+        onError={() => {
+          setLoading(false);
+          Alert.alert(
+            "Captcha failed",
+            "We could not load the captcha. Please check your connection and try again.",
+          );
+        }}
+      />
 
       {/* Terms and Privacy Policy Modal */}
       <Modal

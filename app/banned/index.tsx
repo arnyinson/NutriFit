@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ban, CheckCircle2, ChevronLeft, UserX } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
@@ -14,12 +14,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Captcha, { CaptchaHandle } from "../../components/Captcha";
 import api from "../../constants/api";
 import { clearCache } from "../../constants/offline";
 import { clearPushTokenCache } from "../../constants/pushNotifications";
 import { useTheme } from "../../constants/theme";
 import { publishUnread } from "../../constants/unread";
-
 
 const APPEAL_MAX = 500;
 
@@ -44,6 +44,7 @@ export default function BannedScreen() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const captchaRef = useRef<CaptchaHandle>(null);
 
   // A banned user has nowhere else to go: Back must not return to the app
   useEffect(() => {
@@ -77,8 +78,18 @@ export default function BannedScreen() {
     }
     setError("");
     setSending(true);
+    // Captcha first; sendAppealWithToken(token) runs when it passes
+    captchaRef.current?.show();
+  };
+
+  const sendAppealWithToken = async (captchaToken: string) => {
+    const text = message.trim();
     try {
-      await api.post("/auth/appeal", { appealToken, message: text });
+      await api.post("/auth/appeal", {
+        appealToken,
+        message: text,
+        captcha_token: captchaToken,
+      });
       setSent(true);
       setMessage("");
     } catch (err: any) {
@@ -205,6 +216,17 @@ export default function BannedScreen() {
             )}
           </ScrollView>
         </KeyboardAvoidingView>
+        <Captcha
+          ref={captchaRef}
+          onToken={sendAppealWithToken}
+          onCancel={() => setSending(false)}
+          onError={() => {
+            setSending(false);
+            setError(
+              "We could not load the captcha. Please check your connection and try again.",
+            );
+          }}
+        />
       </SafeAreaView>
     );
   }
