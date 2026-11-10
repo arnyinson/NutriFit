@@ -118,8 +118,16 @@ export default function AchievementsScreen() {
     useState(false);
   const [capturingAchievement, setCapturingAchievement] = useState(false);
 
+  // Share the current level (title + XP) as an image too
+  const [showLevelShareModal, setShowLevelShareModal] = useState(false);
+  const [capturingLevel, setCapturingLevel] = useState(false);
+
+  // Shown on every share card so each card is unique per person
+  const [username, setUsername] = useState("");
+
   const shareCardRef = useRef<ViewShot>(null);
   const achievementShareCardRef = useRef<ViewShot>(null);
+  const levelShareCardRef = useRef<ViewShot>(null);
 
   const loadAchievements = useCallback(async () => {
     try {
@@ -141,6 +149,12 @@ export default function AchievementsScreen() {
   useEffect(() => {
     loadAchievements();
   }, [loadAchievements]);
+
+  useEffect(() => {
+    apiGetCached<any>("/users/me", (data) => {
+      if (data?.user?.username) setUsername(data.user.username);
+    }).catch(() => {});
+  }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -188,6 +202,34 @@ export default function AchievementsScreen() {
       );
     } finally {
       setCapturingAchievement(false);
+    }
+  };
+
+  const captureAndShareLevel = async () => {
+    if (!levelShareCardRef.current?.capture) return;
+    setCapturingLevel(true);
+    try {
+      const uri = await levelShareCardRef.current.capture();
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "image/png",
+          dialogTitle: "Share My Level",
+        });
+      } else {
+        Alert.alert(
+          "Sharing unavailable",
+          "Sharing is not available on this device.",
+        );
+      }
+    } catch (err) {
+      console.error("Capture and share level error:", err);
+      Alert.alert(
+        "Error",
+        "Unable to create your level card. Please try again.",
+      );
+    } finally {
+      setCapturingLevel(false);
     }
   };
 
@@ -303,6 +345,16 @@ export default function AchievementsScreen() {
           <Text style={[styles.xpProgress, { color: colors.textMuted }]}>
             {totalXP % 200} / 200 XP to next level
           </Text>
+          <TouchableOpacity
+            style={[styles.shareProgressBtn, styles.levelShareBtn]}
+            onPress={() => setShowLevelShareModal(true)}
+            hitSlop={HIT_SLOP}
+          >
+            <Share2 size={14} color={colors.primary} />
+            <Text style={[styles.shareProgressText, { color: colors.primary }]}>
+              Share My Level
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Stats Summary */}
@@ -624,7 +676,9 @@ export default function AchievementsScreen() {
                   <Text style={styles.shareCardBrand}>NutriFit</Text>
                 </View>
 
-                <Text style={styles.shareCardTagline}>My Progress</Text>
+                <Text style={styles.shareCardTagline}>
+                  {username ? `${username}'s Progress` : "My Progress"}
+                </Text>
                 <View style={styles.shareCardLevelRow}>
                   <View style={styles.shareCardLevelBadge}>
                     <Text style={styles.shareCardLevelText}>
@@ -762,6 +816,9 @@ export default function AchievementsScreen() {
                     </Text>
                   </View>
 
+                  {username ? (
+                    <Text style={styles.shareCardUsername}>@{username}</Text>
+                  ) : null}
                   <Text style={styles.shareCardFooterText}>
                     Unlocked on NutriFit 🏆
                   </Text>
@@ -791,6 +848,106 @@ export default function AchievementsScreen() {
                 { backgroundColor: colors.input, marginTop: 8 },
               ]}
               onPress={() => setShowAchievementShareModal(false)}
+            >
+              <Text style={[styles.modalCloseBtnText, { color: colors.text }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Share LEVEL Modal: same look as the achievement card, in the level color */}
+      <Modal
+        visible={showLevelShareModal}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Share My Level
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowLevelShareModal(false)}
+                hitSlop={HIT_SLOP}
+              >
+                <X size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ViewShot
+              ref={levelShareCardRef}
+              options={{ format: "png", quality: 1 }}
+              style={styles.shareCardWrapper}
+            >
+              <View
+                style={[
+                  styles.achievementShareCard,
+                  { backgroundColor: "#FF9800" },
+                ]}
+              >
+                <View style={styles.shareCardDecorCircle1} />
+                <View style={styles.shareCardDecorCircle2} />
+
+                <View style={styles.shareCardHeader}>
+                  <Logo size={32} />
+                  <Text style={styles.shareCardBrand}>NutriFit</Text>
+                </View>
+
+                <View style={styles.achievementShareIconCircle}>
+                  <Crown size={40} color="#fff" />
+                </View>
+
+                <Text style={styles.achievementShareCategory}>
+                  LEVEL {currentLevel}
+                </Text>
+                <Text style={styles.achievementShareTitle}>Explorer</Text>
+                <Text style={styles.achievementShareDesc}>
+                  {totalXP} XP earned, +{200 - (totalXP % 200)} exp to Lv.{" "}
+                  {currentLevel + 1}
+                </Text>
+
+                <View style={styles.shareCardXpBarTrack}>
+                  <View
+                    style={[
+                      styles.shareCardXpBarFill,
+                      { width: `${progressToNext}%` },
+                    ]}
+                  />
+                </View>
+
+                {username ? (
+                  <Text style={styles.shareCardUsername}>@{username}</Text>
+                ) : null}
+                <Text style={styles.shareCardFooterText}>
+                  Leveling up on NutriFit 🚀
+                </Text>
+              </View>
+            </ViewShot>
+
+            <TouchableOpacity
+              style={[
+                styles.captureShareBtn,
+                capturingLevel && { opacity: 0.7 },
+              ]}
+              onPress={captureAndShareLevel}
+              disabled={capturingLevel}
+            >
+              <Download size={18} color="#fff" />
+              <Text style={styles.captureShareBtnText}>
+                {capturingLevel ? "Preparing..." : "Save & Share as Image"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.modalCloseBtn,
+                { backgroundColor: colors.input, marginTop: 8 },
+              ]}
+              onPress={() => setShowLevelShareModal(false)}
             >
               <Text style={[styles.modalCloseBtnText, { color: colors.text }]}>
                 Cancel
@@ -836,6 +993,7 @@ const styles = StyleSheet.create({
   xpBar: { height: 10, borderRadius: 5, overflow: "hidden", marginBottom: 6 },
   xpFill: { height: 10, backgroundColor: "#FF9800", borderRadius: 5 },
   xpProgress: { fontSize: 11, textAlign: "right" },
+  levelShareBtn: { marginTop: 14 },
   statsCard: {
     marginHorizontal: 16,
     marginBottom: 14,
@@ -1053,6 +1211,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "500",
     textAlign: "center",
+  },
+  shareCardUsername: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 8,
   },
   captureShareBtn: {
     backgroundColor: "#4CAF50",

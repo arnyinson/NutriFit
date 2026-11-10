@@ -43,6 +43,9 @@ import {
 } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import AllergenPicker from "../../components/AllergenPicker";
+import BirthdayPicker, {
+  validateBirthday,
+} from "../../components/BirthdayPicker";
 import BottomNav from "../../components/BottomNav";
 import ConfirmModal from "../../components/ConfirmModal";
 import DietPicker, { dietLabel } from "../../components/DietPicker";
@@ -121,14 +124,6 @@ const kgToLb = (kg: string | number) => {
 
 const sortedKey = (arr?: string[] | null) => [...(arr || [])].sort().join("|");
 
-const parseDateInput = (mmddyyyy: string) => {
-  const parts = mmddyyyy.split("/");
-  if (parts.length !== 3) return null;
-  const [mm, dd, yyyy] = parts;
-  if (!mm || !dd || !yyyy || yyyy.length !== 4) return null;
-  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
-};
-
 // Line chart layout constants
 const CHART_HEIGHT = 130;
 const CHART_TOP_PADDING = 20;
@@ -152,7 +147,11 @@ export default function ProfileScreen() {
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
-  const [birthdayInput, setBirthdayInput] = useState("");
+  // Birthday is picked with Month / Day / Year dropdowns (same as Register)
+  const [birthMonth, setBirthMonth] = useState<number | null>(null);
+  const [birthDay, setBirthDay] = useState<number | null>(null);
+  const [birthYear, setBirthYear] = useState<number | null>(null);
+  const [showUnsaved, setShowUnsaved] = useState(false);
   const [heightUnit, setHeightUnit] = useState<"cm" | "ft">("cm");
   const [heightFt, setHeightFt] = useState("");
   const [heightIn, setHeightIn] = useState("");
@@ -344,7 +343,16 @@ export default function ProfileScreen() {
       available_equipment: [...(profile.available_equipment || ["Bodyweight"])],
       sex: profile.sex,
     });
-    setBirthdayInput(formatDateDisplay(profile.birthday));
+    const b = new Date(profile.birthday);
+    if (isNaN(b.getTime())) {
+      setBirthMonth(null);
+      setBirthDay(null);
+      setBirthYear(null);
+    } else {
+      setBirthMonth(b.getMonth());
+      setBirthDay(b.getDate());
+      setBirthYear(b.getFullYear());
+    }
     setHeightUnit("cm");
     const totalIn = Math.round(parseFloat(profile.height) / 2.54);
     setHeightFt(String(Math.floor(totalIn / 12)));
@@ -355,15 +363,16 @@ export default function ProfileScreen() {
     setShowEditModal(true);
   };
 
-  const handleBirthdayChange = (text: string) => {
-    const digitsOnly = text.replace(/\D/g, "");
-    let formatted = digitsOnly;
-    if (digitsOnly.length >= 5) {
-      formatted = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2, 4)}/${digitsOnly.slice(4, 8)}`;
-    } else if (digitsOnly.length >= 3) {
-      formatted = `${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}`;
-    }
-    setBirthdayInput(formatted);
+  // True when the picked birthday is different from the saved one
+  const birthdayChanged = () => {
+    if (!profile) return false;
+    const p = new Date(profile.birthday);
+    if (isNaN(p.getTime())) return true;
+    return (
+      birthMonth !== p.getMonth() ||
+      birthDay !== p.getDate() ||
+      birthYear !== p.getFullYear()
+    );
   };
 
   const equipmentList = [
@@ -442,7 +451,8 @@ export default function ProfileScreen() {
     setWeightUnit(next);
   };
 
-  const performSave = async () => {
+  // willRegenerateMeal: the meal plan is rebuilt by this save (diet, allergens, goal, activity)
+  const performSave = async (willRegenerateMeal = false) => {
     if (!editForm.first_name?.trim() || !editForm.last_name?.trim()) {
       Alert.alert(
         "Missing Name",
@@ -464,14 +474,12 @@ export default function ProfileScreen() {
       return;
     }
 
-    const isoBirthday = parseDateInput(birthdayInput);
-    if (!isoBirthday) {
-      Alert.alert(
-        "Error",
-        "Please enter a valid birthday in MM/DD/YYYY format.",
-      );
+    const birthdayError = validateBirthday(birthMonth, birthDay, birthYear);
+    if (birthdayError) {
+      Alert.alert("Invalid Birthday", birthdayError);
       return;
     }
+    const isoBirthday = `${birthYear}-${String((birthMonth as number) + 1).padStart(2, "0")}-${String(birthDay).padStart(2, "0")}`;
 
     const heightCm = getEditHeightCm();
     const weightKg = getEditWeightKg();
@@ -491,6 +499,13 @@ export default function ProfileScreen() {
     }
 
     const weightChanged = weightKg !== parseFloat(profile?.weight ?? "");
+    // Body data only changes the daily calories (TDEE). The current plan is not
+    // rebuilt; the new numbers are used the next time a meal plan is generated.
+    const bodyChanged =
+      weightChanged ||
+      heightCm !== parseFloat(profile?.height ?? "") ||
+      birthdayChanged() ||
+      editForm.sex !== profile?.sex;
 
     setSaving(true);
     try {
@@ -527,6 +542,11 @@ export default function ProfileScreen() {
       setShowEditModal(false);
       if (res.data.plan_warning) {
         Alert.alert("Profile saved", res.data.plan_warning);
+      } else if (bodyChanged && !willRegenerateMeal) {
+        Alert.alert(
+          "Profile saved",
+          "Your daily calorie target (TDEE) was updated. It will be used in your next meal plan.",
+        );
       } else {
         Alert.alert("Success", "Profile saved successfully!");
       }
@@ -554,7 +574,8 @@ export default function ProfileScreen() {
 
   // Kapag may nagbago na nakakaapekto sa meal o workout plan, magtatanong muna
   // bago i-save at i-regenerate. Meal: goal, diet, activity level, allergens.
-  // Workout: goal, equipment.
+  // Workout: goal, equipment. (Weight, height, birthday and sex do not rebuild
+  // the current plan; they are used in the next one.)
   const saveProfile = () => {
     if (!profile) return;
     const meal: string[] = [];
@@ -576,21 +597,6 @@ export default function ProfileScreen() {
     if (sortedKey(editForm.allergens) !== sortedKey(profile.allergens)) {
       meal.push("Allergens");
     }
-    // Body data changes the daily calories, so the meal plan follows it
-    const newWeight = getEditWeightKg();
-    const newHeight = getEditHeightCm();
-    if (newWeight !== null && newWeight !== parseFloat(profile.weight)) {
-      meal.push("Weight");
-    }
-    if (newHeight !== null && newHeight !== parseFloat(profile.height)) {
-      meal.push("Height");
-    }
-    if (birthdayInput !== formatDateDisplay(profile.birthday)) {
-      meal.push("Birthday");
-    }
-    if (editForm.sex !== profile.sex) {
-      meal.push("Sex");
-    }
     if (
       sortedKey(editForm.available_equipment) !==
       sortedKey(profile.available_equipment || ["Bodyweight"])
@@ -602,7 +608,60 @@ export default function ProfileScreen() {
       setPlanPrompt({ meal, workout });
       return;
     }
-    performSave();
+    performSave(false);
+  };
+
+  // True when something in the Edit Profile form was changed but not saved
+  const hasUnsavedChanges = () => {
+    if (!profile || !editForm) return false;
+    if (
+      (editForm.first_name || "").trim() !==
+        (profile.first_name || "").trim() ||
+      (editForm.middle_name || "").trim() !==
+        (profile.middle_name || "").trim() ||
+      (editForm.last_name || "").trim() !== (profile.last_name || "").trim()
+    )
+      return true;
+    if (birthdayChanged()) return true;
+    if (editForm.sex !== profile.sex) return true;
+    if (editForm.dietary_goal !== profile.dietary_goal) return true;
+    if (
+      (editForm.dietary_preference || "None") !==
+      (profile.dietary_preference || "None")
+    )
+      return true;
+    if (editForm.activity_level !== profile.activity_level) return true;
+    if (sortedKey(editForm.allergens) !== sortedKey(profile.allergens))
+      return true;
+    if (
+      sortedKey(editForm.available_equipment) !==
+      sortedKey(profile.available_equipment || ["Bodyweight"])
+    )
+      return true;
+
+    // Height: ft/in boxes that were not touched count as unchanged
+    const initIn = Math.round(parseFloat(profile.height) / 2.54);
+    const ftUntouched =
+      heightUnit === "ft" &&
+      heightFt === String(Math.floor(initIn / 12)) &&
+      heightIn === String(initIn % 12);
+    if (!ftUntouched) {
+      const h = getEditHeightCm();
+      if (h === null || h !== parseFloat(profile.height)) return true;
+    }
+    const w = getEditWeightKg();
+    if (w === null || w !== parseFloat(profile.weight)) return true;
+    return false;
+  };
+
+  // X button / Android back on the Edit Profile screen
+  const requestCloseEdit = () => {
+    if (saving) return;
+    if (hasUnsavedChanges()) {
+      setShowUnsaved(true);
+    } else {
+      setShowEditModal(false);
+    }
   };
 
   const planPromptMessage = () => {
@@ -1136,6 +1195,7 @@ export default function ProfileScreen() {
         animationType="slide"
         transparent
         statusBarTranslucent
+        onRequestClose={requestCloseEdit}
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
@@ -1144,10 +1204,7 @@ export default function ProfileScreen() {
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
                   Edit Profile
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setShowEditModal(false)}
-                  hitSlop={HIT_SLOP}
-                >
+                <TouchableOpacity onPress={requestCloseEdit} hitSlop={HIT_SLOP}>
                   <X size={20} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
@@ -1237,21 +1294,18 @@ export default function ProfileScreen() {
                   >
                     Birthday
                   </Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: colors.input,
-                        borderColor: colors.inputBorder,
-                        color: colors.text,
-                      },
-                    ]}
-                    value={birthdayInput}
-                    onChangeText={handleBirthdayChange}
-                    placeholder="MM/DD/YYYY"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="numeric"
-                    maxLength={10}
+                  <BirthdayPicker
+                    value={{
+                      month: birthMonth,
+                      day: birthDay,
+                      year: birthYear,
+                    }}
+                    onChange={(v) => {
+                      setBirthMonth(v.month);
+                      setBirthDay(v.day);
+                      setBirthYear(v.year);
+                    }}
+                    disabled={saving}
                   />
 
                   <Text
@@ -1625,11 +1679,64 @@ export default function ProfileScreen() {
         message={planPromptMessage()}
         confirmLabel="Regenerate"
         onConfirm={() => {
+          const rebuildsMeal = (planPrompt?.meal.length ?? 0) > 0;
           setPlanPrompt(null);
-          performSave();
+          performSave(rebuildsMeal);
         }}
         onCancel={() => setPlanPrompt(null)}
       />
+
+      {/* Unsaved changes: asked when the user leaves Edit Profile with edits */}
+      <Modal
+        visible={showUnsaved}
+        animationType="fade"
+        transparent
+        statusBarTranslucent
+        onRequestClose={() => setShowUnsaved(false)}
+      >
+        <View style={styles.warningOverlay}>
+          <View style={[styles.warningModal, { backgroundColor: colors.card }]}>
+            <TouchableOpacity
+              style={styles.unsavedClose}
+              onPress={() => setShowUnsaved(false)}
+              hitSlop={HIT_SLOP}
+            >
+              <X size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            <View style={styles.unsavedIconCircle}>
+              <AlertTriangle size={28} color="#FF9800" />
+            </View>
+            <Text style={[styles.warningTitle, { color: colors.text }]}>
+              You have unsaved changes
+            </Text>
+            <Text
+              style={[styles.warningMessage, { color: colors.textSecondary }]}
+            >
+              Do you want to save your changes or discard them?
+            </Text>
+            <View style={styles.unsavedBtnRow}>
+              <TouchableOpacity
+                style={[styles.unsavedDiscard, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowUnsaved(false);
+                  setShowEditModal(false);
+                }}
+              >
+                <Text style={styles.unsavedDiscardText}>Discard Changes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.unsavedSave}
+                onPress={() => {
+                  setShowUnsaved(false);
+                  saveProfile();
+                }}
+              >
+                <Text style={styles.warningBtnText}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <ConfirmModal
         visible={showLogoutConfirm}
@@ -1838,6 +1945,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   warningBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  unsavedClose: { position: "absolute", top: 14, right: 14, zIndex: 1 },
+  unsavedIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#FFF3E0",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  unsavedBtnRow: { flexDirection: "row", gap: 10, width: "100%" },
+  unsavedDiscard: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  unsavedDiscardText: { color: "#F44336", fontWeight: "bold", fontSize: 14 },
+  unsavedSave: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: "#4CAF50",
+    alignItems: "center",
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

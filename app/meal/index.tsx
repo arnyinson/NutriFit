@@ -635,13 +635,17 @@ export default function MealScreen() {
     }
   };
 
-  // ============ EDIT MEAL (per-row pencil: replace or log outside) ============
-  const openEditMeal = (dayIndex: number, entry: MealEntry) => {
+  // ============ EDIT MEAL (pencil = replace, notebook = log outside) ============
+  const openEditMeal = (
+    dayIndex: number,
+    entry: MealEntry,
+    tab: "replace" | "log" = "replace",
+  ) => {
     setEditPlanDayIndex(dayIndex);
     setEditingEntry(entry);
     setEditMealSearch("");
     setEditMealResults([]);
-    setEditTab("replace");
+    setEditTab(tab);
     setManualFoodName("");
     setManualKcal("");
     setManualWeight("");
@@ -1110,19 +1114,37 @@ export default function MealScreen() {
                         </View>
                       )}
 
-                      <TouchableOpacity
-                        style={styles.pencilBtn}
-                        onPress={() =>
-                          !isFuture && openEditMeal(dayIndex, entry)
-                        }
-                        disabled={isFuture}
-                        hitSlop={HIT_SLOP}
-                      >
-                        <Pencil
-                          size={16}
-                          color={isFuture ? colors.border : colors.textMuted}
-                        />
-                      </TouchableOpacity>
+                      <View style={styles.iconBtnRow}>
+                        {/* Notebook = Log Outside food */}
+                        <TouchableOpacity
+                          style={styles.pencilBtn}
+                          onPress={() =>
+                            !isFuture && openEditMeal(dayIndex, entry, "log")
+                          }
+                          disabled={isFuture}
+                          hitSlop={HIT_SLOP}
+                        >
+                          <NotebookPen
+                            size={16}
+                            color={isFuture ? colors.border : colors.textMuted}
+                          />
+                        </TouchableOpacity>
+                        {/* Pencil = Replace this meal */}
+                        <TouchableOpacity
+                          style={styles.pencilBtn}
+                          onPress={() =>
+                            !isFuture &&
+                            openEditMeal(dayIndex, entry, "replace")
+                          }
+                          disabled={isFuture}
+                          hitSlop={HIT_SLOP}
+                        >
+                          <Pencil
+                            size={16}
+                            color={isFuture ? colors.border : colors.textMuted}
+                          />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -1776,7 +1798,7 @@ export default function MealScreen() {
         </View>
       </Modal>
 
-      {/* EDIT MEAL MODAL (Replace / Log Outside) */}
+      {/* EDIT MEAL MODAL (opened by the pencil = Replace, or the notebook = Log Outside) */}
       <Modal visible={showEditMealModal} animationType="slide" transparent>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -1788,7 +1810,7 @@ export default function MealScreen() {
             >
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  Edit Meal
+                  {editTab === "replace" ? "Replace Meal" : "Log Outside Food"}
                 </Text>
                 <TouchableOpacity
                   onPress={() => setShowEditMealModal(false)}
@@ -1796,43 +1818,6 @@ export default function MealScreen() {
                 >
                   <X size={20} color={colors.textMuted} />
                 </TouchableOpacity>
-              </View>
-
-              <View
-                style={[styles.editTabRow, { backgroundColor: colors.input }]}
-              >
-                {(
-                  [
-                    { key: "replace", label: "Replace", Icon: Repeat },
-                    { key: "log", label: "Log Outside", Icon: NotebookPen },
-                  ] as const
-                ).map((tab) => {
-                  const isActive = editTab === tab.key;
-                  return (
-                    <TouchableOpacity
-                      key={tab.key}
-                      style={[
-                        styles.editTabBtn,
-                        isActive && styles.editTabActive,
-                      ]}
-                      onPress={() => setEditTab(tab.key)}
-                    >
-                      <tab.Icon
-                        size={14}
-                        color={isActive ? "#fff" : colors.textMuted}
-                      />
-                      <Text
-                        style={[
-                          styles.editTabText,
-                          { color: colors.textMuted },
-                          isActive && styles.editTabTextActive,
-                        ]}
-                      >
-                        {tab.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
               </View>
 
               {editTab === "replace" && (
@@ -2253,6 +2238,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   pencilBtn: { padding: 4 },
+  iconBtnRow: { flexDirection: "row", gap: 10, alignItems: "center" },
   totalRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2396,25 +2382,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   searchInput: { flex: 1, paddingVertical: 10, fontSize: 14 },
-  editTabRow: {
-    flexDirection: "row",
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
-    gap: 4,
-  },
-  editTabBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  editTabActive: { backgroundColor: "#4CAF50" },
-  editTabText: { fontSize: 11, fontWeight: "600" },
-  editTabTextActive: { color: "#fff" },
   editSectionLabel: {
     fontSize: 13,
     fontWeight: "600",

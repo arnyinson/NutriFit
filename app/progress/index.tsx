@@ -1,9 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import {
+  AlertTriangle,
   Check,
   ChevronLeft,
   Dumbbell,
+  Info,
   RefreshCw,
   Scale,
   Target,
@@ -474,29 +476,52 @@ export default function ProgressScreen() {
         ? "Insights This Month"
         : "Insights This Week";
 
-  const recommendations: string[] = [];
+  // good = green check, warn = orange warning (needs attention), info = neutral.
+  // Being over OR under the calorie target is not a "check", so the user does
+  // not think everything is fine.
+  const recommendations: { text: string; kind: "good" | "warn" | "info" }[] =
+    [];
   if (
     summary.calorieAdherence.percentage >= 90 &&
     summary.calorieAdherence.percentage <= 110
   ) {
-    recommendations.push("Calorie intake is well aligned with your target");
+    recommendations.push({
+      text: "Calorie intake is well aligned with your target",
+      kind: "good",
+    });
   } else if (summary.calorieAdherence.percentage > 110) {
-    recommendations.push("You are consistently over your calorie target");
+    recommendations.push({
+      text: "You are consistently over your calorie target",
+      kind: "warn",
+    });
   } else if (summary.calorieAdherence.percentage > 0) {
-    recommendations.push("You are consistently under your calorie target");
+    recommendations.push({
+      text: "You are consistently under your calorie target",
+      kind: "warn",
+    });
   }
   if (summary.workoutCompletion >= 80) {
-    recommendations.push("Great workout consistency this period");
+    recommendations.push({
+      text: "Great workout consistency this period",
+      kind: "good",
+    });
   } else if (summary.workoutCompletion > 0) {
-    recommendations.push("Try to complete more of your scheduled workouts");
+    recommendations.push({
+      text: "Try to complete more of your scheduled workouts",
+      kind: "warn",
+    });
   }
   if (summary.mealConsistency >= 80) {
-    recommendations.push("Meal logging consistency is strong");
+    recommendations.push({
+      text: "Meal logging consistency is strong",
+      kind: "good",
+    });
   }
   if (recommendations.length === 0) {
-    recommendations.push(
-      "Log your meals and workouts daily to see personalized insights here",
-    );
+    recommendations.push({
+      text: "Log your meals and workouts daily to see personalized insights here",
+      kind: "info",
+    });
   }
 
   const weightChangeDisplay = getWeightChangeDisplay(
@@ -971,14 +996,24 @@ export default function ProgressScreen() {
               </View>
               {recommendations.map((rec, i) => (
                 <View key={i} style={styles.recommendRow}>
-                  <Check size={14} color="#4CAF50" strokeWidth={3} />
+                  {rec.kind === "good" ? (
+                    <Check size={14} color="#4CAF50" strokeWidth={3} />
+                  ) : rec.kind === "warn" ? (
+                    <AlertTriangle
+                      size={14}
+                      color="#FF9800"
+                      strokeWidth={2.5}
+                    />
+                  ) : (
+                    <Info size={14} color={colors.textMuted} />
+                  )}
                   <Text
                     style={[
                       styles.recommendText,
                       { color: colors.textSecondary },
                     ]}
                   >
-                    {rec}
+                    {rec.text}
                   </Text>
                 </View>
               ))}
