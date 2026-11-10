@@ -118,11 +118,15 @@ export default function VerifyOtpScreen() {
                 {
                   color: colors.text,
                   textAlign: "center",
-                  letterSpacing: otp.length > 0 ? 8 : 0,
+                  // Constant spacing: changing it while typing made the caret jump to the right on Android
+                  letterSpacing: 8,
+                  // Balances the extra space after the last digit so the text looks centered
+                  paddingLeft: 8,
                   fontSize: 20,
                 },
               ]}
-              placeholder="- - - - - -"
+              selectionColor={colors.primary}
+              placeholder="------"
               placeholderTextColor={colors.textMuted}
               value={otp}
               onChangeText={(v) => setOtp(v.replace(/[^0-9]/g, "").slice(0, 6))}
@@ -191,7 +195,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 16,
   },
-  input: { flex: 1, paddingVertical: 12, fontSize: 15 },
+  input: { flex: 1, paddingVertical: 12, fontSize: 15, textAlign: "center" },
   button: {
     width: "100%",
     backgroundColor: "#4CAF50",
